@@ -1,0 +1,27 @@
+{
+  "name": "mdoc-protocol",
+  "version": "0.1.0",
+  "description": "ISO/IEC 18013-5:2021 mDoc Protocol - QR, Device Engagement, Credential Transfer",
+  "type": "module",
+  "main": "src/index.js",
+  "scripts": {
+    "generate-qr": "node src/cli/generate-qr.js",
+    "test": "node --test tests/protocol.test.js",
+    "lint": "eslint src/ tests/",
+    "format": "prettier --write 'src/**/*.js' 'tests/**/*.js'"
+  },
+  "dependencies": {
+    "cbor": "^9.0.0",
+    "qrcode": "^1.5.3",
+    "jose": "^5.0.0",
+    "nanoid": "^4.0.2",
+    "dotenv": "^16.3.1"
+  },
+  "devDependencies": {
+    "eslint": "^8.45.0",
+    "prettier": "^3.0.0"
+  },
+  "engines": {
+    "node": ">=18.17.0"
+  }
+}
