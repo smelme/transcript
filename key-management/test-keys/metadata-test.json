@@ -1,0 +1,20 @@
+{
+  "keyId": "YZpSAiGLZLtrE6wB",
+  "keyName": "metadata-test",
+  "publicKey": "-----BEGIN PUBLIC KEY-----\nMCowBQYDK2VwAyEAnQv75+O9VCMr2dKq3e5E1v9VZ4YdJoepoLuj9h05koI=\n-----END PUBLIC KEY-----\n",
+  "publicKeyJWK": {
+    "kty": "OKP",
+    "crv": "Ed25519",
+    "use": "sig",
+    "alg": "EdDSA"
+  },
+  "metadata": {
+    "keyId": "YZpSAiGLZLtrE6wB",
+    "keyName": "metadata-test",
+    "algorithm": "EdDSA",
+    "createdAt": "2026-08-27T11:38:13.495Z",
+    "status": "active",
+    "version": 1
+  },
+  "privateKeyHash": "8e762a7d92990b88e065aafe41acbc67ffb4ddb0b89fe6055d92de14409ce9e7"
+}

@@ -1,0 +1,20 @@
+{
+  "keyId": "0C2Tx7YXE36KRoQr",
+  "keyName": "issuer-key",
+  "publicKey": "-----BEGIN PUBLIC KEY-----\nMCowBQYDK2VwAyEALYkt6s2DHTzSLMYGKb+XGUJC3m7aY9AWEqbfyh3D8JI=\n-----END PUBLIC KEY-----\n",
+  "publicKeyJWK": {
+    "kty": "OKP",
+    "crv": "Ed25519",
+    "use": "sig",
+    "alg": "EdDSA"
+  },
+  "metadata": {
+    "keyId": "0C2Tx7YXE36KRoQr",
+    "keyName": "issuer-key",
+    "algorithm": "EdDSA",
+    "createdAt": "2026-08-27T11:38:18.738Z",
+    "status": "active",
+    "version": 1
+  },
+  "privateKeyHash": "a108bb3fad282f32ff091468dae18fbe7d738d7e389f7bd34ddc5f0c3de668c4"
+}

@@ -1,0 +1,25 @@
+{
+  "name": "key-management",
+  "version": "0.1.0",
+  "description": "ED25519 Key Management for mDoc Credential Signing",
+  "type": "module",
+  "main": "src/index.js",
+  "scripts": {
+    "start": "node src/index.js",
+    "generate-keys": "node src/cli/generate-keys.js",
+    "list-keys": "node src/cli/list-keys.js",
+    "test": "node --test tests/key-management.test.js",
+    "lint": "eslint src/ tests/",
+    "format": "prettier --write 'src/**/*.js' 'tests/**/*.js'"
+  },
+  "dependencies": {
+    "jose": "^5.0.0",
+    "tweetnacl": "^1.0.3",
+    "nanoid": "^4.0.2",
+    "dotenv": "^16.3.1"
+  },
+  "devDependencies": {
+    "eslint": "^8.45.0",
+    "prettier": "^3.0.0"
+  }
+}

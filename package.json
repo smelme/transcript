@@ -5,10 +5,12 @@
   "type": "module",
   "private": true,
   "workspaces": [
+    "key-management",
     "issuer-service",
     "issuer-frontend",
     "verifier-service",
-    "verifier-frontend"
+    "verifier-frontend",
+    "mobile-wallet"
   ],
   "scripts": {
     "install-all": "npm install",
