@@ -6,6 +6,7 @@
   "private": true,
   "workspaces": [
     "key-management",
+    "schema",
     "issuer-service",
     "issuer-frontend",
     "verifier-service",

@@ -1,0 +1,24 @@
+{
+  "name": "mdoc-schema",
+  "version": "0.1.0",
+  "description": "mDoc Credential Schema - Academic Transcripts (ISO/IEC 18013-5)",
+  "type": "module",
+  "main": "src/index.js",
+  "scripts": {
+    "validate": "node src/cli/validate-credential.js",
+    "test": "node --test tests/schema.test.js",
+    "lint": "eslint src/ tests/",
+    "format": "prettier --write 'src/**/*.js' 'tests/**/*.js'"
+  },
+  "dependencies": {
+    "ajv": "^8.0.0",
+    "ajv-formats": "^2.1.0"
+  },
+  "devDependencies": {
+    "eslint": "^8.45.0",
+    "prettier": "^3.0.0"
+  },
+  "engines": {
+    "node": ">=18.17.0"
+  }
+}
