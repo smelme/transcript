@@ -1,0 +1,35 @@
+{
+  "name": "transcript-system",
+  "version": "0.1.0",
+  "description": "ISO mDoc Academic Transcript & Qualification System",
+  "type": "module",
+  "private": true,
+  "workspaces": [
+    "issuer-service",
+    "issuer-frontend",
+    "verifier-service",
+    "verifier-frontend"
+  ],
+  "scripts": {
+    "install-all": "npm install",
+    "dev": "npm run dev --workspaces",
+    "build": "npm run build --workspaces",
+    "test": "npm run test --workspaces",
+    "lint": "npm run lint --workspaces",
+    "format": "npm run format --workspaces"
+  },
+  "engines": {
+    "node": ">=18.17.0",
+    "npm": ">=9.0.0"
+  },
+  "keywords": [
+    "mdoc",
+    "credentials",
+    "academic",
+    "transcript",
+    "digital-id",
+    "iso18013-5"
+  ],
+  "author": "",
+  "license": "ISC"
+}

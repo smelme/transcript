@@ -1,0 +1,69 @@
+# Dependencies
+node_modules/
+package-lock.json
+yarn.lock
+pnpm-lock.yaml
+
+# Environment
+.env
+.env.local
+.env.*.local
+.env.*.production
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+*.sublime-project
+*.sublime-workspace
+
+# Logs
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Build outputs
+dist/
+build/
+out/
+.next/
+.nuxt/
+coverage/
+.nyc_output/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Temporary
+tmp/
+temp/
+*.tmp
+.cache/
+
+# Mobile
+.gradle/
+.android/
+*.keystore
+build-cache/
+
+# Database
+*.sqlite
+*.sqlite3
+*.db
+
+# Testing
+.jest/
+playwright-report/
+test-results/
+
+# Keys & Secrets (NEVER commit)
+*.pem
+*.key
+secrets/
+.keys/
