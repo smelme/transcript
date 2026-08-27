@@ -8,6 +8,7 @@
     "key-management",
     "schema",
     "protocol",
+    "generator",
     "issuer-service",
     "issuer-frontend",
     "verifier-service",
