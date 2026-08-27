@@ -1,0 +1,30 @@
+{
+  "name": "credential-storage",
+  "version": "0.1.0",
+  "description": "Credential Storage Layer - Metadata and audit tracking (no credential data)",
+  "type": "module",
+  "main": "src/index.js",
+  "scripts": {
+    "test": "node --test tests/storage.test.js",
+    "migrate": "node src/cli/migrate.js"
+  },
+  "keywords": [
+    "credential",
+    "storage",
+    "metadata",
+    "audit",
+    "revocation",
+    "tracking"
+  ],
+  "dependencies": {
+    "pg": "^8.10.0",
+    "nanoid": "^4.0.2",
+    "dotenv": "^16.3.1"
+  },
+  "devDependencies": {
+    "node": "^18.17.0"
+  },
+  "engines": {
+    "node": ">=18.17.0"
+  }
+}

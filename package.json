@@ -9,6 +9,7 @@
     "schema",
     "protocol",
     "generator",
+    "storage",
     "issuer-service",
     "issuer-frontend",
     "verifier-service",
