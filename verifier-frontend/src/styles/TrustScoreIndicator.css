@@ -1,0 +1,41 @@
+.trust-score {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  width: 100px;
+  height: 100px;
+  border-radius: 50%;
+  font-weight: bold;
+  color: white;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+  transition: transform 0.3s ease;
+}
+
+.trust-score:hover {
+  transform: scale(1.05);
+}
+
+.trust-score.score-high {
+  background: linear-gradient(135deg, #28a745 0%, #20c997 100%);
+}
+
+.trust-score.score-medium {
+  background: linear-gradient(135deg, #ffc107 0%, #ff9800 100%);
+}
+
+.trust-score.score-low {
+  background: linear-gradient(135deg, #dc3545 0%, #f14668 100%);
+}
+
+.score-value {
+  font-size: 2rem;
+  line-height: 1;
+}
+
+.score-label {
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-top: 0.25rem;
+}
