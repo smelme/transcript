@@ -1,0 +1,30 @@
+{
+  "name": "verifier-registry",
+  "version": "0.1.0",
+  "description": "Verifier Registry - Trusted verifier management and public key distribution",
+  "type": "module",
+  "main": "src/index.js",
+  "scripts": {
+    "test": "node --test tests/registry.test.js"
+  },
+  "keywords": [
+    "verifier",
+    "registry",
+    "trust",
+    "public-key",
+    "verification"
+  ],
+  "dependencies": {
+    "ajv": "^8.0.0",
+    "ajv-formats": "^2.1.0",
+    "nanoid": "^4.0.2",
+    "dotenv": "^16.3.1",
+    "pg": "^8.10.0"
+  },
+  "devDependencies": {
+    "node": "^18.17.0"
+  },
+  "engines": {
+    "node": ">=18.17.0"
+  }
+}
