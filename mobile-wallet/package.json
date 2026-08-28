@@ -1,0 +1,23 @@
+{
+  "name": "mobile-wallet",
+  "version": "0.1.0",
+  "description": "Mobile Wallet - Digital credential wallet for iOS and Android",
+  "type": "module",
+  "main": "src/index.js",
+  "scripts": {
+    "test": "node --test tests/wallet.test.js"
+  },
+  "keywords": [
+    "mobile",
+    "wallet",
+    "credentials",
+    "mdoc",
+    "digital-identity"
+  ],
+  "dependencies": {
+    "uuid": "^9.0.0"
+  },
+  "engines": {
+    "node": ">=18.17.0"
+  }
+}
