@@ -1,0 +1,16 @@
+{
+  "name": "devops-deployment",
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "test": "node --test tests/devops.test.js",
+    "build": "echo 'Building Docker images...'",
+    "deploy": "echo 'Deploying to production...'",
+    "health-check": "node scripts/health-check.js"
+  },
+  "dependencies": {
+    "axios": "^1.6.0",
+    "dotenv": "^16.0.3"
+  },
+  "devDependencies": {}
+}
