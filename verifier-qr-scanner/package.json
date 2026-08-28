@@ -1,0 +1,23 @@
+{
+  "name": "verifier-qr-scanner",
+  "version": "0.1.0",
+  "description": "Verifier QR Scanner - Scan and process credential presentations",
+  "type": "module",
+  "main": "src/index.js",
+  "scripts": {
+    "test": "node --test tests/scanner.test.js"
+  },
+  "keywords": [
+    "verifier",
+    "qr",
+    "presentation",
+    "verification",
+    "mdoc"
+  ],
+  "dependencies": {
+    "jsqr": "^1.4.0"
+  },
+  "engines": {
+    "node": ">=18.17.0"
+  }
+}
