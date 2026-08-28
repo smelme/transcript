@@ -1,0 +1,121 @@
+.result-page {
+  max-width: 600px;
+  margin: 0 auto;
+}
+
+.result-card {
+  background-color: white;
+  border-radius: 8px;
+  padding: 2rem;
+  margin: 2rem 0;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.12);
+  border: 2px solid var(--border);
+  text-align: center;
+}
+
+.result-card.verified {
+  border-color: var(--success);
+  background-color: #f0fdf4;
+}
+
+.result-card.rejected {
+  border-color: var(--danger);
+  background-color: #fef2f2;
+}
+
+.result-card.pending {
+  border-color: var(--warning);
+  background-color: #fffbf0;
+}
+
+.result-icon {
+  font-size: 3rem;
+  margin-bottom: 1rem;
+}
+
+.result-status {
+  font-size: 2rem;
+  margin-bottom: 1.5rem;
+  font-weight: bold;
+}
+
+.result-details {
+  text-align: left;
+  margin: 2rem 0;
+  padding: 1.5rem;
+  background-color: var(--light);
+  border-radius: 6px;
+}
+
+.detail-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: start;
+  margin-bottom: 1rem;
+  padding-bottom: 1rem;
+  border-bottom: 1px solid var(--border);
+}
+
+.detail-item:last-child {
+  border-bottom: none;
+  margin-bottom: 0;
+  padding-bottom: 0;
+}
+
+.detail-item label {
+  font-weight: bold;
+  margin: 0;
+  color: var(--muted);
+}
+
+.detail-item value {
+  text-align: right;
+  max-width: 60%;
+  word-break: break-word;
+  color: var(--dark);
+}
+
+.detail-item .status-verified {
+  color: var(--success);
+  font-weight: bold;
+}
+
+.detail-item .status-rejected {
+  color: var(--danger);
+  font-weight: bold;
+}
+
+.detail-item .status-pending {
+  color: var(--warning);
+  font-weight: bold;
+}
+
+.trust-section {
+  flex-direction: column;
+  align-items: center;
+}
+
+.reason-box {
+  padding: 1rem;
+  margin: 1.5rem 0 0 0;
+  border-radius: 6px;
+  font-size: 0.95rem;
+}
+
+.reason-box.verified {
+  background-color: #d4edda;
+  color: #155724;
+  border: 1px solid #c3e6cb;
+}
+
+.reason-box.rejected {
+  background-color: #f8d7da;
+  color: #721c24;
+  border: 1px solid #f5c6cb;
+}
+
+.reason-box.pending {
+  background-color: #fff3cd;
+  color: #856404;
+  border: 1px solid #ffeeba;
+}

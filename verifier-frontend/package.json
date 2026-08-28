@@ -8,20 +8,23 @@
     "dev": "vite",
     "build": "vite build",
     "preview": "vite preview",
-    "test": "vitest",
+    "test": "node --test tests/components.test.js",
     "lint": "eslint src/",
     "format": "prettier --write 'src/**/*.{js,jsx,ts,tsx}'"
   },
   "dependencies": {
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
-    "react-router-dom": "^6.14.0"
+    "react-router-dom": "^6.14.0",
+    "axios": "^1.6.0",
+    "qrcode.react": "^1.0.1",
+    "html5-qrcode": "^2.3.4",
+    "date-fns": "^2.30.0"
   },
   "devDependencies": {
     "@vitejs/plugin-react": "^4.0.0",
     "vite": "^4.4.0",
     "eslint": "^8.45.0",
-    "prettier": "^3.0.0",
-    "vitest": "^0.34.0"
+    "prettier": "^3.0.0"
   }
 }
