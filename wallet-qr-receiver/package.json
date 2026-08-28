@@ -1,0 +1,23 @@
+{
+  "name": "wallet-qr-receiver",
+  "version": "0.1.0",
+  "description": "Wallet QR Code Reception - Receive and manage credentials via QR",
+  "type": "module",
+  "main": "src/index.js",
+  "scripts": {
+    "test": "node --test tests/wallet.test.js"
+  },
+  "keywords": [
+    "wallet",
+    "qr",
+    "credentials",
+    "mdoc"
+  ],
+  "dependencies": {
+    "jsqr": "^1.4.0",
+    "jszip": "^3.10.1"
+  },
+  "engines": {
+    "node": ">=18.17.0"
+  }
+}
