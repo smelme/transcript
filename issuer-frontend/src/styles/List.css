@@ -1,0 +1,130 @@
+/* List Styles */
+.list-container {
+  max-width: 1200px;
+}
+
+.list-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 2rem;
+}
+
+.list-header h1 {
+  color: #2c3e50;
+  margin: 0;
+}
+
+.filter-section {
+  margin-bottom: 1.5rem;
+  padding: 1rem;
+  background: #f8f9fa;
+  border-radius: 4px;
+}
+
+.filter-section label {
+  margin-right: 0.5rem;
+  font-weight: 500;
+}
+
+.filter-section select {
+  padding: 0.5rem;
+  border: 1px solid #bdc3c7;
+  border-radius: 4px;
+}
+
+.table-container {
+  background: white;
+  border-radius: 8px;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+  overflow: auto;
+}
+
+.list-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.list-table thead {
+  background-color: #f8f9fa;
+  border-bottom: 2px solid #dee2e6;
+}
+
+.list-table th {
+  padding: 1rem;
+  text-align: left;
+  font-weight: 600;
+  color: #2c3e50;
+}
+
+.list-table td {
+  padding: 1rem;
+  border-bottom: 1px solid #dee2e6;
+}
+
+.list-table a {
+  color: #007bff;
+  text-decoration: none;
+}
+
+.list-table a:hover {
+  text-decoration: underline;
+}
+
+.status {
+  display: inline-block;
+  padding: 0.25rem 0.75rem;
+  border-radius: 20px;
+  font-size: 0.85rem;
+  font-weight: 500;
+}
+
+.status-pending {
+  background-color: #fff3cd;
+  color: #856404;
+}
+
+.status-issued {
+  background-color: #d4edda;
+  color: #155724;
+}
+
+.status-revoked {
+  background-color: #f8d7da;
+  color: #721c24;
+}
+
+.status-expired {
+  background-color: #e7e7e7;
+  color: #585858;
+}
+
+.status-approved {
+  background-color: #d4edda;
+  color: #155724;
+}
+
+.status-suspended {
+  background-color: #fff3cd;
+  color: #856404;
+}
+
+.trust-score {
+  font-weight: 600;
+  color: #ffc107;
+}
+
+.pagination {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 1rem;
+  margin-top: 2rem;
+  padding: 1rem;
+}
+
+.empty-state {
+  text-align: center;
+  padding: 3rem;
+  color: #7f8c8d;
+}

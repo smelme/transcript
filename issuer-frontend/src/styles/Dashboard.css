@@ -1,0 +1,32 @@
+/* Dashboard Styles */
+.dashboard {
+  max-width: 1200px;
+}
+
+.dashboard h1 {
+  color: #2c3e50;
+  margin-bottom: 2rem;
+}
+
+.stats-section {
+  margin-bottom: 2rem;
+}
+
+.stats-section h2 {
+  color: #34495e;
+  font-size: 1.1rem;
+  margin-bottom: 1rem;
+}
+
+.stats-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 1rem;
+}
+
+.activity-section {
+  background: white;
+  padding: 1.5rem;
+  border-radius: 8px;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+}
