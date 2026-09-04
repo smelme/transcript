@@ -1,0 +1,20 @@
+{
+  "keyId": "UX8GVWZgwzQyYFFH",
+  "keyName": "mdoc-signer",
+  "publicKey": "-----BEGIN PUBLIC KEY-----\nMFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAE/C0TcAHbPrdQJ64stzDUtQXbB/ZD\nzqSRQTCkzJi7djsNGZdO3Hmk59mD16RWuAHbSwYyfIv5r4YIQriNgLxMnw==\n-----END PUBLIC KEY-----\n",
+  "publicKeyJWK": {
+    "kty": "EC",
+    "x": "_C0TcAHbPrdQJ64stzDUtQXbB_ZDzqSRQTCkzJi7djs",
+    "y": "DRmXTtx5pOfZg9ekVrgB20sGMnyL-a-GCEK4jYC8TJ8",
+    "crv": "P-256"
+  },
+  "metadata": {
+    "keyId": "UX8GVWZgwzQyYFFH",
+    "keyName": "mdoc-signer",
+    "algorithm": "ES256",
+    "createdAt": "2026-08-29T02:46:38.138Z",
+    "status": "active",
+    "version": 1
+  },
+  "privateKeyHash": "8f297ca64a61f85b330924993bcaa6534f8d019f59cc075152c7f964f6e57418"
+}

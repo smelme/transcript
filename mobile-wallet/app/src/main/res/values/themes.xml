@@ -1,0 +1,3 @@
+<resources>
+    <style name="Theme.TranscriptWallet" parent="android:Theme.Material.Light.NoActionBar" />
+</resources>

@@ -31,12 +31,41 @@ Environment variables: See `.env.example`
 - `POST /api/policies` - Create verification policy
 - `GET /api/audit-logs` - Get verification logs
 
+## org-iso-mdoc presentation (W3C Digital Credentials API)
+
+The reusable verifier exposes a one-time, replay-protected presentation flow backed
+by the same library the Smart College verifier uses (`id-verifier`):
+
+- `POST /presentation/sessions` — creates a short-lived session and an
+  `org-iso-mdoc` request (`deviceRequest` + `encryptionInfo`) for
+  `navigator.credentials.get()`.
+- `POST /presentation/sessions/:id/response` — decrypts and verifies the wallet's
+  encrypted Annex C `DeviceResponse` (HPKE + device signature + issuer signature
+  + claim digests), consumes the session, and returns only server-verified claims:
+  `name`, `institution`, `degreeLevel`, `graduationDate`.
+
+### Issuer trust
+
+- By default, trust follows `id-verifier`'s `trusted-issuer-registry` (same as the
+  Smart College verifier).
+- For fail-closed pinned trust, set `TRUSTED_ACADEMIC_ISSUER_SHA256` to a
+  comma-separated list of hex SHA-256 fingerprints of the DER-encoded issuer
+  certificates allowed to sign academic credentials:
+
+  ```bash
+  # openssl x509 -in issuer.pem -outform DER | sha256sum
+  TRUSTED_ACADEMIC_ISSUER_SHA256=abc123...,def456...
+  ```
+
+  When set, any presented credential whose IssuerAuth leaf certificate does not
+  match a pin is rejected.
+
 ## Tech Stack
 
 - Express.js
 - PostgreSQL
-- ED25519 (jose/tweetnacl)
-- CBOR decoding
+- `id-verifier` (HPKE, device auth, issuer auth, claim digest verification)
+- `cbor2`
 
 ## Development
 

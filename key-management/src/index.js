@@ -1,9 +1,10 @@
 /**
- * Key Management Service for ED25519 Credential Signing
- * Handles key generation, storage, retrieval, and rotation
+ * Key Management Service for mDoc Credential Signing
+ * Supports EdDSA (Ed25519) and ES256 (ECDSA P-256) key types.
+ * Handles key generation, storage, retrieval, and rotation.
  */
 
-import { generateKeyPair, exportSPKI, exportPKCS8 } from 'jose';
+import { generateKeyPair, exportSPKI, exportPKCS8, exportJWK } from 'jose';
 import { createHash } from 'crypto';
 import { promises as fs } from 'fs';
 import path from 'path';
@@ -45,12 +46,7 @@ export class KeyManagementService {
         keyName,
         publicKey: publicKeyPem,
         privateKey: privateKeyPem,
-        publicKeyJWK: {
-          kty: 'OKP',
-          crv: 'Ed25519',
-          use: 'sig',
-          alg: 'EdDSA'
-        },
+        publicKeyJWK: await exportJWK(publicKey),
         metadata: keyMetadata
       };
     } catch (error) {
@@ -78,12 +74,7 @@ export class KeyManagementService {
    * Export Public Key to JWK Format
    */
   async exportPublicKeyJWK(publicKey) {
-    return {
-      kty: 'OKP',
-      crv: 'Ed25519',
-      use: 'sig',
-      alg: 'EdDSA'
-    };
+    return exportJWK(publicKey);
   }
 
   /**

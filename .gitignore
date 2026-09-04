@@ -51,6 +51,7 @@ temp/
 .android/
 *.keystore
 build-cache/
+local.properties
 
 # Database
 *.sqlite

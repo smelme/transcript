@@ -1,0 +1,20 @@
+{
+  "keyId": "mtpi_s1MsgHFn-7N",
+  "keyName": "wallet-token-signer",
+  "publicKey": "-----BEGIN PUBLIC KEY-----\nMFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEnT8mbSPUzS6VBq2FrJm0a8biGyJq\nCtVIVazN4+vr1upzwq/5VaJKpJXnZNoPFp3kzCvcoD3mOEAExkUBwgUVew==\n-----END PUBLIC KEY-----\n",
+  "publicKeyJWK": {
+    "kty": "EC",
+    "x": "nT8mbSPUzS6VBq2FrJm0a8biGyJqCtVIVazN4-vr1uo",
+    "y": "c8Kv-VWiSqSV52TaDxad5Mwr3KA95jhABMZFAcIFFXs",
+    "crv": "P-256"
+  },
+  "metadata": {
+    "keyId": "mtpi_s1MsgHFn-7N",
+    "keyName": "wallet-token-signer",
+    "algorithm": "ES256",
+    "createdAt": "2026-08-29T23:05:50.811Z",
+    "status": "active",
+    "version": 1
+  },
+  "privateKeyHash": "48e7eedcdff6ebd4dc710fbd2f7db0da492d43df84db2f4ee60eeb5daea5f05d"
+}

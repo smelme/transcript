@@ -1,20 +1,25 @@
 # Key Management Service
 
-ED25519 Key Management for mDoc Credential Signing and Verification
+Key Management for mDoc Credential Signing (EdDSA + ES256)
 
 ## Overview
 
-Handles secure generation, storage, rotation, and distribution of ED25519 cryptographic keys used for signing academic credentials. Provides both file-based storage (development) and HSM-ready integration (production).
+Handles secure generation, storage, rotation, and distribution of cryptographic keys used for signing academic credentials. Provides both file-based storage (development) and HSM-ready integration (production).
+
+Supported key types:
+- **EdDSA (Ed25519)** — general-purpose credential signing
+- **ES256 (ECDSA P-256)** — ISO 18013-5 mdoc `issuerAuth` signing
 
 ## Features
 
-- ✓ ED25519 key pair generation (cryptographically secure)
+- ✓ EdDSA and ES256 key pair generation (cryptographically secure)
 - ✓ PEM and JWK export formats
 - ✓ Secure key storage (environment variables in production, file-based in development)
 - ✓ Public key registry for distribution to verifiers
 - ✓ Key versioning and rotation support
 - ✓ Key metadata tracking
 - ✓ CLI tools for key management
+- ✓ mdoc document-signer generation (ES256 key + self-signed X.509 certificate)
 
 ## Installation
 
@@ -43,6 +48,22 @@ With custom key name:
 ```bash
 node src/cli/generate-keys.js my-issuer-key
 ```
+
+### Generate mdoc Document Signer (ES256 + X.509)
+
+Generates the ES256 (P-256) key and self-signed certificate used by the
+issuer-service to sign ISO 18013-5 mdoc credentials. Requires `openssl` on
+the PATH.
+
+```bash
+npm run generate-mdoc-signer
+```
+
+Outputs to `keys/`:
+
+- `mdoc-signer.private.pem` — private key (never commit)
+- `mdoc-signer.cert.der` — X.509 certificate (embedded in the mdoc x5chain)
+- `mdoc-signer.json` — public key + metadata registry entry
 
 ### List Keys
 

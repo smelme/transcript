@@ -48,36 +48,36 @@ export default function VerificationResult() {
         <div className="result-details">
           <div className="detail-item">
             <label>Verification ID:</label>
-            <value>{verification.verificationId}</value>
+            <span>{verification.verificationId}</span>
           </div>
 
           <div className="detail-item">
             <label>Credential ID:</label>
-            <value>{verification.credentialId}</value>
+            <span>{verification.credentialId}</span>
           </div>
 
           <div className="detail-item">
             <label>Issuer ID:</label>
-            <value>{verification.issuerId}</value>
+            <span>{verification.issuerId}</span>
           </div>
 
           {verification.studentId && (
             <div className="detail-item">
               <label>Student ID:</label>
-              <value>{verification.studentId}</value>
+              <span>{verification.studentId}</span>
             </div>
           )}
 
           {verification.credentialType && (
             <div className="detail-item">
               <label>Credential Type:</label>
-              <value>{verification.credentialType}</value>
+              <span>{verification.credentialType}</span>
             </div>
           )}
 
           <div className="detail-item">
             <label>Status:</label>
-            <value className={`status-${verification.status}`}>{verification.status}</value>
+            <span className={`status-${verification.status}`}>{verification.status}</span>
           </div>
 
           {verification.trustScore !== undefined && (
@@ -89,7 +89,7 @@ export default function VerificationResult() {
 
           <div className="detail-item">
             <label>Verified At:</label>
-            <value>{new Date(verification.createdAt).toLocaleString()}</value>
+            <span>{new Date(verification.createdAt).toLocaleString()}</span>
           </div>
         </div>
 

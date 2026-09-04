@@ -36,7 +36,7 @@
 │         └────────────────────────┘                              │
 │                                                                   │
 │  Authentication: Keycloak (reuse Smart College setup)           │
-│  Signing: ED25519 keys, x509 certificates                       │
+│  Signing: ES256 (P-256) keys, x509 certificates                       │
 │  Storage: PostgreSQL, encrypted wallet storage                  │
 │  Protocol: QR code scanning (ISO18013-5 mdoc reader)           │
 │                                                                   │
@@ -49,7 +49,7 @@
 - **Verifier**: Node.js/Express (Smart College verification pattern)
 - **Authentication**: Keycloak (existing)
 - **Database**: PostgreSQL (existing)
-- **Signing Library**: libsodium/tweetnacl.js for ED25519
+- **Signing Library**: ES256 (ECDSA P-256) for mdoc issuerAuth via mdoc-core; EdDSA optional
 - **mDoc Standard**: ISO/IEC 18013-5:2021 (mdoc standard)
 - **Optional**: OpenID4VC for additional flexibility
 - **Deployment**: Railway (existing)
@@ -88,13 +88,14 @@
 
 3. **Credential Generation Engine**
    - Parse student data, generate mDoc
-   - Sign credential with issuer's ED25519 key
+   - Sign credential with issuer's ES256 (P-256) key
    - Generate wallet request QR codes (ISO 18013-5)
    - Store issued credential metadata (student ID, issuance date, status)
    - Story: `issuer-generate-mdoc-credentials`
 
 4. **Credential Storage & Tracking**
-   - Database schema: Credentials table (credential_id, student_id, credential_type, data, signature, status)
+   - Database stores metadata only: Credentials table (credential_id, student_id, credential_type, status, expiry, references)
+   - mdoc payloads are ephemeral: held in-memory with a configurable session timeout (default 10 minutes), never persisted
    - Status tracking: issued, revoked, expired
    - Audit log: Who issued when, modifications
    - Story: `issuer-credential-storage`
@@ -247,7 +248,7 @@
     - Story: `protocol-mdoc-request-response`
 
 20. **Key Management**
-    - Generate issuer ED25519 key pair (secure key storage)
+    - Generate issuer ES256 (P-256) key pair (secure key storage)
     - Generate verifier-specific public keys (if multi-verifier)
     - Secure key rotation process
     - Story: `protocol-key-management`

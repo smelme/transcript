@@ -1,27 +1,26 @@
 {
   "name": "issuer-frontend",
   "version": "0.1.0",
-  "description": "Issuer Frontend - Admin portal for credential issuance",
-  "type": "module",
+  "description": "Issuer Frontend - Next.js admin portal for credential issuance",
   "private": true,
+  "engines": {
+    "node": ">=20.9.0"
+  },
   "scripts": {
-    "dev": "vite",
-    "build": "vite build",
-    "preview": "vite preview",
-    "test": "vitest",
-    "lint": "eslint src/",
-    "format": "prettier --write 'src/**/*.{js,jsx,ts,tsx}'"
+    "dev": "next dev -p 3002",
+    "build": "next build",
+    "start": "next start -p 3002",
+    "lint": "next lint"
   },
   "dependencies": {
-    "react": "^18.2.0",
-    "react-dom": "^18.2.0",
-    "react-router-dom": "^6.14.0"
+    "next": "^16.3.3",
+    "react": "^19.2.8",
+    "react-dom": "^19.2.8"
   },
   "devDependencies": {
-    "@vitejs/plugin-react": "^4.0.0",
-    "vite": "^4.4.0",
-    "eslint": "^8.45.0",
-    "prettier": "^3.0.0",
-    "vitest": "^0.34.0"
+    "@types/node": "^20.11.0",
+    "@types/react": "^18.2.0",
+    "@types/react-dom": "^18.2.0",
+    "typescript": "^5.4.0"
   }
 }

@@ -16,9 +16,12 @@ export default function IssuersList() {
   const fetchIssuers = async () => {
     try {
       setLoading(true);
+      console.log('Fetching issuers with filter:', filter);
       const result = await listIssuers(filter !== 'all' ? filter : null);
+      console.log('Issuers received:', result);
       setIssuers(result);
     } catch (err) {
+      console.error('Error fetching issuers:', err);
       setError(err.message);
     } finally {
       setLoading(false);

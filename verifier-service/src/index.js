@@ -5,8 +5,14 @@ import dotenv from 'dotenv';
 import { v4 as uuidv4 } from 'uuid';
 import Ajv from 'ajv';
 import addFormats from 'ajv-formats';
+import { verifyIssuerSigned, parseMdoc } from '../../mdoc-core.js';
+import { PresentationSessionService } from './presentation-session-service.js';
+import path from 'path';
+import { pathToFileURL, fileURLToPath } from 'url';
 
-dotenv.config();
+dotenv.config({
+  path: path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../.env'),
+});
 
 // Verifier Service - Handles credential verification and validation
 class VerifierService {
@@ -264,6 +270,60 @@ class VerifierService {
     };
   }
 
+  // Verify an ISO 18013-5 IssuerSigned mdoc (cryptographic verification)
+  verifyMdoc(mdocBase64url) {
+    const verification = verifyIssuerSigned(mdocBase64url);
+    const verificationId = uuidv4();
+    const now = new Date();
+
+    const status = verification.valid ? 'verified' : 'rejected';
+    const record = {
+      verificationId,
+      method: 'mdoc',
+      docType: verification.docType,
+      issuerCert: verification.issuerCert,
+      signatureValid: verification.signatureValid,
+      digestsValid: verification.digestsValid,
+      status,
+      reason: verification.error || (verification.valid ? null : 'Signature or digest verification failed'),
+      createdAt: now.toISOString()
+    };
+
+    this.verifications.set(verificationId, record);
+
+    this.statistics.totalVerifications++;
+    if (status === 'verified') {
+      this.statistics.verifiedCount++;
+      this.statistics.byStatus['verified'] = (this.statistics.byStatus['verified'] || 0) + 1;
+    } else {
+      this.statistics.rejectedCount++;
+      this.statistics.byStatus['rejected'] = (this.statistics.byStatus['rejected'] || 0) + 1;
+    }
+
+    this.auditLog.push({
+      timestamp: now.toISOString(),
+      action: 'mdoc_verified',
+      verificationId,
+      details: {
+        docType: verification.docType,
+        signatureValid: verification.signatureValid,
+        digestsValid: verification.digestsValid
+      }
+    });
+
+    return {
+      success: verification.valid,
+      verificationId,
+      docType: verification.docType,
+      signatureValid: verification.signatureValid,
+      digestsValid: verification.digestsValid,
+      issuerCert: verification.issuerCert,
+      validityInfo: verification.validityInfo,
+      namespaces: verification.namespaces,
+      error: verification.error || undefined
+    };
+  }
+
   // Reject verification
   rejectVerification(verificationId, reason = 'Manual rejection') {
     const verification = this.verifications.get(verificationId);
@@ -401,12 +461,13 @@ const verifier = new VerifierService({
   verifierId: process.env.VERIFIER_ID || 'verifier-001',
   verifierName: process.env.VERIFIER_NAME || 'Smart College Verifier'
 });
+const presentationSessions = new PresentationSessionService();
 
 // Create Express app
 const app = express();
 app.use(helmet());
 app.use(cors());
-app.use(express.json());
+app.use(express.json({ limit: '10mb' }));
 
 app.use((req, res, next) => {
   console.log(`${req.method} ${req.path}`);
@@ -420,9 +481,45 @@ app.get('/health', (req, res) => {
   res.json({ status: 'ok', verifierId: verifier.verifierId });
 });
 
+// Create a one-time W3C Digital Credentials API request for an academic mdoc.
+app.post('/presentation/sessions', async (req, res) => {
+  try {
+    const result = await presentationSessions.create(req.body || {});
+    res.status(201).json({ success: true, ...result });
+  } catch (error) {
+    res.status(400).json({ success: false, error: error.message });
+  }
+});
+
+// Decrypt and verify one ISO 18013-7 Annex C (org-iso-mdoc) response. The
+// session is consumed before decryption so malformed or failing responses
+// cannot be replayed. Only server-verified academic claims are returned.
+app.post('/presentation/sessions/:id/response', async (req, res) => {
+  try {
+    const { relyingPartyId, origin, credential } = req.body || {};
+    const result = await presentationSessions.verify(req.params.id, { relyingPartyId, origin, credential });
+    res.json({ success: true, verifiedAt: new Date().toISOString(), ...result });
+  } catch (error) {
+    res.status(400).json({ success: false, error: error.message });
+  }
+});
+
+
 // Scan and verify credential
 app.post('/verify/scan', (req, res) => {
   const result = verifier.scanPresentation(req.body);
+  res.status(result.success ? 200 : 400).json(result);
+});
+
+// Verify an ISO 18013-5 IssuerSigned mdoc (base64url)
+app.post('/verify/mdoc', (req, res) => {
+  const body = req.body || {};
+  const input = body.mdocBase64url || body.mdoc || body.credential;
+  if (!input) {
+    res.status(400).json({ success: false, error: 'Missing mdocBase64url in request body' });
+    return;
+  }
+  const result = verifier.verifyMdoc(input);
   res.status(result.success ? 200 : 400).json(result);
 });
 
@@ -515,12 +612,20 @@ app.use((err, req, res, next) => {
 });
 
 // Export for testing
-export { VerifierService, app, verifier };
+export { VerifierService, PresentationSessionService, app, verifier };
 
-// Start server if run directly
+// Start server if run directly (robust entry-point detection)
 const PORT = process.env.PORT || 3001;
-if (import.meta.url === `file://${process.argv[1]}`) {
-  app.listen(PORT, () => {
+const isMain = process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href;
+
+if (isMain) {
+  const server = app.listen(PORT, () => {
     console.log(`Verifier Service listening on port ${PORT}`);
+    console.log(`API available at http://localhost:${PORT}`);
+  });
+  
+  server.on('error', (err) => {
+    console.error('Server error:', err);
+    process.exit(1);
   });
 }

@@ -14,18 +14,21 @@ export default function Dashboard() {
   const fetchStats = async () => {
     try {
       setLoading(true);
+      console.log('Fetching statistics...');
       const result = await getStatistics();
+      console.log('Statistics received:', result);
       setStats(result);
     } catch (err) {
+      console.error('Error fetching statistics:', err);
       setError(err.message);
     } finally {
       setLoading(false);
     }
   };
 
-  if (loading) return <div className="dashboard-page"><p>Loading...</p></div>;
-  if (error) return <div className="dashboard-page alert alert-error">{error}</div>;
-  if (!stats) return <div className="dashboard-page"><p>No data</p></div>;
+  if (loading) return <div className="dashboard-page"><p>Loading dashboard...</p></div>;
+  if (error) return <div className="dashboard-page alert alert-error">Error: {error}</div>;
+  if (!stats) return <div className="dashboard-page alert alert-error">No statistics available</div>;
 
   const verificationRate = stats.totalVerifications > 0 
     ? ((stats.verifiedCount / stats.totalVerifications) * 100).toFixed(1)

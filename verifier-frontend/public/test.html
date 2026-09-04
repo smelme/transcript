@@ -1,0 +1,110 @@
+// Test file to verify frontend is working
+// Navigate to: http://localhost:5173/test.html
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Frontend Status Test</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      max-width: 800px;
+      margin: 50px auto;
+      padding: 20px;
+      background: #f5f5f5;
+    }
+    .status {
+      padding: 15px;
+      margin: 10px 0;
+      border-radius: 5px;
+      border-left: 4px solid #007bff;
+      background: white;
+    }
+    .status.success { border-left-color: #28a745; background: #d4edda; }
+    .status.error { border-left-color: #dc3545; background: #f8d7da; }
+    .status.warning { border-left-color: #ffc107; background: #fff3cd; }
+    h1 { color: #333; }
+    code {
+      background: #f0f0f0;
+      padding: 2px 6px;
+      border-radius: 3px;
+      font-family: monospace;
+    }
+  </style>
+</head>
+<body>
+  <h1>Credential Verifier - Frontend Status</h1>
+  
+  <div class="status success">
+    <strong>✓ Frontend Server</strong><br>
+    Vite dev server is running on port 5173
+  </div>
+
+  <div class="status">
+    <strong>API Endpoints to Test:</strong>
+    <ul>
+      <li>Issuer Service: <code>http://localhost:3000</code></li>
+      <li>Verifier Service: <code>http://localhost:3001</code></li>
+    </ul>
+  </div>
+
+  <div class="status">
+    <strong>Available Routes:</strong>
+    <ul>
+      <li><a href="http://localhost:5173/">Home</a> (redirects to /dashboard)</li>
+      <li><a href="http://localhost:5173/dashboard">/dashboard</a> - Statistics Dashboard</li>
+      <li><a href="http://localhost:5173/scan">/scan</a> - QR Scanner</li>
+      <li><a href="http://localhost:5173/issuers">/issuers</a> - Trusted Issuers</li>
+    </ul>
+  </div>
+
+  <div class="status warning">
+    <strong>Troubleshooting:</strong>
+    <ol>
+      <li>Open DevTools: Press <code>F12</code> or <code>Ctrl+Shift+I</code></li>
+      <li>Go to <strong>Console</strong> tab</li>
+      <li>Look for initialization logs</li>
+      <li>Check for any red errors</li>
+      <li>Check network tab for failed API calls</li>
+    </ol>
+  </div>
+
+  <div class="status">
+    <strong>If pages still show blank:</strong>
+    <ol>
+      <li>Hard refresh: <code>Ctrl+Shift+R</code> (or Cmd+Shift+R on Mac)</li>
+      <li>Clear cache: DevTools → Application → Clear Storage</li>
+      <li>Check browser console for errors</li>
+      <li>Ensure Verifier Service is running on port 3001</li>
+    </ol>
+  </div>
+
+  <script>
+    console.log('Frontend Status Test Page Loaded');
+    console.log('Location:', window.location.href);
+    
+    // Test API connectivity
+    async function testAPIs() {
+      console.log('Testing API connectivity...');
+      
+      try {
+        const issuerResp = await fetch('http://localhost:3000/health', { timeout: 5000 });
+        console.log('Issuer Service:', issuerResp.ok ? '✓ OK' : '✗ Failed');
+      } catch (err) {
+        console.error('Issuer Service Error:', err.message);
+      }
+      
+      try {
+        const verifierResp = await fetch('http://localhost:3001/health', { timeout: 5000 });
+        console.log('Verifier Service:', verifierResp.ok ? '✓ OK' : '✗ Failed');
+      } catch (err) {
+        console.error('Verifier Service Error:', err.message);
+      }
+    }
+    
+    testAPIs();
+  </script>
+</body>
+</html>

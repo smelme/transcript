@@ -7,6 +7,8 @@ export default function Navigation({ verifierId }) {
 
   const isActive = (path) => location.pathname === path;
 
+  console.log('Navigation rendering - current path:', location.pathname);
+
   return (
     <nav className="navbar">
       <div className="navbar-brand">
@@ -17,6 +19,11 @@ export default function Navigation({ verifierId }) {
         <li>
           <Link to="/dashboard" className={isActive('/dashboard') ? 'active' : ''}>
             Dashboard
+          </Link>
+        </li>
+        <li>
+          <Link to="/verify-academic" className={isActive('/verify-academic') ? 'active' : ''}>
+            Verify for MyJob
           </Link>
         </li>
         <li>

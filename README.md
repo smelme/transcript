@@ -1,6 +1,6 @@
 # ISO mDoc Academic Transcript & Qualification System
 
-**Status**: Planning & Setup Phase  
+**Status**: Phase 1 MVP — issuer, verifier, wallet, and shared mdoc library implemented
 **Created**: 2026-08-27
 
 ## Overview
@@ -13,11 +13,14 @@ This is a monorepo containing all components:
 
 ```
 Transcript/
+├── mdoc-core.js             # Shared ISO 18013-5 mdoc library (generate/verify IssuerSigned)
 ├── issuer-service/          # Backend: Credential issuance & management (Node.js/Express)
 ├── issuer-frontend/         # Web UI: Admin portal for issuing credentials
 ├── verifier-service/        # Backend: Credential verification (Node.js/Express)
 ├── verifier-frontend/       # Web UI: Employer/verifier verification interface
-├── mobile-wallet/           # Mobile App: Student wallet to store & share credentials (Kotlin Multiplatform)
+├── mobile-wallet-native/    # Mobile App: Student wallet (React Native prototype)
+├── mobile-wallet/           # Mobile App: Kotlin Multiplatform (multipaz base)
+├── key-management/          # Key generation, storage, and rotation service
 ├── docs/                    # Documentation & planning
 ├── .github/                 # GitHub workflows, issue templates
 ├── package.json             # Monorepo root (npm workspaces)
@@ -31,13 +34,13 @@ Node.js/Express backend for credential issuance.
 
 **Responsibilities:**
 - Define credential schemas (transcripts, qualifications)
-- Generate mDoc credentials with ED25519 signatures
-- Store issued credentials in database
+- Generate mDoc credentials with ES256 (ECDSA P-256) signatures
+- Store credential metadata & status in database (mdoc payloads are ephemeral and never persisted)
 - Manage credential revocation
 - Provide credential distribution APIs
 - Audit logging for compliance
 
-**Tech Stack:** Node.js, Express, PostgreSQL, ED25519 signing
+**Tech Stack:** Node.js, Express, PostgreSQL, ES256 (ECDSA P-256) mdoc signing
 
 ---
 
@@ -60,7 +63,7 @@ Web UI for university admins to issue credentials.
 Node.js/Express backend for credential verification.
 
 **Responsibilities:**
-- Validate mDoc signatures (ED25519)
+- Validate mDoc signatures (ES256 / ECDSA P-256)
 - Check revocation status
 - Verify credential expiry
 - Enforce verification policies
@@ -107,8 +110,9 @@ Native mobile app for students to store and share credentials.
 - **Runtime:** Node.js ≥18.17.0
 - **Framework:** Express.js
 - **Database:** PostgreSQL
+- **Storage model:** credential metadata/status in PostgreSQL; mdoc payloads are held in-memory only with a configurable session timeout (default 10 minutes, `MDOC_SESSION_TTL_SECONDS`)
 - **Authentication:** Keycloak (OAuth2/OIDC)
-- **Signing:** ED25519 keys (libsodium/tweetnacl.js)
+- **Signing:** ES256 (ECDSA P-256) for mdoc issuerAuth; EdDSA (Ed25519) supported via key-management
 - **Standards:** ISO/IEC 18013-5:2021 (mDoc), OpenID4VC (Phase 2)
 
 ### Frontend

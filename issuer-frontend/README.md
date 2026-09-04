@@ -1,16 +1,13 @@
-# Issuer Frontend
+# Issuer Frontend (Next.js)
 
-Admin portal for university administrators to issue academic credentials.
+Admin portal for issuing ISO 23220 Photo ID mDOC credentials.
 
-## Overview
+## Tech Stack
 
-The Issuer Frontend provides:
-- Keycloak-protected admin interface
-- Single credential issuance form
-- Bulk upload (CSV import)
-- Credential preview
-- QR code generation & download
-- Distribution tracking
+- **Framework:** Next.js (React, App Router)
+- **Language:** TypeScript
+- **Runtime:** Node.js >= 20.9.0 (see `.nvmrc`)
+- **API:** proxies `/api/*` to the issuer-service (`http://localhost:3000` by default, override with `ISSUER_API_URL`)
 
 ## Quick Start
 
@@ -19,25 +16,31 @@ npm install
 npm run dev
 ```
 
-Open http://localhost:5173
+Open http://localhost:3002
+
+## Structure
+
+```
+app/
+├── layout.tsx      # Root layout + metadata
+├── page.tsx        # Issuance form + result display
+├── globals.css     # Global styles
+└── lib/
+    └── api.ts      # Typed API client for the issuer-service
+```
 
 ## Pages
 
-(TBD - see Phase 1 stories for implementation details)
+- `/` — Single credential issuance (Photo ID) with live mdoc verification.
 
-- `/dashboard` - Admin dashboard
-- `/issue` - Single credential issuance
-- `/bulk-upload` - Bulk CSV upload
-- `/credentials` - View issued credentials
-- `/history` - Issuance audit log
+## Configuration
 
-## Tech Stack
+| Variable | Default | Description |
+|---|---|---|
+| `ISSUER_API_URL` | `http://localhost:3000` | Issuer-service base URL (used by rewrites) |
 
-- React 18
-- Vite
-- Keycloak OIDC
-- Axios
+## Notes
 
-## Development
-
-See main repository README and system plan for full context.
+- The mdoc payload returned by the issuer is held in-memory only with a
+  configurable session timeout (default 10 minutes) — retrieve it via
+  `GET /credentials/:id/mdoc` before it expires.
