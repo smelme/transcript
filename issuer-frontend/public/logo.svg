@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="Smart Academy">
+  <rect width="64" height="64" rx="14" fill="#0d0d0d" />
+  <path d="M32 12 L54 23 L32 34 L10 23 Z" fill="#ffc400" />
+  <path d="M20 30 v9 c0 5 5.5 7 12 7 s12-2 12-7 v-9 L32 37 Z" fill="#ffc400" />
+  <path d="M54 23 v12" stroke="#ffc400" stroke-width="3.5" fill="none" stroke-linecap="round" />
+  <circle cx="54" cy="38" r="2.8" fill="#ffc400" />
+</svg>

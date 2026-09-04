@@ -1,3 +1,5 @@
 <resources>
-    <style name="Theme.TranscriptWallet" parent="android:Theme.Material.Light.NoActionBar" />
+    <style name="Theme.Quals" parent="android:Theme.Material.Light.NoActionBar">
+        <item name="android:windowBackground">@color/quals_white</item>
+    </style>
 </resources>

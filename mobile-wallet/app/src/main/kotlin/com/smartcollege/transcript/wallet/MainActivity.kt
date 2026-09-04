@@ -4,7 +4,6 @@ import android.os.Bundle
 import androidx.activity.compose.setContent
 import androidx.biometric.BiometricManager
 import androidx.biometric.BiometricPrompt
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -23,6 +22,7 @@ import com.smartcollege.transcript.wallet.data.WalletRepository
 import com.smartcollege.transcript.wallet.ui.CredentialDetailScreen
 import com.smartcollege.transcript.wallet.ui.CredentialListScreen
 import com.smartcollege.transcript.wallet.ui.OfferScanScreen
+import com.smartcollege.transcript.wallet.ui.QualsTheme
 import com.smartcollege.transcript.wallet.ui.SignInScreen
 
 class MainActivity : FragmentActivity() {
@@ -34,7 +34,7 @@ class MainActivity : FragmentActivity() {
         val repository = WalletRepository(client, store)
 
         setContent {
-            MaterialTheme {
+            QualsTheme {
                 WalletApp(repository, this)
             }
         }
@@ -149,7 +149,7 @@ private fun authenticateWallet(
     )
     prompt.authenticate(
         BiometricPrompt.PromptInfo.Builder()
-            .setTitle("Unlock Smart College Wallet")
+            .setTitle("Unlock Quals")
             .setSubtitle("Use biometrics or device PIN to access credentials")
             .setAllowedAuthenticators(authenticators)
             .build(),

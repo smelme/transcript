@@ -13,7 +13,7 @@ export default function IssuePage() {
     full_name: 'Erika Mustermann',
     date_of_birth: '1964-08-12',
     document_number: 'Z021AB37X13',
-    issuing_authority: 'Smart College',
+    issuing_authority: 'Smart Academy',
     issuing_country: 'NL',
     issue_date: '2025-03-24',
     expiry_date: '2031-03-24',
