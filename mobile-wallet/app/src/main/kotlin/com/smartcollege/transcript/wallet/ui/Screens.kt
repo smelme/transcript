@@ -3,8 +3,6 @@ package com.smartcollege.transcript.wallet.ui
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -14,15 +12,21 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Email
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
@@ -38,8 +42,10 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -70,93 +76,153 @@ fun SignInScreen(repository: WalletRepository, onSignedIn: () -> Unit) {
         }
     }
 
+    val cardBg = Color(0xFF16191C)
+    val fieldBg = Color(0xFF1E2226)
+    val olive = Color(0xFF3A3A2E)
+    val mutedText = Color(0xFF9CA3AD)
+
     val fieldColors = OutlinedTextFieldDefaults.colors(
         focusedTextColor = Color.White,
         unfocusedTextColor = Color.White,
         cursorColor = QualsGold,
-        focusedBorderColor = QualsGold,
-        unfocusedBorderColor = Color.White.copy(alpha = 0.45f),
+        focusedBorderColor = Color.Transparent,
+        unfocusedBorderColor = Color.Transparent,
+        focusedContainerColor = fieldBg,
+        unfocusedContainerColor = fieldBg,
         focusedLabelColor = QualsGold,
-        unfocusedLabelColor = Color.White.copy(alpha = 0.6f),
-        focusedContainerColor = Color.Transparent,
-        unfocusedContainerColor = Color.Transparent,
+        unfocusedLabelColor = Color.White.copy(alpha = 0.55f),
+        focusedLeadingIconColor = QualsGold,
+        unfocusedLeadingIconColor = QualsGold,
     )
 
     Column(
         modifier = Modifier
             .fillMaxSize()
             .background(Color.Black)
-            .padding(horizontal = 28.dp),
+            .verticalScroll(rememberScrollState())
+            .padding(horizontal = 24.dp, vertical = 40.dp),
         verticalArrangement = Arrangement.Center,
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
-        QualsLogoMark(Modifier.fillMaxWidth(0.5f))
-        Spacer(Modifier.height(24.dp))
+        QualsLogoMark(Modifier.width(120.dp))
+        Spacer(Modifier.height(12.dp))
         Text(
-            "Sign in to access your credentials",
-            style = MaterialTheme.typography.bodyLarge,
-            color = Color.White.copy(alpha = 0.75f),
+            "QUALS",
+            color = Color.White,
+            fontFamily = FontFamily.Serif,
+            fontWeight = FontWeight.Bold,
+            fontSize = 30.sp,
+            letterSpacing = 8.sp,
+        )
+        Spacer(Modifier.height(6.dp))
+        Text(
+            "Your credentials, verified",
+            color = mutedText,
+            fontSize = 15.sp,
         )
         Spacer(Modifier.height(28.dp))
-        OutlinedTextField(
-            value = email,
-            onValueChange = { email = it },
-            label = { Text("EMAIL ADDRESS") },
-            singleLine = true,
-            colors = fieldColors,
-            modifier = Modifier.fillMaxWidth(),
-        )
-        Spacer(Modifier.height(16.dp))
 
-        if (otpSent) {
+        // Sign-in card
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(24.dp))
+                .background(cardBg)
+                .padding(22.dp),
+        ) {
+            Text(
+                "Sign in",
+                color = Color.White,
+                fontWeight = FontWeight.Bold,
+                fontSize = 22.sp,
+            )
+            Spacer(Modifier.height(4.dp))
+            Text(
+                "Enter your email to receive a one-time code",
+                color = mutedText,
+                fontSize = 14.sp,
+            )
+            Spacer(Modifier.height(18.dp))
+
             OutlinedTextField(
-                value = otp,
-                onValueChange = { otp = it },
-                label = { Text("ONE-TIME CODE") },
+                value = email,
+                onValueChange = { email = it },
+                label = { Text("Email address") },
+                leadingIcon = {
+                    Icon(
+                        imageVector = Icons.Filled.Email,
+                        contentDescription = null,
+                        tint = QualsGold,
+                    )
+                },
                 singleLine = true,
+                shape = RoundedCornerShape(14.dp),
                 colors = fieldColors,
                 modifier = Modifier.fillMaxWidth(),
             )
-            Spacer(Modifier.height(4.dp))
-            TextButton(
-                onClick = requestCode,
-                enabled = !busy && email.isNotBlank(),
-            ) {
-                Text("Resend code", color = MaterialTheme.colorScheme.primary)
-            }
-            Spacer(Modifier.height(12.dp))
-            Button(
-                onClick = {
-                    scope.launch {
-                        busy = true
-                        repository.signIn(email, otp)
-                            .onSuccess { onSignedIn() }
-                            .onFailure { message = it.message }
-                        busy = false
-                    }
-                },
-                enabled = !busy && email.isNotBlank() && otp.isNotBlank(),
-                modifier = Modifier.fillMaxWidth().height(52.dp),
-                shape = RoundedCornerShape(12.dp),
-                colors = ButtonDefaults.buttonColors(containerColor = QualsGold, contentColor = Color.Black),
-            ) {
-                Text("Sign in", fontWeight = FontWeight.Bold, fontSize = 16.sp)
-            }
-        } else {
-            Button(
-                onClick = requestCode,
-                enabled = !busy && email.isNotBlank(),
-                modifier = Modifier.fillMaxWidth().height(52.dp),
-                shape = RoundedCornerShape(12.dp),
-                colors = ButtonDefaults.buttonColors(containerColor = QualsGold, contentColor = Color.Black),
-            ) {
-                Text("Get a one-time code", fontWeight = FontWeight.Bold, fontSize = 16.sp)
-            }
-        }
+            Spacer(Modifier.height(14.dp))
 
-        message?.let {
-            Spacer(Modifier.height(12.dp))
-            Text(it, color = MaterialTheme.colorScheme.primary)
+            if (otpSent) {
+                OutlinedTextField(
+                    value = otp,
+                    onValueChange = { otp = it },
+                    label = { Text("One-time code") },
+                    singleLine = true,
+                    shape = RoundedCornerShape(14.dp),
+                    colors = fieldColors,
+                    modifier = Modifier.fillMaxWidth(),
+                )
+                Spacer(Modifier.height(6.dp))
+                TextButton(
+                    onClick = requestCode,
+                    enabled = !busy && email.isNotBlank(),
+                ) {
+                    Text("Resend code", color = QualsGold)
+                }
+                Spacer(Modifier.height(10.dp))
+                Button(
+                    onClick = {
+                        scope.launch {
+                            busy = true
+                            repository.signIn(email, otp)
+                                .onSuccess { onSignedIn() }
+                                .onFailure { message = it.message }
+                            busy = false
+                        }
+                    },
+                    enabled = !busy && email.isNotBlank() && otp.isNotBlank(),
+                    modifier = Modifier.fillMaxWidth().height(52.dp),
+                    shape = RoundedCornerShape(14.dp),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = olive,
+                        contentColor = QualsGold,
+                        disabledContainerColor = olive,
+                        disabledContentColor = QualsGold.copy(alpha = 0.4f),
+                    ),
+                ) {
+                    Text("Sign in", fontWeight = FontWeight.Bold, fontSize = 16.sp)
+                }
+            } else {
+                Button(
+                    onClick = requestCode,
+                    enabled = !busy && email.isNotBlank(),
+                    modifier = Modifier.fillMaxWidth().height(52.dp),
+                    shape = RoundedCornerShape(14.dp),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = olive,
+                        contentColor = QualsGold,
+                        disabledContainerColor = olive,
+                        disabledContentColor = QualsGold.copy(alpha = 0.4f),
+                    ),
+                ) {
+                    Text("Get a one-time code", fontWeight = FontWeight.Bold, fontSize = 16.sp)
+                }
+            }
+
+            message?.let {
+                Spacer(Modifier.height(12.dp))
+                Text(it, color = QualsGold, fontSize = 13.sp)
+            }
         }
     }
 }
