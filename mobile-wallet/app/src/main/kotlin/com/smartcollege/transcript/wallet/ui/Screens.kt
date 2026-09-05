@@ -25,6 +25,7 @@ import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -69,17 +70,32 @@ fun SignInScreen(repository: WalletRepository, onSignedIn: () -> Unit) {
         }
     }
 
+    val fieldColors = OutlinedTextFieldDefaults.colors(
+        focusedTextColor = Color.White,
+        unfocusedTextColor = Color.White,
+        cursorColor = QualsGold,
+        focusedBorderColor = QualsGold,
+        unfocusedBorderColor = Color.White.copy(alpha = 0.45f),
+        focusedLabelColor = QualsGold,
+        unfocusedLabelColor = Color.White.copy(alpha = 0.6f),
+        focusedContainerColor = Color.Transparent,
+        unfocusedContainerColor = Color.Transparent,
+    )
+
     Column(
-        modifier = Modifier.fillMaxSize().padding(horizontal = 28.dp),
+        modifier = Modifier
+            .fillMaxSize()
+            .background(Color.Black)
+            .padding(horizontal = 28.dp),
         verticalArrangement = Arrangement.Center,
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
-        QualsLogoMark(Modifier.fillMaxWidth(0.6f))
+        QualsLogoMark(Modifier.fillMaxWidth(0.5f))
         Spacer(Modifier.height(24.dp))
         Text(
             "Sign in to access your credentials",
             style = MaterialTheme.typography.bodyLarge,
-            color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.65f),
+            color = Color.White.copy(alpha = 0.75f),
         )
         Spacer(Modifier.height(28.dp))
         OutlinedTextField(
@@ -87,6 +103,7 @@ fun SignInScreen(repository: WalletRepository, onSignedIn: () -> Unit) {
             onValueChange = { email = it },
             label = { Text("EMAIL ADDRESS") },
             singleLine = true,
+            colors = fieldColors,
             modifier = Modifier.fillMaxWidth(),
         )
         Spacer(Modifier.height(16.dp))
@@ -97,6 +114,7 @@ fun SignInScreen(repository: WalletRepository, onSignedIn: () -> Unit) {
                 onValueChange = { otp = it },
                 label = { Text("ONE-TIME CODE") },
                 singleLine = true,
+                colors = fieldColors,
                 modifier = Modifier.fillMaxWidth(),
             )
             Spacer(Modifier.height(4.dp))
