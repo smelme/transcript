@@ -55,6 +55,7 @@ sealed interface Screen {
 @Composable
 fun WalletApp(repository: WalletRepository, activity: FragmentActivity) {
     var hasCredentials by remember { mutableStateOf(repository.credentialIds().isNotEmpty()) }
+    var signedIn by remember { mutableStateOf(repository.isSignedIn()) }
     var unlocked by remember { mutableStateOf(false) }
     var isForeground by remember { mutableStateOf(true) }
     val lifecycleOwner = LocalLifecycleOwner.current
@@ -65,7 +66,7 @@ fun WalletApp(repository: WalletRepository, activity: FragmentActivity) {
                 Lifecycle.Event.ON_START -> isForeground = true
                 Lifecycle.Event.ON_STOP -> {
                     isForeground = false
-                    if (hasCredentials) unlocked = false
+                    if (signedIn && hasCredentials) unlocked = false
                 }
                 else -> Unit
             }
@@ -74,8 +75,8 @@ fun WalletApp(repository: WalletRepository, activity: FragmentActivity) {
         onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
     }
 
-    LaunchedEffect(hasCredentials, unlocked, isForeground) {
-        if (hasCredentials && !unlocked && isForeground) {
+    LaunchedEffect(hasCredentials, signedIn, unlocked, isForeground) {
+        if (signedIn && hasCredentials && !unlocked && isForeground) {
             authenticateWallet(
                 activity = activity,
                 onSuccess = { unlocked = true },
@@ -84,16 +85,22 @@ fun WalletApp(repository: WalletRepository, activity: FragmentActivity) {
         }
     }
 
-    if (hasCredentials && !unlocked) {
+    if (signedIn && hasCredentials && !unlocked) {
         return
     }
 
     var screen by remember {
-        mutableStateOf<Screen>(if (repository.isSignedIn()) Screen.List else Screen.SignIn)
+        mutableStateOf<Screen>(if (signedIn) Screen.List else Screen.SignIn)
     }
 
     when (val current = screen) {
-        Screen.SignIn -> SignInScreen(repository, onSignedIn = { screen = Screen.List })
+        Screen.SignIn -> SignInScreen(
+            repository,
+            onSignedIn = {
+                signedIn = true
+                screen = Screen.List
+            },
+        )
         Screen.Scan -> OfferScanScreen(
             repository,
             onDone = {
@@ -106,7 +113,11 @@ fun WalletApp(repository: WalletRepository, activity: FragmentActivity) {
             repository,
             onScan = { screen = Screen.Scan },
             onOpen = { screen = Screen.Detail(it) },
-            onSignOut = { screen = Screen.SignIn },
+            onSignOut = {
+                repository.signOut()
+                signedIn = false
+                screen = Screen.SignIn
+            },
         )
         is Screen.Detail -> CredentialDetailScreen(
             repository,

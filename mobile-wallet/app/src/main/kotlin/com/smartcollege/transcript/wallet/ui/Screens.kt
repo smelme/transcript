@@ -56,9 +56,23 @@ private val QualsGold = Color(0xFFFFC400)
 fun SignInScreen(repository: WalletRepository, onSignedIn: () -> Unit) {
     var email by remember { mutableStateOf("") }
     var otp by remember { mutableStateOf("") }
+    var otpSent by remember { mutableStateOf(false) }
     var busy by remember { mutableStateOf(false) }
     var message by remember { mutableStateOf<String?>(null) }
     val scope = rememberCoroutineScope()
+
+    val requestCode: () -> Unit = {
+        scope.launch {
+            busy = true
+            repository.requestOtp(email)
+                .onSuccess { devOtp ->
+                    otpSent = true
+                    message = devOtp?.let { "Dev code: $it" } ?: "Code sent to $email"
+                }
+                .onFailure { message = it.message }
+            busy = false
+        }
+    }
 
     Column(
         modifier = Modifier.fillMaxSize().padding(horizontal = 28.dp),
@@ -80,49 +94,53 @@ fun SignInScreen(repository: WalletRepository, onSignedIn: () -> Unit) {
             singleLine = true,
             modifier = Modifier.fillMaxWidth(),
         )
-        Spacer(Modifier.height(12.dp))
-        OutlinedTextField(
-            value = otp,
-            onValueChange = { otp = it },
-            label = { Text("ONE-TIME CODE") },
-            singleLine = true,
-            modifier = Modifier.fillMaxWidth(),
-        )
-        Spacer(Modifier.height(4.dp))
-        TextButton(
-            onClick = {
-                scope.launch {
-                    busy = true
-                    repository.requestOtp(email)
-                        .onSuccess { devOtp ->
-                            message = devOtp?.let { "Dev code: $it" } ?: "Code sent to $email"
-                        }
-                        .onFailure { message = it.message }
-                    busy = false
-                }
-            },
-            enabled = !busy && email.isNotBlank(),
-        ) {
-            Text("Get a one-time code", color = MaterialTheme.colorScheme.primary)
+        Spacer(Modifier.height(16.dp))
+
+        if (otpSent) {
+            OutlinedTextField(
+                value = otp,
+                onValueChange = { otp = it },
+                label = { Text("ONE-TIME CODE") },
+                singleLine = true,
+                modifier = Modifier.fillMaxWidth(),
+            )
+            Spacer(Modifier.height(4.dp))
+            TextButton(
+                onClick = requestCode,
+                enabled = !busy && email.isNotBlank(),
+            ) {
+                Text("Resend code", color = MaterialTheme.colorScheme.primary)
+            }
+            Spacer(Modifier.height(12.dp))
+            Button(
+                onClick = {
+                    scope.launch {
+                        busy = true
+                        repository.signIn(email, otp)
+                            .onSuccess { onSignedIn() }
+                            .onFailure { message = it.message }
+                        busy = false
+                    }
+                },
+                enabled = !busy && email.isNotBlank() && otp.isNotBlank(),
+                modifier = Modifier.fillMaxWidth().height(52.dp),
+                shape = RoundedCornerShape(12.dp),
+                colors = ButtonDefaults.buttonColors(containerColor = QualsGold, contentColor = Color.Black),
+            ) {
+                Text("Sign in", fontWeight = FontWeight.Bold, fontSize = 16.sp)
+            }
+        } else {
+            Button(
+                onClick = requestCode,
+                enabled = !busy && email.isNotBlank(),
+                modifier = Modifier.fillMaxWidth().height(52.dp),
+                shape = RoundedCornerShape(12.dp),
+                colors = ButtonDefaults.buttonColors(containerColor = QualsGold, contentColor = Color.Black),
+            ) {
+                Text("Get a one-time code", fontWeight = FontWeight.Bold, fontSize = 16.sp)
+            }
         }
-        Spacer(Modifier.height(12.dp))
-        Button(
-            onClick = {
-                scope.launch {
-                    busy = true
-                    repository.signIn(email, otp)
-                        .onSuccess { onSignedIn() }
-                        .onFailure { message = it.message }
-                    busy = false
-                }
-            },
-            enabled = !busy && email.isNotBlank() && otp.isNotBlank(),
-            modifier = Modifier.fillMaxWidth().height(52.dp),
-            shape = RoundedCornerShape(12.dp),
-            colors = ButtonDefaults.buttonColors(containerColor = QualsGold, contentColor = Color.Black),
-        ) {
-            Text("Sign in", fontWeight = FontWeight.Bold, fontSize = 16.sp)
-        }
+
         message?.let {
             Spacer(Modifier.height(12.dp))
             Text(it, color = MaterialTheme.colorScheme.primary)

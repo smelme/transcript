@@ -91,6 +91,7 @@ class SecureStore(context: Context) {
 
     fun saveAccessToken(token: String) = prefs.edit().putString(KEY_TOKEN, token).apply()
     fun accessToken(): String? = prefs.getString(KEY_TOKEN, null)
+    fun clearAccessToken() = prefs.edit().remove(KEY_TOKEN).apply()
 
     fun saveMdoc(credentialId: String, mdocBase64url: String) {
         prefs.edit().putString("mdoc_$credentialId", mdocBase64url).apply()

@@ -67,4 +67,9 @@ class WalletRepository(private val client: IssuerClient, private val store: Secu
         fullName.isNotBlank() || institution.isNotBlank() || degreeLevel.isNotBlank() || graduationDate.isNotBlank()
 
     fun isSignedIn(): Boolean = store.accessToken() != null
+
+    /** Clear the access token so the wallet returns to the sign-in screen. */
+    fun signOut() {
+        store.clearAccessToken()
+    }
 }
