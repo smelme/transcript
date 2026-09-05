@@ -3,4 +3,5 @@
     <color name="quals_green_dark">#0E6B3D</color>
     <color name="quals_white">#FFFFFF</color>
     <color name="quals_black">#0B0F0C</color>
+    <color name="quals_pure_black">#000000</color>
 </resources>

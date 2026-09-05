@@ -1,5 +1,5 @@
 <resources>
     <style name="Theme.Quals" parent="android:Theme.Material.NoActionBar">
-        <item name="android:windowBackground">@color/quals_black</item>
+        <item name="android:windowBackground">@color/quals_pure_black</item>
     </style>
 </resources>
