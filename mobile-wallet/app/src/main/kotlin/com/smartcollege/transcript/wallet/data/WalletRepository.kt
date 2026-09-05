@@ -18,7 +18,9 @@ class WalletRepository(private val client: IssuerClient, private val store: Secu
 
     /** Request a one-time code (normally emailed; returned in dev). */
     suspend fun requestOtp(email: String): Result<String?> = runCatching {
-        client.requestOtp(email).otp
+        val response = client.requestOtp(email)
+        if (!response.success) error(response.error ?: "Could not send a code")
+        response.otp
     }
 
     /** Exchange the emailed OTP for an access token and persist it. */
