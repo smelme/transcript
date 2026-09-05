@@ -1,52 +1,38 @@
 package com.smartcollege.transcript.wallet.ui
 
-import android.net.Uri
-import android.widget.VideoView
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
-import androidx.compose.ui.viewinterop.AndroidView
+import com.smartcollege.transcript.wallet.R
 import kotlinx.coroutines.delay
 
+/** The Quals brand mark (navy Q + graduation cap + QUALS wordmark). */
 @Composable
-fun VideoLogo(modifier: Modifier = Modifier) {
-    val context = LocalContext.current
-    val uri = Uri.parse("android.resource://${context.packageName}/raw/logo")
-    AndroidView(
-        factory = { ctx ->
-            VideoView(ctx).apply {
-                setVideoURI(uri)
-                setOnPreparedListener { mediaPlayer ->
-                    mediaPlayer.isLooping = true
-                    start()
-                }
-                setOnCompletionListener { mediaPlayer ->
-                    mediaPlayer.start()
-                }
-            }
-        },
-        modifier = modifier,
+fun QualsLogoMark(modifier: Modifier = Modifier) {
+    Image(
+        painter = painterResource(R.drawable.quals_logo),
+        contentDescription = "Quals",
+        modifier = modifier.clip(RoundedCornerShape(28.dp)),
+        contentScale = ContentScale.Crop,
     )
 }
 
 @Composable
 fun BrandSplash(onFinished: () -> Unit) {
     LaunchedEffect(Unit) {
-        delay(2400)
+        delay(2000)
         onFinished()
     }
     Box(
@@ -55,16 +41,6 @@ fun BrandSplash(onFinished: () -> Unit) {
             .background(MaterialTheme.colorScheme.background),
         contentAlignment = Alignment.Center,
     ) {
-        Column(horizontalAlignment = Alignment.CenterHorizontally) {
-            VideoLogo(Modifier.size(200.dp))
-            Spacer(Modifier.height(10.dp))
-            Text(
-                "QUALS",
-                color = QualsGold,
-                fontWeight = FontWeight.ExtraBold,
-                letterSpacing = 8.sp,
-                fontSize = 22.sp,
-            )
-        }
+        QualsLogoMark(Modifier.size(220.dp))
     }
 }

@@ -74,10 +74,8 @@ fun SignInScreen(repository: WalletRepository, onSignedIn: () -> Unit) {
         verticalArrangement = Arrangement.Center,
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
-        VideoLogo(Modifier.size(200.dp))
-        Spacer(Modifier.height(10.dp))
-        Text("QUALS", color = QualsGold, fontWeight = FontWeight.ExtraBold, letterSpacing = 8.sp, fontSize = 22.sp)
-        Spacer(Modifier.height(14.dp))
+        QualsLogoMark(Modifier.size(210.dp))
+        Spacer(Modifier.height(24.dp))
         Text(
             "Sign in to access your credentials",
             style = MaterialTheme.typography.bodyLarge,
