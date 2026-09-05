@@ -16,11 +16,11 @@ private val QualsWhite = Color(0xFFFFFFFF)
 private val QualsInk = Color(0xFF0B0F0C)
 
 private val LightColors = lightColorScheme(
-    primary = QualsGreen,
-    onPrimary = QualsWhite,
-    primaryContainer = Color(0xFFD3F5E4),
-    onPrimaryContainer = QualsGreenDark,
-    secondary = QualsGreenDark,
+    primary = QualsGold,
+    onPrimary = QualsInk,
+    primaryContainer = Color(0xFFFFE9A8),
+    onPrimaryContainer = Color(0xFF4A3B00),
+    secondary = QualsGreen,
     onSecondary = QualsWhite,
     secondaryContainer = Color(0xFFE2F7EC),
     onSecondaryContainer = QualsGreenDark,
@@ -34,10 +34,10 @@ private val LightColors = lightColorScheme(
 )
 
 private val DarkColors = darkColorScheme(
-    primary = QualsGreenLight,
-    onPrimary = QualsGreenDark,
-    primaryContainer = Color(0xFF0E6B3D),
-    onPrimaryContainer = Color(0xFFD3F5E4),
+    primary = QualsGold,
+    onPrimary = QualsInk,
+    primaryContainer = Color(0xFF4A3B00),
+    onPrimaryContainer = Color(0xFFFFE9A8),
     secondary = QualsGreenLight,
     onSecondary = QualsGreenDark,
     secondaryContainer = Color(0xFF123F2A),

@@ -1,6 +1,6 @@
 <resources>
     <style name="Theme.Quals" parent="android:Theme.Material.Light.NoActionBar">
         <item name="android:windowSplashScreenBackground">@color/quals_white</item>
-        <item name="android:windowSplashScreenAnimatedIcon">@drawable/ic_quals_logo</item>
+        <item name="android:windowSplashScreenAnimatedIcon">@mipmap/ic_launcher</item>
     </style>
 </resources>
