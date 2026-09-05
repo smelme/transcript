@@ -1,20 +1,24 @@
 package com.smartcollege.transcript.wallet.ui
 
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -32,13 +36,21 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import com.smartcollege.transcript.wallet.data.CredentialSummary
 import com.smartcollege.transcript.wallet.data.WalletRepository
 import kotlinx.coroutines.launch
+
+private val QualsGold = Color(0xFFFFC400)
 
 @Composable
 fun SignInScreen(repository: WalletRepository, onSignedIn: () -> Unit) {
@@ -49,28 +61,35 @@ fun SignInScreen(repository: WalletRepository, onSignedIn: () -> Unit) {
     val scope = rememberCoroutineScope()
 
     Column(
-        modifier = Modifier.fillMaxSize().padding(24.dp),
+        modifier = Modifier.fillMaxSize().padding(horizontal = 28.dp),
         verticalArrangement = Arrangement.Center,
+        horizontalAlignment = Alignment.CenterHorizontally,
     ) {
-        Text("Sign in to your wallet", style = MaterialTheme.typography.headlineSmall)
-        Spacer(Modifier.height(16.dp))
+        QualsLogo()
+        Spacer(Modifier.height(18.dp))
+        Text(
+            "Sign in to access your credentials",
+            style = MaterialTheme.typography.bodyLarge,
+            color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.65f),
+        )
+        Spacer(Modifier.height(28.dp))
         OutlinedTextField(
             value = email,
             onValueChange = { email = it },
-            label = { Text("Email") },
+            label = { Text("EMAIL ADDRESS") },
             singleLine = true,
             modifier = Modifier.fillMaxWidth(),
         )
-        Spacer(Modifier.height(8.dp))
+        Spacer(Modifier.height(12.dp))
         OutlinedTextField(
             value = otp,
             onValueChange = { otp = it },
-            label = { Text("One-time code") },
+            label = { Text("ONE-TIME CODE") },
             singleLine = true,
             modifier = Modifier.fillMaxWidth(),
         )
-        Spacer(Modifier.height(16.dp))
-        Button(
+        Spacer(Modifier.height(4.dp))
+        TextButton(
             onClick = {
                 scope.launch {
                     busy = true
@@ -83,9 +102,10 @@ fun SignInScreen(repository: WalletRepository, onSignedIn: () -> Unit) {
                 }
             },
             enabled = !busy && email.isNotBlank(),
-            modifier = Modifier.fillMaxWidth(),
-        ) { Text("Request code") }
-        Spacer(Modifier.height(8.dp))
+        ) {
+            Text("Get a one-time code", color = MaterialTheme.colorScheme.primary)
+        }
+        Spacer(Modifier.height(12.dp))
         Button(
             onClick = {
                 scope.launch {
@@ -97,12 +117,71 @@ fun SignInScreen(repository: WalletRepository, onSignedIn: () -> Unit) {
                 }
             },
             enabled = !busy && email.isNotBlank() && otp.isNotBlank(),
-            modifier = Modifier.fillMaxWidth(),
-        ) { Text("Sign in") }
+            modifier = Modifier.fillMaxWidth().height(52.dp),
+            shape = RoundedCornerShape(12.dp),
+            colors = ButtonDefaults.buttonColors(containerColor = QualsGold, contentColor = Color.Black),
+        ) {
+            Text("Sign in", fontWeight = FontWeight.Bold, fontSize = 16.sp)
+        }
         message?.let {
             Spacer(Modifier.height(12.dp))
             Text(it, color = MaterialTheme.colorScheme.primary)
         }
+    }
+}
+
+@Composable
+private fun QualsLogo() {
+    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+        Canvas(Modifier.size(width = 88.dp, height = 52.dp)) {
+            val w = size.width
+            val h = size.height
+            // Mortarboard (graduation cap top)
+            val board = Path().apply {
+                moveTo(w * 0.5f, h * 0.06f)
+                lineTo(w * 0.94f, h * 0.34f)
+                lineTo(w * 0.5f, h * 0.60f)
+                lineTo(w * 0.06f, h * 0.34f)
+                close()
+            }
+            drawPath(board, QualsGold)
+            // Tassel
+            drawLine(
+                QualsGold,
+                Offset(w * 0.5f, h * 0.06f),
+                Offset(w * 0.64f, h * 0.5f),
+                strokeWidth = 3.dp.toPx(),
+                cap = StrokeCap.Round,
+            )
+            drawCircle(QualsGold, radius = 3.5.dp.toPx(), center = Offset(w * 0.64f, h * 0.56f))
+            // Head of the cap
+            drawArc(
+                color = QualsGold,
+                startAngle = 200f,
+                sweepAngle = 140f,
+                useCenter = false,
+                topLeft = Offset(w * 0.28f, h * 0.55f),
+                size = Size(w * 0.44f, h * 0.42f),
+                style = Stroke(width = 3.dp.toPx(), cap = StrokeCap.Round),
+            )
+        }
+        Spacer(Modifier.height(6.dp))
+        Box(
+            modifier = Modifier
+                .size(92.dp)
+                .background(QualsGold, RoundedCornerShape(24.dp)),
+            contentAlignment = Alignment.Center,
+        ) {
+            Text("Q", color = Color.Black, fontSize = 56.sp, fontWeight = FontWeight.Black)
+        }
+        Spacer(Modifier.height(14.dp))
+        Text(
+            "QUALS",
+            color = QualsGold,
+            fontWeight = FontWeight.ExtraBold,
+            letterSpacing = 8.sp,
+            fontSize = 22.sp,
+        )
     }
 }
 
@@ -128,74 +207,142 @@ fun CredentialListScreen(
             )
         },
     ) { padding ->
-        if (ids.isEmpty()) {
-            Box(Modifier.fillMaxSize().padding(padding), contentAlignment = Alignment.Center) {
-                Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    Text("No credentials yet")
-                    Spacer(Modifier.height(8.dp))
-                    Button(onClick = onScan) { Text("Scan offer QR") }
+        Column(Modifier.fillMaxSize().padding(padding)) {
+            Text(
+                "YOUR CREDENTIALS",
+                style = MaterialTheme.typography.labelLarge,
+                color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.6f),
+                modifier = Modifier.padding(horizontal = 20.dp, vertical = 12.dp),
+            )
+            if (ids.isEmpty()) {
+                Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        Text("No credentials yet")
+                        Spacer(Modifier.height(8.dp))
+                        Button(onClick = onScan) { Text("Scan offer QR") }
+                    }
                 }
-            }
-        } else {
-            LazyColumn(Modifier.fillMaxSize().padding(padding)) {
-                items(ids) { id ->
-                    CertificateCard(
-                        summary = summaries[id],
-                        onClick = { onOpen(id) },
-                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
-                    )
+            } else {
+                LazyColumn(Modifier.fillMaxSize()) {
+                    items(ids) { id ->
+                        CredentialCard(
+                            credentialId = id,
+                            summary = summaries[id],
+                            onClick = { onOpen(id) },
+                            modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+                        )
+                    }
                 }
             }
         }
     }
 }
 
+private val MonthNames = listOf(
+    "January", "February", "March", "April", "May", "June",
+    "July", "August", "September", "October", "November", "December",
+)
+
+private val InstitutionColors = listOf(
+    Color(0xFF1D3557), // navy
+    Color(0xFF1B5E20), // green
+    Color(0xFF6A1B2A), // maroon
+    Color(0xFF4A148C), // purple
+    Color(0xFF006064), // teal
+    Color(0xFF4E342E), // brown
+)
+
 @Composable
-private fun CertificateCard(summary: CredentialSummary?, onClick: () -> Unit, modifier: Modifier = Modifier) {
-    val personName = summary?.fullName?.takeIf { it.isNotBlank() } ?: "Issued credential"
+private fun CredentialCard(
+    credentialId: String,
+    summary: CredentialSummary?,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
     val institution = summary?.institution?.takeIf { it.isNotBlank() } ?: "Smart Academy"
-    val degreeLevel = summary?.degreeLevel?.takeIf { it.isNotBlank() } ?: "Degree level not recorded"
-    val graduationDate = summary?.graduationDate?.takeIf { it.isNotBlank() } ?: "Graduation date not recorded"
+    val title = summary?.degreeLevel?.takeIf { it.isNotBlank() } ?: "Credential"
+    val issuedDate = formatDate(summary?.graduationDate)
+    val cardColor = institutionColor(institution)
 
     Card(
         modifier = modifier.fillMaxWidth().clickable(onClick = onClick),
         shape = RoundedCornerShape(20.dp),
-        elevation = CardDefaults.cardElevation(defaultElevation = 6.dp),
-        colors = CardDefaults.cardColors(containerColor = Color.Transparent),
+        elevation = CardDefaults.cardElevation(defaultElevation = 4.dp),
+        colors = CardDefaults.cardColors(containerColor = cardColor),
     ) {
-        Column(
-            modifier = Modifier
-                .background(
-                    Brush.linearGradient(
-                        colors = listOf(Color(0xFF1B9C5B), Color(0xFF0E6B3D)),
-                    )
+        Column(Modifier.padding(20.dp)) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.Top,
+            ) {
+                Text(
+                    institution.uppercase(),
+                    style = MaterialTheme.typography.labelMedium,
+                    color = Color.White.copy(alpha = 0.9f),
+                    modifier = Modifier.weight(1f),
                 )
-                .padding(20.dp),
-        ) {
+                VerifiedPill()
+            }
+            Spacer(Modifier.height(10.dp))
             Text(
-                "ACADEMIC CERTIFICATE",
-                style = MaterialTheme.typography.labelSmall,
-                color = Color(0xFFD3F5E4),
+                title,
+                style = MaterialTheme.typography.titleLarge,
+                color = Color.White,
+                fontWeight = FontWeight.Bold,
             )
-            Spacer(Modifier.height(14.dp))
-            Text(personName, style = MaterialTheme.typography.headlineSmall, color = Color.White)
-            Spacer(Modifier.height(8.dp))
-            Text(institution, style = MaterialTheme.typography.titleMedium, color = Color(0xFFE2F7EC))
-            Spacer(Modifier.height(16.dp))
-            Text(degreeLevel, style = MaterialTheme.typography.bodyLarge, color = Color.White)
+            Spacer(Modifier.height(6.dp))
             Text(
-                "Graduation: $graduationDate",
+                credentialId,
                 style = MaterialTheme.typography.bodyMedium,
-                color = Color(0xFFE2F7EC),
+                color = Color.White.copy(alpha = 0.75f),
             )
-            Spacer(Modifier.height(14.dp))
+            if (issuedDate != null) {
+                Text(
+                    "Issued $issuedDate",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = Color.White.copy(alpha = 0.7f),
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun VerifiedPill() {
+    Box(
+        modifier = Modifier
+            .background(Color.White.copy(alpha = 0.18f), RoundedCornerShape(999.dp))
+            .padding(horizontal = 12.dp, vertical = 5.dp),
+    ) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text("\u2713", color = Color.White, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+            Spacer(Modifier.size(4.dp))
             Text(
-                "Tap to view credential details",
-                style = MaterialTheme.typography.labelMedium,
-                color = Color(0xFFD3F5E4),
+                "VERIFIED",
+                color = Color.White,
+                fontSize = 11.sp,
+                fontWeight = FontWeight.Bold,
+                letterSpacing = 1.sp,
             )
         }
     }
+}
+
+private fun institutionColor(institution: String): Color {
+    val hash = institution.hashCode().let { if (it == Int.MIN_VALUE) 0 else kotlin.math.abs(it) }
+    return InstitutionColors[hash % InstitutionColors.size]
+}
+
+private fun formatDate(raw: String?): String? {
+    if (raw.isNullOrBlank()) return null
+    val match = Regex("^(\\d{4})-(\\d{2})").find(raw.trim())
+    if (match != null) {
+        val year = match.groupValues[1]
+        val month = match.groupValues[2].toIntOrNull()?.takeIf { it in 1..12 }
+        return if (month != null) "${MonthNames[month - 1]} $year" else year
+    }
+    return raw.trim()
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
