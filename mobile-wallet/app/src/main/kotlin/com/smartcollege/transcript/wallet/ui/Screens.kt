@@ -3,6 +3,8 @@ package com.smartcollege.transcript.wallet.ui
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -38,6 +40,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.smartcollege.transcript.wallet.data.CredentialSummary
@@ -312,6 +315,12 @@ fun CredentialDetailScreen(repository: WalletRepository, credentialId: String, o
     val scope = rememberCoroutineScope()
     val context = LocalContext.current
 
+    val personName = summary?.fullName?.takeIf { it.isNotBlank() } ?: "Credential holder"
+    val institution = summary?.institution?.takeIf { it.isNotBlank() } ?: "Smart Academy"
+    val title = summary?.degreeLevel?.takeIf { it.isNotBlank() } ?: "Credential"
+    val issuedDate = formatDate(summary?.graduationDate)
+    val cardColor = institutionColor(institution)
+
     Scaffold(
         topBar = {
             TopAppBar(
@@ -320,18 +329,98 @@ fun CredentialDetailScreen(repository: WalletRepository, credentialId: String, o
             )
         },
     ) { padding ->
-        Column(Modifier.fillMaxSize().padding(padding).padding(16.dp)) {
-            Text("Certificate details", style = MaterialTheme.typography.headlineSmall)
-            Spacer(Modifier.height(16.dp))
-            DetailField("Name", summary?.fullName)
-            DetailField("Institution", summary?.institution)
-            DetailField("Degree level", summary?.degreeLevel)
-            DetailField("Graduation date", summary?.graduationDate)
-            deleteError?.let {
-                Text(it, color = MaterialTheme.colorScheme.error)
-                Spacer(Modifier.height(12.dp))
+        Column(
+            Modifier
+                .fillMaxSize()
+                .padding(padding)
+                .verticalScroll(rememberScrollState())
+                .padding(16.dp),
+        ) {
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(24.dp),
+                elevation = CardDefaults.cardElevation(defaultElevation = 6.dp),
+                colors = CardDefaults.cardColors(containerColor = cardColor),
+            ) {
+                Column(Modifier.padding(22.dp)) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.Top,
+                    ) {
+                        Text(
+                            institution.uppercase(),
+                            style = MaterialTheme.typography.labelMedium,
+                            color = Color.White.copy(alpha = 0.9f),
+                            modifier = Modifier.weight(1f),
+                        )
+                        VerifiedPill()
+                    }
+                    Spacer(Modifier.height(16.dp))
+                    Text(
+                        personName,
+                        style = MaterialTheme.typography.headlineMedium,
+                        color = Color.White,
+                        fontWeight = FontWeight.Bold,
+                    )
+                    Spacer(Modifier.height(6.dp))
+                    Text(
+                        title,
+                        style = MaterialTheme.typography.titleMedium,
+                        color = Color.White.copy(alpha = 0.9f),
+                    )
+                    Spacer(Modifier.height(18.dp))
+                    Text(
+                        credentialId,
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = Color.White.copy(alpha = 0.75f),
+                    )
+                    if (issuedDate != null) {
+                        Text(
+                            "Issued $issuedDate",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = Color.White.copy(alpha = 0.7f),
+                        )
+                    }
+                }
             }
-            Button(onClick = { confirmDelete = true }, enabled = !deleting) {
+
+            Spacer(Modifier.height(24.dp))
+            Text(
+                "DETAILS",
+                style = MaterialTheme.typography.labelLarge,
+                color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.6f),
+                modifier = Modifier.padding(bottom = 8.dp),
+            )
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(16.dp),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                elevation = CardDefaults.cardElevation(defaultElevation = 1.dp),
+            ) {
+                Column(Modifier.padding(vertical = 6.dp)) {
+                    DetailRow("Name", summary?.fullName)
+                    DetailRow("Institution", summary?.institution)
+                    DetailRow("Degree level", summary?.degreeLevel)
+                    DetailRow("Graduation date", summary?.graduationDate)
+                    DetailRow("Credential ID", credentialId)
+                }
+            }
+
+            deleteError?.let {
+                Spacer(Modifier.height(12.dp))
+                Text(it, color = MaterialTheme.colorScheme.error)
+            }
+            Spacer(Modifier.height(24.dp))
+            Button(
+                onClick = { confirmDelete = true },
+                enabled = !deleting,
+                modifier = Modifier.fillMaxWidth(),
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = MaterialTheme.colorScheme.errorContainer,
+                    contentColor = MaterialTheme.colorScheme.onErrorContainer,
+                ),
+            ) {
                 Text("Delete credential")
             }
         }
@@ -370,8 +459,22 @@ fun CredentialDetailScreen(repository: WalletRepository, credentialId: String, o
 }
 
 @Composable
-private fun DetailField(label: String, value: String?) {
-    Text(label, style = MaterialTheme.typography.labelMedium)
-    Text(value?.takeIf { it.isNotBlank() } ?: "Not recorded", style = MaterialTheme.typography.bodyLarge)
-    Spacer(Modifier.height(12.dp))
+private fun DetailRow(label: String, value: String?) {
+    Row(
+        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 12.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(
+            label,
+            style = MaterialTheme.typography.labelMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.weight(1f),
+        )
+        Text(
+            value?.takeIf { it.isNotBlank() } ?: "Not recorded",
+            style = MaterialTheme.typography.bodyMedium,
+            fontWeight = FontWeight.SemiBold,
+            textAlign = TextAlign.End,
+        )
+    }
 }
