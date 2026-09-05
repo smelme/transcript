@@ -19,6 +19,7 @@ import androidx.lifecycle.compose.LocalLifecycleOwner
 import com.smartcollege.transcript.wallet.data.IssuerClient
 import com.smartcollege.transcript.wallet.data.SecureStore
 import com.smartcollege.transcript.wallet.data.WalletRepository
+import com.smartcollege.transcript.wallet.ui.BrandSplash
 import com.smartcollege.transcript.wallet.ui.CredentialDetailScreen
 import com.smartcollege.transcript.wallet.ui.CredentialListScreen
 import com.smartcollege.transcript.wallet.ui.OfferScanScreen
@@ -35,7 +36,12 @@ class MainActivity : FragmentActivity() {
 
         setContent {
             QualsTheme {
-                WalletApp(repository, this)
+                var showSplash by remember { mutableStateOf(true) }
+                if (showSplash) {
+                    BrandSplash(onFinished = { showSplash = false })
+                } else {
+                    WalletApp(repository, this)
+                }
             }
         }
 
