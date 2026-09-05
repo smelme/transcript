@@ -74,7 +74,7 @@ fun SignInScreen(repository: WalletRepository, onSignedIn: () -> Unit) {
         verticalArrangement = Arrangement.Center,
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
-        QualsLogoMark(Modifier.size(210.dp))
+        QualsLogoMark(Modifier.fillMaxWidth(0.6f))
         Spacer(Modifier.height(24.dp))
         Text(
             "Sign in to access your credentials",

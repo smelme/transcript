@@ -3,8 +3,9 @@ package com.smartcollege.transcript.wallet.ui
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
@@ -12,6 +13,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.dp
@@ -21,11 +23,16 @@ import kotlinx.coroutines.delay
 /** The Quals brand mark (navy Q + graduation cap + QUALS wordmark). */
 @Composable
 fun QualsLogoMark(modifier: Modifier = Modifier) {
+    val painter = painterResource(R.drawable.quals_logo)
+    val natural: Size = painter.intrinsicSize
+    val ratio = if (natural.width > 0f && natural.height > 0f) natural.width / natural.height else 1f
     Image(
-        painter = painterResource(R.drawable.quals_logo),
+        painter = painter,
         contentDescription = "Quals",
-        modifier = modifier.clip(RoundedCornerShape(28.dp)),
-        contentScale = ContentScale.Crop,
+        modifier = modifier
+            .aspectRatio(ratio)
+            .clip(RoundedCornerShape(20.dp)),
+        contentScale = ContentScale.Fit,
     )
 }
 
@@ -41,6 +48,6 @@ fun BrandSplash(onFinished: () -> Unit) {
             .background(MaterialTheme.colorScheme.background),
         contentAlignment = Alignment.Center,
     ) {
-        QualsLogoMark(Modifier.size(220.dp))
+        QualsLogoMark(Modifier.width(250.dp))
     }
 }
