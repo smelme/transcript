@@ -116,7 +116,8 @@ class PresentationActivity : FragmentActivity() {
 
         val store = SecureStore(applicationContext)
         val credentialIds = try {
-            store.credentialIds()
+            // Only the currently signed-in account's credentials may be shared.
+            store.credentialIdsForOwner(store.ownerEmail())
         } catch (e: Throwable) {
             Log.e(TAG, "credentialIds() failed", e)
             emptyList()

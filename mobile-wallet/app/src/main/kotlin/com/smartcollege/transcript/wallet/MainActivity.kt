@@ -182,6 +182,9 @@ fun WalletApp(repository: WalletRepository, activity: FragmentActivity) {
                 onOpen = { screen = Screen.Detail(it) },
                 onSignOut = {
                     repository.signOut()
+                    // Clear the system registry so Chrome can't keep offering
+                    // the previous account's credentials after sign-out.
+                    repository.registerWithSystem(activity.applicationContext)
                     signedIn = false
                     screen = Screen.SignIn
                 },

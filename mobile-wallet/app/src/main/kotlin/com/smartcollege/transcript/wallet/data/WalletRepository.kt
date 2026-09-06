@@ -28,6 +28,7 @@ class WalletRepository(private val client: IssuerClient, private val store: Secu
         val response = client.exchangeToken(email, otp)
         val token = requireNotNull(response.accessToken) { response.error ?: "Sign-in failed" }
         store.saveAccessToken(token)
+        store.saveOwnerEmail(response.email ?: email)
         token
     }
 
@@ -42,16 +43,17 @@ class WalletRepository(private val client: IssuerClient, private val store: Secu
         val id = requireNotNull(response.credentialId)
         val mdoc = requireNotNull(response.mdocBase64url)
         val summary = MdocParser.readCredentialSummary(mdoc) ?: CredentialSummary()
-        store.saveMdoc(id, mdoc)
+        store.saveMdoc(id, mdoc, ownerEmail = store.ownerEmail())
         store.saveCredentialSummary(id, summary)
         StoredCredential(id, response.docType ?: "org.iso.23220.photoid.1", mdoc, response.deviceBound, summary)
     }
 
-    fun credentialIds(): List<String> = store.credentialIds()
+    /** Credential ids belonging to the currently signed-in account. */
+    fun credentialIds(): List<String> = store.credentialIdsForOwner(store.ownerEmail())
     fun mdoc(credentialId: String): String? = store.mdoc(credentialId)
 
-    /** Re-publish stored credentials to the Android Credential Manager registry. */
-    fun registerWithSystem(context: Context) = CredentialRegistry.register(context, store)
+    /** Re-publish the current user's stored credentials to the Android Credential Manager registry. */
+    fun registerWithSystem(context: Context) = CredentialRegistry.register(context, store, credentialIds())
     fun deleteCredential(credentialId: String): Result<Unit> = runCatching {
         check(store.deleteCredential(credentialId)) { "Could not delete credential from secure storage" }
     }
@@ -70,8 +72,9 @@ class WalletRepository(private val client: IssuerClient, private val store: Secu
 
     fun isSignedIn(): Boolean = store.accessToken() != null
 
-    /** Clear the access token so the wallet returns to the sign-in screen. */
+    /** Clear the access token and owner so the wallet returns to the sign-in screen. */
     fun signOut() {
         store.clearAccessToken()
+        store.clearOwnerEmail()
     }
 }

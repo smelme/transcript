@@ -97,13 +97,18 @@ class SecureStore(context: Context) {
     fun accessToken(): String? = prefs.getString(KEY_TOKEN, null)
     fun clearAccessToken() = prefs.edit().remove(KEY_TOKEN).apply()
 
+    /** Persist which wallet account (email) currently owns the session. */
+    fun saveOwnerEmail(email: String) = prefs.edit().putString(KEY_OWNER_EMAIL, email.trim().lowercase()).apply()
+    fun ownerEmail(): String? = prefs.getString(KEY_OWNER_EMAIL, null)
+    fun clearOwnerEmail() = prefs.edit().remove(KEY_OWNER_EMAIL).apply()
+
     /**
      * Store a received mdoc. The payload is wrapped with an AES key that only
      * the Android Keystore releases while the user is recently authenticated,
      * so the credential bytes cannot be decrypted without a fresh biometric /
      * device PIN. Legacy plaintext values (from earlier builds) remain readable.
      */
-    fun saveMdoc(credentialId: String, mdocBase64url: String) {
+    fun saveMdoc(credentialId: String, mdocBase64url: String, ownerEmail: String? = null) {
         val stored = try {
             MDOC_PREFIX + encryptMdocBody(mdocBase64url)
         } catch (e: Throwable) {
@@ -113,9 +118,16 @@ class SecureStore(context: Context) {
             mdocBase64url
         }
         prefs.edit().putString("mdoc_$credentialId", stored).apply()
+        if (ownerEmail != null) {
+            prefs.edit().putString("owner_$credentialId", ownerEmail.trim().lowercase()).apply()
+        }
         val ids = credentialIds().toMutableSet().apply { add(credentialId) }
         prefs.edit().putString(KEY_IDS, JSONArray(ids.toList()).toString()).apply()
     }
+
+    /** The owning account email recorded when this credential was claimed, if any. */
+    fun ownerEmailOf(credentialId: String): String? =
+        prefs.getString("owner_$credentialId", null)?.takeIf { it.isNotBlank() }
 
     /**
      * Read a stored mdoc. Returns the plaintext when the user is recently
@@ -175,6 +187,7 @@ class SecureStore(context: Context) {
         return prefs.edit()
             .remove("mdoc_$credentialId")
             .remove("summary_$credentialId")
+            .remove("owner_$credentialId")
             .putString(KEY_IDS, JSONArray(ids.toList()).toString())
             .commit()
     }
@@ -210,6 +223,12 @@ class SecureStore(context: Context) {
         return (0 until arr.length()).map { arr.getString(it) }
     }
 
+    /** Credential ids that belong to the given account email. Empty when no owner is signed in. */
+    fun credentialIdsForOwner(ownerEmail: String?): List<String> {
+        val owner = ownerEmail?.trim()?.lowercase() ?: return emptyList()
+        return credentialIds().filter { id -> ownerEmailOf(id) == owner }
+    }
+
     companion object {
         private const val TAG = "SecureStore"
         private const val KEYSTORE = "AndroidKeyStore"
@@ -220,6 +239,7 @@ class SecureStore(context: Context) {
         private const val MDOC_PREFIX = "enc:v1:"
         private const val PREFS_FILE = "transcript-wallet-secure"
         private const val KEY_TOKEN = "access_token"
+        private const val KEY_OWNER_EMAIL = "owner_email"
         private const val KEY_IDS = "credential_ids"
     }
 }

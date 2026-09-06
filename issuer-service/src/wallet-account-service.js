@@ -180,7 +180,7 @@ export class WalletAccountService {
       .setExpirationTime(this.tokenTtl)
       .sign(privateKey);
 
-    return { success: true, accessToken, tokenType: 'Bearer', sub: account.sub };
+    return { success: true, accessToken, tokenType: 'Bearer', sub: account.sub, email: account.email };
   }
 
   /** Verify an access token and return its claims ({ sub, email, scope, ... }). */

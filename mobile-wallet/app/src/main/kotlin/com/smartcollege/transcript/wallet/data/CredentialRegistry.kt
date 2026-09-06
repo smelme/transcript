@@ -31,10 +31,10 @@ object CredentialRegistry {
         "graduation_date" to "Graduation date",
     )
 
-    /** Re-publishes every stored credential to the system registry. Safe to call repeatedly. */
-    fun register(context: Context, store: SecureStore) {
+    /** Re-publishes the given credentials (already scoped to the current owner) to the system registry. Safe to call repeatedly. */
+    fun register(context: Context, store: SecureStore, credentialIds: List<String> = store.credentialIdsForOwner(store.ownerEmail())) {
         try {
-            val database = buildCredentialDatabase(store)
+            val database = buildCredentialDatabase(store, credentialIds)
             val matcher = loadMatcher(context)
             val client = IdentityCredentialManager.getClient(context)
 
@@ -60,8 +60,8 @@ object CredentialRegistry {
         return context.assets.open("identitycredentialmatcher.wasm").use { it.readBytes() }
     }
 
-    private fun buildCredentialDatabase(store: SecureStore): ByteArray {
-        val credentials = store.credentialIds().mapNotNull { id ->
+    private fun buildCredentialDatabase(store: SecureStore, credentialIds: List<String>): ByteArray {
+        val credentials = credentialIds.mapNotNull { id ->
             val mdoc = store.mdoc(id) ?: return@mapNotNull null
             val summary = store.credentialSummary(id)
             buildCredentialEntry(id, mdoc, summary)

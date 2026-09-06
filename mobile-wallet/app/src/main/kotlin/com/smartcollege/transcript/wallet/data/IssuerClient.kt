@@ -21,7 +21,7 @@ data class OtpResponse(val success: Boolean = false, val otp: String? = null, va
 data class TokenRequest(val email: String, val otp: String)
 
 @Serializable
-data class TokenResponse(val success: Boolean = false, val accessToken: String? = null, val error: String? = null)
+data class TokenResponse(val success: Boolean = false, val accessToken: String? = null, val sub: String? = null, val email: String? = null, val error: String? = null)
 
 @Serializable
 data class IssuanceRequest(val offerUrl: String, val accessToken: String, val cwt: String)
