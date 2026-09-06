@@ -116,19 +116,21 @@ class PresentationActivity : FragmentActivity() {
             emptyList()
         }
         val credentialId = credentialIds.firstOrNull()
-        val mdocBase64Url = credentialId?.let { store.mdoc(it) }
-        Log.d(TAG, "credentialIds=$credentialIds first=$credentialId mdocPresent=${mdocBase64Url != null}")
+        Log.d(TAG, "credentialIds=$credentialIds first=$credentialId")
 
+        // NOTE: the mdoc itself is NOT read here. Its bytes are encrypted with a
+        // user-auth-bound Keystore key, so they are only decryptable immediately
+        // after a successful biometric/PIN prompt (see PresentmentFlow).
         setContent {
             MaterialTheme {
                 Surface(modifier = Modifier.fillMaxSize()) {
-                    if (credentialId == null || mdocBase64Url == null) {
+                    if (credentialId == null) {
                         MissingCredentialScreen(onClose = { finishWithFailure("No academic credential stored") })
                     } else {
                         PresentmentFlow(
                             activity = this,
                             store = store,
-                            mdocBase64Url = mdocBase64Url,
+                            credentialId = credentialId,
                         )
                     }
                 }
@@ -140,7 +142,7 @@ class PresentationActivity : FragmentActivity() {
     private fun PresentmentFlow(
         activity: PresentationActivity,
         store: SecureStore,
-        mdocBase64Url: String,
+        credentialId: String,
     ) {
         var origin by remember { mutableStateOf<String?>(null) }
         var requestData by remember { mutableStateOf<Pair<String, String>?>(null) } // (deviceRequest, encryptionInfo)
@@ -185,11 +187,21 @@ class PresentationActivity : FragmentActivity() {
 
         val ready = origin != null && requestData != null
 
-        // Once authenticated and parsed, build and return the encrypted response.
+        // Once authenticated and parsed, read the (auth-bound) mdoc and respond.
         androidx.compose.runtime.LaunchedEffect(authenticated, ready) {
             val resolvedOrigin = origin
             val resolvedRequest = requestData
             if (authenticated && resolvedOrigin != null && resolvedRequest != null) {
+                val mdocBase64Url = try {
+                    store.mdoc(credentialId)
+                } catch (e: Throwable) {
+                    Log.e(TAG, "mdoc read failed", e)
+                    null
+                }
+                if (mdocBase64Url == null) {
+                    activity.finishWithFailure("Credential could not be unlocked for sharing")
+                    return@LaunchedEffect
+                }
                 buildAndRespond(activity, store, mdocBase64Url, resolvedOrigin, resolvedRequest)
             }
         }

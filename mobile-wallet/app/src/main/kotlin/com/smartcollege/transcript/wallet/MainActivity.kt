@@ -4,13 +4,18 @@ import android.os.Bundle
 import androidx.activity.compose.setContent
 import androidx.biometric.BiometricManager
 import androidx.biometric.BiometricPrompt
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.core.content.ContextCompat
 import androidx.fragment.app.FragmentActivity
 import androidx.lifecycle.Lifecycle
@@ -39,9 +44,10 @@ class MainActivity : FragmentActivity() {
             }
         }
 
-        // Re-publish any already-stored credentials to the Android Credential
-        // Manager so Chrome can discover them for org-iso-mdoc presentment.
-        Thread { repository.registerWithSystem(applicationContext) }.start()
+        // NOTE: mdocs are now stored behind a user-auth-bound Keystore key, so
+        // they cannot be read at cold start (before the user authenticates).
+        // Re-publishing to the Android Credential Manager happens after a
+        // successful biometric unlock in WalletApp, and after each claim.
     }
 }
 
@@ -58,15 +64,24 @@ fun WalletApp(repository: WalletRepository, activity: FragmentActivity) {
     var signedIn by remember { mutableStateOf(repository.isSignedIn()) }
     var unlocked by remember { mutableStateOf(false) }
     var isForeground by remember { mutableStateOf(true) }
+    var lastInteraction by remember { mutableLongStateOf(System.currentTimeMillis()) }
     val lifecycleOwner = LocalLifecycleOwner.current
+
+    // Re-lock after this many ms of inactivity while the wallet is in the
+    // foreground, so a phone left open on the credential list re-requires
+    // biometrics instead of staying visible to anyone nearby.
+    val idleLockMs = 60_000L
 
     DisposableEffect(lifecycleOwner) {
         val observer = LifecycleEventObserver { _, event ->
             when (event) {
-                Lifecycle.Event.ON_START -> isForeground = true
+                Lifecycle.Event.ON_START -> {
+                    isForeground = true
+                    lastInteraction = System.currentTimeMillis()
+                }
                 Lifecycle.Event.ON_STOP -> {
                     isForeground = false
-                    if (signedIn && hasCredentials) unlocked = false
+                    if (signedIn) unlocked = false
                 }
                 else -> Unit
             }
@@ -75,17 +90,43 @@ fun WalletApp(repository: WalletRepository, activity: FragmentActivity) {
         onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
     }
 
-    LaunchedEffect(hasCredentials, signedIn, unlocked, isForeground) {
-        if (signedIn && hasCredentials && !unlocked && isForeground) {
+    // Prompt for biometrics whenever the wallet needs to be unlocked.
+    LaunchedEffect(signedIn, unlocked, isForeground) {
+        if (signedIn && !unlocked && isForeground) {
             authenticateWallet(
                 activity = activity,
-                onSuccess = { unlocked = true },
+                onSuccess = {
+                    unlocked = true
+                    lastInteraction = System.currentTimeMillis()
+                    // After the user authenticates, re-publish stored mdocs so
+                    // Chrome can discover them (mdoc decryption needs auth).
+                    try {
+                        repository.registerWithSystem(activity.applicationContext)
+                    } catch (e: Throwable) {
+                        // non-fatal
+                    }
+                },
                 onError = { activity.moveTaskToBack(true) },
             )
         }
     }
 
-    if (signedIn && hasCredentials && !unlocked) {
+    // Idle auto-lock: while unlocked & foregrounded, re-lock after inactivity.
+    LaunchedEffect(signedIn, unlocked, isForeground) {
+        if (signedIn && unlocked && isForeground) {
+            while (true) {
+                kotlinx.coroutines.delay(1_000)
+                if (!unlocked || !isForeground) break
+                val idle = System.currentTimeMillis() - lastInteraction
+                if (idle > idleLockMs) {
+                    unlocked = false
+                    break
+                }
+            }
+        }
+    }
+
+    if (signedIn && !unlocked) {
         return
     }
 
@@ -93,40 +134,54 @@ fun WalletApp(repository: WalletRepository, activity: FragmentActivity) {
         mutableStateOf<Screen>(if (signedIn) Screen.List else Screen.SignIn)
     }
 
-    when (val current = screen) {
-        Screen.SignIn -> SignInScreen(
-            repository,
-            onSignedIn = {
-                signedIn = true
-                screen = Screen.List
-            },
-        )
-        Screen.Scan -> OfferScanScreen(
-            repository,
-            onDone = {
-                hasCredentials = repository.credentialIds().isNotEmpty()
-                screen = Screen.List
-            },
-            onBack = { screen = Screen.List },
-        )
-        Screen.List -> CredentialListScreen(
-            repository,
-            onScan = { screen = Screen.Scan },
-            onOpen = { screen = Screen.Detail(it) },
-            onSignOut = {
-                repository.signOut()
-                signedIn = false
-                screen = Screen.SignIn
-            },
-        )
-        is Screen.Detail -> CredentialDetailScreen(
-            repository,
-            current.credentialId,
-            onBack = {
-                hasCredentials = repository.credentialIds().isNotEmpty()
-                screen = Screen.List
-            },
-        )
+    // Any pointer activity inside the wallet resets the idle auto-lock timer.
+    Box(
+        Modifier
+            .fillMaxSize()
+            .pointerInput(Unit) {
+                awaitPointerEventScope {
+                    while (true) {
+                        awaitPointerEvent()
+                        lastInteraction = System.currentTimeMillis()
+                    }
+                }
+            }
+    ) {
+        when (val current = screen) {
+            Screen.SignIn -> SignInScreen(
+                repository,
+                onSignedIn = {
+                    signedIn = true
+                    screen = Screen.List
+                },
+            )
+            Screen.Scan -> OfferScanScreen(
+                repository,
+                onDone = {
+                    hasCredentials = repository.credentialIds().isNotEmpty()
+                    screen = Screen.List
+                },
+                onBack = { screen = Screen.List },
+            )
+            Screen.List -> CredentialListScreen(
+                repository,
+                onScan = { screen = Screen.Scan },
+                onOpen = { screen = Screen.Detail(it) },
+                onSignOut = {
+                    repository.signOut()
+                    signedIn = false
+                    screen = Screen.SignIn
+                },
+            )
+            is Screen.Detail -> CredentialDetailScreen(
+                repository,
+                current.credentialId,
+                onBack = {
+                    hasCredentials = repository.credentialIds().isNotEmpty()
+                    screen = Screen.List
+                },
+            )
+        }
     }
 }
 

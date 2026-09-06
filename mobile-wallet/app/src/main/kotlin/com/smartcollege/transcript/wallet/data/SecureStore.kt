@@ -14,6 +14,10 @@ import java.security.KeyStore
 import java.security.interfaces.ECPublicKey
 import java.security.spec.ECGenParameterSpec
 import java.util.Base64
+import javax.crypto.Cipher
+import javax.crypto.KeyGenerator
+import javax.crypto.SecretKey
+import javax.crypto.spec.GCMParameterSpec
 
 data class DeviceKey(val keyAlias: String, val publicJwk: Map<String, String>)
 
@@ -93,13 +97,77 @@ class SecureStore(context: Context) {
     fun accessToken(): String? = prefs.getString(KEY_TOKEN, null)
     fun clearAccessToken() = prefs.edit().remove(KEY_TOKEN).apply()
 
+    /**
+     * Store a received mdoc. The payload is wrapped with an AES key that only
+     * the Android Keystore releases while the user is recently authenticated,
+     * so the credential bytes cannot be decrypted without a fresh biometric /
+     * device PIN. Legacy plaintext values (from earlier builds) remain readable.
+     */
     fun saveMdoc(credentialId: String, mdocBase64url: String) {
-        prefs.edit().putString("mdoc_$credentialId", mdocBase64url).apply()
+        val stored = try {
+            MDOC_PREFIX + encryptMdocBody(mdocBase64url)
+        } catch (e: Throwable) {
+            // No usable auth-bound key (e.g. device has no lock screen) — keep
+            // the value in the (still EncryptedSharedPreferences-encrypted) store.
+            android.util.Log.w(TAG, "mdoc auth-encrypt unavailable; storing plaintext", e)
+            mdocBase64url
+        }
+        prefs.edit().putString("mdoc_$credentialId", stored).apply()
         val ids = credentialIds().toMutableSet().apply { add(credentialId) }
         prefs.edit().putString(KEY_IDS, JSONArray(ids.toList()).toString()).apply()
     }
 
-    fun mdoc(credentialId: String): String? = prefs.getString("mdoc_$credentialId", null)
+    /**
+     * Read a stored mdoc. Returns the plaintext when the user is recently
+     * authenticated, otherwise null (callers should prompt for auth and retry).
+     */
+    fun mdoc(credentialId: String): String? {
+        val raw = prefs.getString("mdoc_$credentialId", null) ?: return null
+        return if (raw.startsWith(MDOC_PREFIX)) {
+            try {
+                decryptMdocBody(raw.removePrefix(MDOC_PREFIX))
+            } catch (e: Throwable) {
+                android.util.Log.w(TAG, "mdoc decrypt failed (locked?): $e")
+                null
+            }
+        } else {
+            raw // legacy plaintext from before auth-bound storage
+        }
+    }
+
+    /** Get (or create) the AES key that requires recent user authentication. */
+    private fun getOrCreateMdocAuthKey(): SecretKey {
+        val ks = KeyStore.getInstance(KEYSTORE).apply { load(null) }
+        (ks.getKey(KEY_MDOC_AUTH, null) as? SecretKey)?.let { return it }
+        val kg = KeyGenerator.getInstance(KeyProperties.KEY_ALGORITHM_AES, KEYSTORE)
+        kg.init(
+            KeyGenParameterSpec.Builder(KEY_MDOC_AUTH, KeyProperties.PURPOSE_ENCRYPT or KeyProperties.PURPOSE_DECRYPT)
+                .setBlockModes(KeyProperties.BLOCK_MODE_GCM)
+                .setEncryptionPaddings(KeyProperties.ENCRYPTION_PADDING_NONE)
+                .setKeySize(256)
+                .setUserAuthenticationRequired(true)
+                .setUserAuthenticationValidityDurationSeconds(MDOC_AUTH_VALIDITY_SECONDS)
+                .build()
+        )
+        return kg.generateKey()
+    }
+
+    private fun encryptMdocBody(plainText: String): String {
+        val cipher = Cipher.getInstance(MDOC_TRANSFORMATION)
+        cipher.init(Cipher.ENCRYPT_MODE, getOrCreateMdocAuthKey())
+        val iv = cipher.iv
+        val cipherText = cipher.doFinal(plainText.toByteArray(Charsets.UTF_8))
+        return Base64.getEncoder().encodeToString(iv + cipherText)
+    }
+
+    private fun decryptMdocBody(stored: String): String {
+        val bytes = Base64.getDecoder().decode(stored)
+        val iv = bytes.copyOfRange(0, 12)
+        val cipherText = bytes.copyOfRange(12, bytes.size)
+        val cipher = Cipher.getInstance(MDOC_TRANSFORMATION)
+        cipher.init(Cipher.DECRYPT_MODE, getOrCreateMdocAuthKey(), GCMParameterSpec(128, iv))
+        return String(cipher.doFinal(cipherText), Charsets.UTF_8)
+    }
     
     /** Permanently remove one credential and its derived display data from encrypted storage. */
     fun deleteCredential(credentialId: String): Boolean {
@@ -143,8 +211,13 @@ class SecureStore(context: Context) {
     }
 
     companion object {
+        private const val TAG = "SecureStore"
         private const val KEYSTORE = "AndroidKeyStore"
         private const val KEY_ALIAS = "transcript-wallet-device-key"
+        private const val KEY_MDOC_AUTH = "transcript-wallet-mdoc-auth"
+        private const val MDOC_TRANSFORMATION = "AES/GCM/NoPadding"
+        private const val MDOC_AUTH_VALIDITY_SECONDS = 300
+        private const val MDOC_PREFIX = "enc:v1:"
         private const val PREFS_FILE = "transcript-wallet-secure"
         private const val KEY_TOKEN = "access_token"
         private const val KEY_IDS = "credential_ids"
