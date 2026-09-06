@@ -63,6 +63,12 @@ class PresentationActivity : FragmentActivity() {
 
     private companion object {
         private const val TAG = "PresentationActivity"
+        private const val EXTRA_SET_ELEMENT_LENGTH =
+            "androidx.credentials.registry.provider.extra.CREDENTIAL_SET_ELEMENT_LENGTH"
+        private const val EXTRA_SET_ELEMENT_ID_PREFIX =
+            "androidx.credentials.registry.provider.extra.CREDENTIAL_SET_ELEMENT_ID_"
+        private const val EXTRA_CREDENTIAL_ID =
+            "androidx.credentials.registry.provider.extra.CREDENTIAL_ID"
     }
 
     // Trusted browsers/apps allowed to attest a web origin (see
@@ -115,8 +121,16 @@ class PresentationActivity : FragmentActivity() {
             Log.e(TAG, "credentialIds() failed", e)
             emptyList()
         }
-        val credentialId = credentialIds.firstOrNull()
-        Log.d(TAG, "credentialIds=$credentialIds first=$credentialId")
+        // Honor the user's selection from the Android Credential Manager
+        // chooser. The chosen entry's documentId (which we registered as the
+        // wallet's credentialId) arrives in the request's sourceBundle extras.
+        val request = runCatching {
+            PendingIntentHandler.retrieveProviderGetCredentialRequest(intent)
+        }.getOrNull()
+        val credentialId = request
+            ?.let { selectedCredentialId(it, credentialIds) }
+            ?: credentialIds.firstOrNull()
+        Log.d(TAG, "credentialIds=$credentialIds selected=$credentialId")
 
         // NOTE: the mdoc itself is NOT read here. Its bytes are encrypted with a
         // user-auth-bound Keystore key, so they are only decryptable immediately
@@ -136,6 +150,40 @@ class PresentationActivity : FragmentActivity() {
                 }
             }
         }
+    }
+
+    /**
+     * Read the credential the user selected in the Android Credential Manager
+     * chooser. Selection arrives in the request's `sourceBundle` extras (see
+     * androidx.credentials.registry:registry-provider): each selected element
+     * id is `<index> <protocol> <documentId>`; the `documentId` is the id we
+     * registered as the wallet's credentialId. Returns null when no selection
+     * is present, in which case the caller falls back to the first credential.
+     */
+    private fun selectedCredentialId(
+        request: androidx.credentials.provider.ProviderGetCredentialRequest,
+        credentialIds: List<String>,
+    ): String? {
+        val bundle = request.sourceBundle ?: run {
+            Log.d(TAG, "sourceBundle null; no selection info")
+            return null
+        }
+        // Preferred path: GMS writes the selected entry(s) as a "credential
+        // set" with element ids "<index> <protocol> <documentId>".
+        val length = bundle.getInt(EXTRA_SET_ELEMENT_LENGTH, 0)
+        if (length > 0) {
+            val selectedDocumentIds = (0 until length).mapNotNull { n ->
+                bundle.getString("${EXTRA_SET_ELEMENT_ID_PREFIX}$n")
+                    ?.substringAfterLast(' ')
+                    ?.takeIf { it.isNotBlank() }
+            }
+            Log.d(TAG, "sourceBundle set documentIds=$selectedDocumentIds stored=$credentialIds")
+            selectedDocumentIds.firstOrNull { it in credentialIds }?.let { return it }
+        }
+        // Fallback: single selected entry id "<index> <protocol> <documentId>".
+        val single = bundle.getString(EXTRA_CREDENTIAL_ID)?.substringAfterLast(' ')
+        Log.d(TAG, "sourceBundle single selected=$single length=$length")
+        return single?.takeIf { it in credentialIds }
     }
 
     @Composable
