@@ -15,6 +15,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -36,7 +37,12 @@ import kotlinx.coroutines.launch
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun OfferScanScreen(repository: WalletRepository, onDone: () -> Unit, onBack: () -> Unit) {
+fun OfferScanScreen(
+    repository: WalletRepository,
+    onDone: () -> Unit,
+    onBack: () -> Unit,
+    onScannerOpenChange: (Boolean) -> Unit = {},
+) {
     var manualUrl by remember { mutableStateOf("") }
     var busy by remember { mutableStateOf(false) }
     var message by remember { mutableStateOf<String?>(null) }
@@ -50,6 +56,13 @@ fun OfferScanScreen(repository: WalletRepository, onDone: () -> Unit, onBack: ()
                 .enableAutoZoom()
                 .build()
         )
+    }
+
+    // ML Kit's bundled scanner launches a separate Activity, which would pause
+    // the wallet. Tell the host so it does not re-lock (and cancel this screen)
+    // while scanning is in progress.
+    DisposableEffect(Unit) {
+        onDispose { onScannerOpenChange(false) }
     }
 
     fun claim(url: String) {
@@ -83,12 +96,15 @@ fun OfferScanScreen(repository: WalletRepository, onDone: () -> Unit, onBack: ()
             Button(
                 onClick = {
                     message = null
+                    onScannerOpenChange(true)
                     scanner.startScan()
                         .addOnSuccessListener { barcode ->
+                            onScannerOpenChange(false)
                             barcode.rawValue?.let { claim(it) }
                                 ?: run { message = "The QR code did not contain an offer URL." }
                         }
                         .addOnFailureListener { error ->
+                            onScannerOpenChange(false)
                             message = error.message
                                 ?: "Unable to start the QR scanner. Paste the offer URL instead."
                         }

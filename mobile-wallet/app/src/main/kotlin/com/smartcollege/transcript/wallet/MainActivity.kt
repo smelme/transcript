@@ -65,6 +65,11 @@ fun WalletApp(repository: WalletRepository, activity: FragmentActivity) {
     var unlocked by remember { mutableStateOf(false) }
     var isForeground by remember { mutableStateOf(true) }
     var lastInteraction by remember { mutableLongStateOf(System.currentTimeMillis()) }
+    // True while the ML Kit offer scanner (which runs in its own Activity) is
+    // open. We must NOT treat that transient overlay as "the user left the
+    // wallet": relocking would tear down the scan screen and cancel the
+    // claim coroutine before it can reach the network.
+    var scannerOpen by remember { mutableStateOf(false) }
     val lifecycleOwner = LocalLifecycleOwner.current
 
     // Re-lock after this many ms of inactivity while the wallet is in the
@@ -81,7 +86,10 @@ fun WalletApp(repository: WalletRepository, activity: FragmentActivity) {
                 }
                 Lifecycle.Event.ON_STOP -> {
                     isForeground = false
-                    if (signedIn) unlocked = false
+                    // Keep the wallet unlocked if the only reason we stopped is
+                    // the in-app offer scanner overlay; otherwise re-lock so the
+                    // credentials are hidden again when the user leaves.
+                    if (signedIn && !scannerOpen) unlocked = false
                 }
                 else -> Unit
             }
@@ -157,11 +165,16 @@ fun WalletApp(repository: WalletRepository, activity: FragmentActivity) {
             )
             Screen.Scan -> OfferScanScreen(
                 repository,
+                onScannerOpenChange = { scannerOpen = it },
                 onDone = {
+                    scannerOpen = false
                     hasCredentials = repository.credentialIds().isNotEmpty()
                     screen = Screen.List
                 },
-                onBack = { screen = Screen.List },
+                onBack = {
+                    scannerOpen = false
+                    screen = Screen.List
+                },
             )
             Screen.List -> CredentialListScreen(
                 repository,
