@@ -106,7 +106,6 @@ export async function sendOtpEmail({ email, otp, purpose, institution, siteUrl }
       <a href="${siteUrl}" style="display:inline-block;background:#14161c;color:#fff;text-decoration:none;padding:12px 22px;border-radius:8px;">Continue on the ${institute} site</a>
     </p>
     <p class="muted">Or visit ${siteUrl}</p>` : ''}
-    ${otp ? `<p>Development one-time code: <span class="code">${otp}</span></p>` : ''}
     <p class="muted">If you did not request this invitation, you can safely ignore this email.</p>
   </div>
 </body>
