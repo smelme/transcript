@@ -752,6 +752,8 @@ function loadWalletTokenSigner() {
 const walletAccounts = new WalletAccountService({
   signerKeyPem: loadWalletTokenSigner(),
   issuerId: issuer.issuerId,
+  issuerName: issuer.issuerName,
+  siteUrl: process.env.ISSUER_FRONTEND_URL || process.env.ISSUER_BASE_URL,
   emailSender: emailService.sendOtpEmail,
 });
 

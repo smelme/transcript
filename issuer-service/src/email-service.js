@@ -58,14 +58,64 @@ export async function sendEmail({ to, subject, html }) {
 }
 
 /**
- * Send a one-time code email for wallet account invitation or sign-in.
+ * Send the wallet email for a wallet-account invitation or sign-in.
+ *
+ * For an invitation (`purpose === 'invite'`) this is a proper "you've been
+ * invited to download credentials" email that names the issuing authority and
+ * explains the steps (install the wallet, sign in with the invited email, then
+ * continue on the site to transfer the credential). The one-time code is still
+ * included as a fallback in development.
+ *
  * @returns {{ success: boolean, messageId?: string|null, reason?: string, error?: string }}
  */
-export async function sendOtpEmail({ email, otp, purpose }) {
+export async function sendOtpEmail({ email, otp, purpose, institution, siteUrl }) {
   const isInvite = purpose === 'invite';
-  const subject = isInvite ? 'Your wallet verification code' : 'Your wallet sign-in code';
-  const action = isInvite ? 'verify your email address' : 'sign in to your wallet';
+  const institute = institution || 'Your institution';
 
+  if (isInvite) {
+    const subject = `${institute} has sent you an invitation to download credentials`;
+    const html = `
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <style>
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; }
+    .header { background: #14161c; color: #fff; padding: 24px 28px; border-radius: 12px 12px 0 0; }
+    .header h1 { margin: 0; font-size: 20px; }
+    .body { background: #fff; border: 1px solid #e5e5e5; border-top: none; padding: 24px 28px; border-radius: 0 0 12px 12px; }
+    .step { margin: 14px 0; padding-left: 0; }
+    .step b { color: #0a58ca; }
+    .code { font-size: 22px; font-weight: 700; letter-spacing: 4px; color: #0a58ca; }
+    .muted { color: #666; font-size: 13px; }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <h1>${institute} has sent you an invitation</h1>
+  </div>
+  <div class="body">
+    <p>Hello,</p>
+    <p><strong>${institute}</strong> has invited you to download your verified credentials into the Quals wallet.</p>
+    <p>To get started:</p>
+    <div class="step"><b>1.</b> Download the wallet app first, if you haven't done so already.</div>
+    <div class="step"><b>2.</b> Sign in using the email address this invitation was sent to (${email}).</div>
+    <div class="step"><b>3.</b> You will then be able to continue on the ${institute} site to transfer your credential to your wallet.</div>
+    ${siteUrl ? `
+    <p style="margin: 22px 0;">
+      <a href="${siteUrl}" style="display:inline-block;background:#14161c;color:#fff;text-decoration:none;padding:12px 22px;border-radius:8px;">Continue on the ${institute} site</a>
+    </p>
+    <p class="muted">Or visit ${siteUrl}</p>` : ''}
+    ${otp ? `<p>Development one-time code: <span class="code">${otp}</span></p>` : ''}
+    <p class="muted">If you did not request this invitation, you can safely ignore this email.</p>
+  </div>
+</body>
+</html>`;
+    return sendEmail({ to: email, subject, html });
+  }
+
+  // Sign-in one-time code.
+  const subject = 'Your wallet sign-in code';
   const html = `
 <!DOCTYPE html>
 <html>
@@ -77,12 +127,11 @@ export async function sendOtpEmail({ email, otp, purpose }) {
   </style>
 </head>
 <body>
-  <p>Use the code below to ${action}:</p>
+  <p>Use the code below to sign in to your wallet:</p>
   <p class="code">${otp}</p>
   <p>This code expires in 10 minutes. If you did not request this, you can safely ignore this email.</p>
 </body>
 </html>`;
-
   return sendEmail({ to: email, subject, html });
 }
 

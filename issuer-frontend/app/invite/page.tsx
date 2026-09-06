@@ -13,6 +13,7 @@ import {
 export default function InvitePage() {
   const [email, setEmail] = useState('');
   const [studentId, setStudentId] = useState('');
+  const [issuingAuthority, setIssuingAuthority] = useState('Smart Academy');
   const [fullName, setFullName] = useState('Erika Mustermann');
   const [dateOfBirth, setDateOfBirth] = useState('1964-08-12');
   const [documentNumber, setDocumentNumber] = useState('Z021AB37X13');
@@ -31,7 +32,7 @@ export default function InvitePage() {
     setError(null);
     setInvite(null);
     try {
-      const r = await inviteWallet({ email, studentId });
+      const r = await inviteWallet({ email, studentId, institution: issuingAuthority });
       if (r.success) setInvite(r);
       else setError(r.error || 'Invitation failed');
     } catch (err) {
@@ -51,17 +52,18 @@ export default function InvitePage() {
     try {
       const r = await createIssuanceSession({
         studentId,
+        institution: issuingAuthority,
         credentialData: {
           docType: 'org.iso.23220.photoid.1',
           full_name: fullName,
           date_of_birth: dateOfBirth,
           document_number: documentNumber,
-          issuing_authority: 'Smart Academy',
+          issuing_authority: issuingAuthority,
           issue_date: '2025-03-24',
           expiry_date: '2031-03-24',
           issuing_country: 'NL',
           education_qualification: {
-            institution_name: 'Smart Academy',
+            institution_name: issuingAuthority,
             degree_level: degreeLevel,
             graduation_date: graduationDate,
           },
@@ -121,6 +123,10 @@ export default function InvitePage() {
               <label>Student ID</label>
               <input value={studentId} onChange={(e) => setStudentId(e.target.value)} required />
             </div>
+            <div className="field full">
+              <label>Issuing authority (institution)</label>
+              <input value={issuingAuthority} onChange={(e) => setIssuingAuthority(e.target.value)} />
+            </div>
           </div>
           <button type="submit" disabled={busy}>
             {busy ? 'Sending…' : 'Send invitation'}
@@ -159,6 +165,10 @@ export default function InvitePage() {
         </p>
         <form onSubmit={handleCreateSession}>
           <div className="grid">
+            <div className="field full">
+              <label>Issuing authority (used as institution on the credential)</label>
+              <input value={issuingAuthority} onChange={(e) => setIssuingAuthority(e.target.value)} />
+            </div>
             <div className="field">
               <label>Student ID</label>
               <input value={studentId} onChange={(e) => setStudentId(e.target.value)} required />

@@ -19,11 +19,15 @@ export class WalletAccountService {
   constructor({
     signerKeyPem,
     issuerId = 'issuer-001',
+    issuerName,
+    siteUrl,
     otpTtlMs = 10 * 60 * 1000,
     tokenTtl = '10m',
     emailSender = null,
   } = {}) {
     this.issuerId = issuerId;
+    this.issuerName = issuerName || issuerId;
+    this.siteUrl = siteUrl;
     this.otpTtlMs = otpTtlMs;
     this.tokenTtl = tokenTtl;
     this.signerKeyPem = signerKeyPem;
@@ -86,7 +90,14 @@ export class WalletAccountService {
     if (!linkExists) account.links.push({ institution: inst, studentId: sid });
 
     const otp = this._issueOtp(account.email);
-    const sent = await this._sendOtpEmail(account.email, otp, 'invite');
+    // For an invitation the recipient-facing institute name is what they should
+    // recognise. `inst` may be a stable id rather than a display name, so fall
+    // back to issuerName when institution is not supplied.
+    const inviteInstitute = institution || this.issuerName;
+    const sent = await this._sendOtpEmail(account.email, otp, 'invite', {
+      institution: inviteInstitute,
+      siteUrl: this.siteUrl,
+    });
     return {
       success: true,
       sub: account.sub,
@@ -108,10 +119,10 @@ export class WalletAccountService {
 
   // Best-effort email delivery. When no emailSender is configured (or delivery
   // fails), the OTP is returned in the response so the flow stays usable in dev.
-  async _sendOtpEmail(email, otp, purpose) {
+  async _sendOtpEmail(email, otp, purpose, extra = {}) {
     if (!this.emailSender) return { success: false, reason: 'no email sender configured' };
     try {
-      return await this.emailSender({ email, otp, purpose });
+      return await this.emailSender({ email, otp, purpose, ...extra });
     } catch (e) {
       console.error('[wallet-account] OTP email send failed:', e.message);
       return { success: false, error: e.message };
