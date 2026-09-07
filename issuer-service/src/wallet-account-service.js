@@ -22,7 +22,7 @@ export class WalletAccountService {
     issuerName,
     siteUrl,
     otpTtlMs = 10 * 60 * 1000,
-    tokenTtl = '10m',
+    tokenTtl = process.env.ACCESS_TOKEN_TTL || '24h',
     emailSender = null,
   } = {}) {
     this.issuerId = issuerId;
