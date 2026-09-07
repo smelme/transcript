@@ -17,6 +17,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Email
@@ -25,6 +26,7 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.Checkbox
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -47,6 +49,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -389,7 +392,12 @@ private fun formatDate(raw: String?): String? {
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun CredentialDetailScreen(repository: WalletRepository, credentialId: String, onBack: () -> Unit) {
+fun CredentialDetailScreen(
+    repository: WalletRepository,
+    credentialId: String,
+    onBack: () -> Unit,
+    onShare: () -> Unit,
+) {
     val summary = remember(credentialId) { repository.credentialSummary(credentialId) }
     var confirmDelete by remember { mutableStateOf(false) }
     var deleting by remember { mutableStateOf(false) }
@@ -495,6 +503,14 @@ fun CredentialDetailScreen(repository: WalletRepository, credentialId: String, o
             }
             Spacer(Modifier.height(24.dp))
             Button(
+                onClick = onShare,
+                modifier = Modifier.fillMaxWidth().height(52.dp),
+                shape = RoundedCornerShape(14.dp),
+            ) {
+                Text("Share credential", fontWeight = FontWeight.Bold, fontSize = 16.sp)
+            }
+            Spacer(Modifier.height(12.dp))
+            Button(
                 onClick = { confirmDelete = true },
                 enabled = !deleting,
                 modifier = Modifier.fillMaxWidth(),
@@ -558,5 +574,227 @@ private fun DetailRow(label: String, value: String?) {
             fontWeight = FontWeight.SemiBold,
             textAlign = TextAlign.End,
         )
+    }
+}
+
+private data class ShareCategory(val id: String, val label: String, val description: String)
+
+private val ShareCategories = listOf(
+    ShareCategory("personal", "Personal information", "Name and date of birth"),
+    ShareCategory("qualification", "Qualification information", "Institution, degree and graduation date"),
+    ShareCategory("transcript", "Transcript information", "Student ID, courses and status"),
+)
+
+/** Multi-step selective-disclosure share flow (alternative to DCAPI presentment). */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun ShareFlowScreen(
+    repository: WalletRepository,
+    credentialId: String,
+    onDone: () -> Unit,
+    onBack: () -> Unit,
+) {
+    var step by remember { mutableStateOf(0) } // 0 = disclosure, 1 = recipient, 2 = success
+    var selected by remember { mutableStateOf(setOf<String>()) }
+    var recipientName by remember { mutableStateOf("") }
+    var recipientEmail by remember { mutableStateOf("") }
+    var message by remember { mutableStateOf("") }
+    var termsAccepted by remember { mutableStateOf(false) }
+    var busy by remember { mutableStateOf(false) }
+    var error by remember { mutableStateOf<String?>(null) }
+    var sharedTo by remember { mutableStateOf<String?>(null) }
+    val scope = rememberCoroutineScope()
+
+    val submit: () -> Unit = {
+        scope.launch {
+            busy = true
+            error = null
+            repository.createShare(
+                credentialId = credentialId,
+                categories = selected.toList(),
+                recipientName = recipientName,
+                recipientEmail = recipientEmail,
+                message = message,
+            ).onSuccess { created ->
+                val shareId = created.shareId ?: error("No share id returned")
+                val deviceRequest = created.deviceRequest ?: error("No device request returned")
+                val encryptionInfo = created.encryptionInfo ?: error("No encryption info returned")
+                val origin = created.origin ?: error("No origin returned")
+                repository.submitShare(shareId, credentialId, deviceRequest, encryptionInfo, origin)
+                    .onSuccess {
+                        sharedTo = recipientEmail
+                        step = 2
+                    }
+                    .onFailure { error = it.message }
+            }.onFailure { error = it.message }
+            busy = false
+        }
+    }
+
+    Scaffold(
+        topBar = {
+            TopAppBar(
+                title = { Text("Share credential") },
+                navigationIcon = { TextButton(onClick = onBack) { Text("Back") } },
+            )
+        },
+    ) { padding ->
+        Column(
+            Modifier
+                .fillMaxSize()
+                .padding(padding)
+                .verticalScroll(rememberScrollState())
+                .padding(16.dp),
+        ) {
+            when (step) {
+                0 -> {
+                    Text(
+                        "What would you like to share?",
+                        style = MaterialTheme.typography.titleLarge,
+                        fontWeight = FontWeight.Bold,
+                    )
+                    Spacer(Modifier.height(6.dp))
+                    Text(
+                        "Select the sections of this credential to disclose. Only the selected fields are sent.",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.6f),
+                    )
+                    Spacer(Modifier.height(16.dp))
+                    for (category in ShareCategories) {
+                        Card(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(vertical = 6.dp)
+                                .clickable {
+                                    selected = if (category.id in selected) selected - category.id
+                                    else selected + category.id
+                                },
+                            shape = RoundedCornerShape(16.dp),
+                            colors = CardDefaults.cardColors(
+                                containerColor = if (category.id in selected)
+                                    MaterialTheme.colorScheme.primaryContainer
+                                else MaterialTheme.colorScheme.surface,
+                            ),
+                            elevation = CardDefaults.cardElevation(defaultElevation = 1.dp),
+                        ) {
+                            Row(
+                                modifier = Modifier.fillMaxWidth().padding(16.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                            ) {
+                                Column(Modifier.weight(1f)) {
+                                    Text(category.label, fontWeight = FontWeight.Bold)
+                                    Text(
+                                        category.description,
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    )
+                                }
+                                Checkbox(
+                                    checked = category.id in selected,
+                                    onCheckedChange = { checked ->
+                                        selected = if (checked) selected + category.id
+                                        else selected - category.id
+                                    },
+                                )
+                            }
+                        }
+                    }
+                    Spacer(Modifier.height(20.dp))
+                    Button(
+                        onClick = { step = 1 },
+                        enabled = selected.isNotEmpty(),
+                        modifier = Modifier.fillMaxWidth().height(52.dp),
+                        shape = RoundedCornerShape(14.dp),
+                    ) { Text("Continue", fontWeight = FontWeight.Bold) }
+                }
+
+                1 -> {
+                    Text(
+                        "Recipient details",
+                        style = MaterialTheme.typography.titleLarge,
+                        fontWeight = FontWeight.Bold,
+                    )
+                    Spacer(Modifier.height(16.dp))
+                    OutlinedTextField(
+                        value = recipientName,
+                        onValueChange = { recipientName = it },
+                        label = { Text("Recipient name") },
+                        singleLine = true,
+                        shape = RoundedCornerShape(14.dp),
+                        modifier = Modifier.fillMaxWidth(),
+                    )
+                    Spacer(Modifier.height(12.dp))
+                    OutlinedTextField(
+                        value = recipientEmail,
+                        onValueChange = { recipientEmail = it },
+                        label = { Text("Recipient email") },
+                        singleLine = true,
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email),
+                        shape = RoundedCornerShape(14.dp),
+                        modifier = Modifier.fillMaxWidth(),
+                    )
+                    Spacer(Modifier.height(12.dp))
+                    OutlinedTextField(
+                        value = message,
+                        onValueChange = { message = it },
+                        label = { Text("Message (optional)") },
+                        minLines = 2,
+                        maxLines = 4,
+                        shape = RoundedCornerShape(14.dp),
+                        modifier = Modifier.fillMaxWidth(),
+                    )
+                    Spacer(Modifier.height(16.dp))
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Checkbox(
+                            checked = termsAccepted,
+                            onCheckedChange = { termsAccepted = it },
+                        )
+                        Text(
+                            "I acknowledge and agree to the terms and conditions",
+                            style = MaterialTheme.typography.bodyMedium,
+                            modifier = Modifier.weight(1f),
+                        )
+                    }
+                    error?.let {
+                        Spacer(Modifier.height(8.dp))
+                        Text(it, color = MaterialTheme.colorScheme.error)
+                    }
+                    Spacer(Modifier.height(20.dp))
+                    Button(
+                        onClick = submit,
+                        enabled = !busy && recipientName.isNotBlank() && recipientEmail.isNotBlank() && termsAccepted,
+                        modifier = Modifier.fillMaxWidth().height(52.dp),
+                        shape = RoundedCornerShape(14.dp),
+                    ) {
+                        Text(if (busy) "Sharing…" else "Share", fontWeight = FontWeight.Bold)
+                    }
+                }
+
+                else -> {
+                    Column(
+                        Modifier.fillMaxWidth().padding(top = 24.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                    ) {
+                        Text(
+                            "Shared",
+                            style = MaterialTheme.typography.headlineMedium,
+                            fontWeight = FontWeight.Bold,
+                        )
+                        Spacer(Modifier.height(10.dp))
+                        Text(
+                            "The selected information was shared with ${sharedTo ?: "the recipient"}.",
+                            style = MaterialTheme.typography.bodyLarge,
+                            textAlign = TextAlign.Center,
+                        )
+                        Spacer(Modifier.height(24.dp))
+                        Button(
+                            onClick = onDone,
+                            modifier = Modifier.fillMaxWidth().height(52.dp),
+                            shape = RoundedCornerShape(14.dp),
+                        ) { Text("Done", fontWeight = FontWeight.Bold) }
+                    }
+                }
+            }
+        }
     }
 }

@@ -70,6 +70,65 @@ class WalletRepository(private val client: IssuerClient, private val store: Secu
     private fun CredentialSummary.hasDisplayFields(): Boolean =
         fullName.isNotBlank() || institution.isNotBlank() || degreeLevel.isNotBlank() || graduationDate.isNotBlank()
 
+    /**
+     * Step 1 of sharing: ask the issuer to prepare a one-time verifier request
+     * for the selected disclosure categories and return the DCAPI parameters
+     * (deviceRequest + encryptionInfo + origin) the wallet needs to build the
+     * encrypted envelope.
+     */
+    suspend fun createShare(
+        credentialId: String,
+        categories: List<String>,
+        recipientName: String,
+        recipientEmail: String,
+        message: String,
+    ): Result<ShareCreateResponse> = runCatching {
+        val token = store.accessToken() ?: error("Not signed in")
+        val response = client.createShare(
+            ShareCreateRequest(
+                accessToken = token,
+                credentialId = credentialId,
+                categories = categories,
+                recipientName = recipientName,
+                recipientEmail = recipientEmail,
+                message = message,
+            )
+        )
+        require(response.success) { response.error ?: "Could not prepare share" }
+        response
+    }
+
+    /**
+     * Step 2 of sharing: build the same HPKE-encrypted, selectively-disclosed
+     * DeviceResponse the wallet uses for DCAPI presentment, and submit it to the
+     * issuer, which forwards it to the verifier service.
+     */
+    suspend fun submitShare(
+        shareId: String,
+        credentialId: String,
+        deviceRequest: String,
+        encryptionInfo: String,
+        origin: String,
+    ): Result<Unit> = runCatching {
+        val token = store.accessToken() ?: error("Not signed in")
+        val mdoc = store.mdoc(credentialId) ?: error("Credential could not be unlocked")
+        val envelope = com.smartcollege.transcript.wallet.presentation.MdocResponseBuilder.build(
+            deviceRequestBase64Url = deviceRequest,
+            encryptionInfoBase64Url = encryptionInfo,
+            origin = origin,
+            mdocBase64Url = mdoc,
+            devicePrivateKey = store.devicePrivateKey(),
+        )
+        val response = client.submitShare(
+            shareId,
+            ShareSubmitRequest(
+                accessToken = token,
+                credential = ShareCredential(protocol = "org-iso-mdoc", data = envelope),
+            )
+        )
+        require(response.success) { response.error ?: "Share failed" }
+    }
+
     fun isSignedIn(): Boolean = store.accessToken() != null
 
     /** Clear the access token and owner so the wallet returns to the sign-in screen. */

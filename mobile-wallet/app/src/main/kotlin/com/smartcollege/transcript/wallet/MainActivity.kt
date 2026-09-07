@@ -28,6 +28,7 @@ import com.smartcollege.transcript.wallet.ui.CredentialDetailScreen
 import com.smartcollege.transcript.wallet.ui.CredentialListScreen
 import com.smartcollege.transcript.wallet.ui.OfferScanScreen
 import com.smartcollege.transcript.wallet.ui.QualsTheme
+import com.smartcollege.transcript.wallet.ui.ShareFlowScreen
 import com.smartcollege.transcript.wallet.ui.SignInScreen
 
 class MainActivity : FragmentActivity() {
@@ -56,6 +57,7 @@ sealed interface Screen {
     data object Scan : Screen
     data object List : Screen
     data class Detail(val credentialId: String) : Screen
+    data class Share(val credentialId: String) : Screen
 }
 
 @Composable
@@ -196,6 +198,13 @@ fun WalletApp(repository: WalletRepository, activity: FragmentActivity) {
                     hasCredentials = repository.credentialIds().isNotEmpty()
                     screen = Screen.List
                 },
+                onShare = { screen = Screen.Share(current.credentialId) },
+            )
+            is Screen.Share -> ShareFlowScreen(
+                repository,
+                current.credentialId,
+                onDone = { screen = Screen.List },
+                onBack = { screen = Screen.Detail(current.credentialId) },
             )
         }
     }

@@ -19,6 +19,7 @@ import {
   verifyIssuerSigned,
 } from '../../mdoc-core.js';
 import { WalletAccountService } from './wallet-account-service.js';
+import { ShareService } from './share-service.js';
 import * as emailService from './email-service.js';
 
 dotenv.config({
@@ -757,6 +758,16 @@ const walletAccounts = new WalletAccountService({
   emailSender: emailService.sendOtpEmail,
 });
 
+// Selective-disclosure "share" flow (alternative to DCAPI integration).
+const shareService = new ShareService({
+  issuerService: issuer,
+  walletAccounts,
+  verifierApiUrl: process.env.VERIFIER_API_URL || 'http://localhost:3001',
+  siteUrl: process.env.ISSUER_FRONTEND_URL || process.env.ISSUER_BASE_URL || 'http://localhost:3002',
+  origin: process.env.ISSUER_FRONTEND_URL || process.env.ISSUER_BASE_URL || 'http://localhost:3002',
+  emailSender: emailService.sendEmail,
+});
+
 // Build an OpenID4VCI credential-offer URL that references an issuance session.
 function buildCredentialOfferUrl(session) {
   const offer = {
@@ -1001,6 +1012,97 @@ app.post('/wallet/issuance', async (req, res) => {
     mdocBase64url: result.mdocBase64url,
     deviceBound: result.deviceBound,
   });
+});
+
+// ── Selective-disclosure share flow (no DCAPI integration required) ──────
+// 1. Wallet creates a share: issuer mints a one-time verifier request for the
+//    selected namespaces and returns deviceRequest + encryptionInfo.
+app.post('/shares', async (req, res) => {
+  try {
+    const result = await shareService.create(req.body || {});
+    res.status(201).json(result);
+  } catch (e) {
+    res.status(400).json({ success: false, error: e.message });
+  }
+});
+
+// 2. Wallet returns the HPKE-encrypted, selectively-disclosed DeviceResponse.
+//    The issuer forwards it to the verifier and stores the verified claims.
+app.post('/shares/:id/response', async (req, res) => {
+  try {
+    const result = await shareService.submit({
+      shareId: req.params.id,
+      accessToken: req.body?.accessToken,
+      credential: req.body?.credential,
+    });
+    res.json(result);
+  } catch (e) {
+    res.status(400).json({ success: false, error: e.message });
+  }
+});
+
+// 3. Recipient access: OTP sign-in with the invited email, accept terms, view.
+app.post('/shares/:id/otp', async (req, res) => {
+  try {
+    res.json(await shareService.requestOtp({
+      shareId: req.params.id,
+      email: req.body?.email,
+    }));
+  } catch (e) {
+    res.status(400).json({ success: false, error: e.message });
+  }
+});
+
+app.post('/shares/:id/verify', (req, res) => {
+  try {
+    res.json(shareService.verifyOtp({
+      shareId: req.params.id,
+      email: req.body?.email,
+      otp: req.body?.otp,
+    }));
+  } catch (e) {
+    res.status(400).json({ success: false, error: e.message });
+  }
+});
+
+app.post('/shares/:id/accept-terms', (req, res) => {
+  try {
+    res.json(shareService.acceptTerms({
+      shareId: req.params.id,
+      recipientToken: req.body?.recipientToken,
+    }));
+  } catch (e) {
+    res.status(400).json({ success: false, error: e.message });
+  }
+});
+
+app.post('/shares/:id/view', (req, res) => {
+  try {
+    res.json(shareService.view({
+      shareId: req.params.id,
+      recipientToken: req.body?.recipientToken,
+    }));
+  } catch (e) {
+    res.status(400).json({ success: false, error: e.message });
+  }
+});
+
+app.get('/shares/:id/pdf', (req, res) => {
+  try {
+    const result = shareService.pdf({
+      shareId: req.params.id,
+      recipientToken: req.query.token || req.headers['x-share-token'],
+    });
+    res.setHeader('content-type', 'application/pdf');
+    res.setHeader('content-disposition', `attachment; filename="${result.filename}"`);
+    res.send(result.pdf);
+  } catch (e) {
+    res.status(400).json({ success: false, error: e.message });
+  }
+});
+
+app.get('/shares', (req, res) => {
+  res.json({ success: true, shares: shareService.list() });
 });
 
 // Error handler

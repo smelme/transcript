@@ -72,14 +72,17 @@ const jwkToCoseKey = (jwk) => {
 
 // Mirrors id-verifier's MDOCProtocolHelper._createDeviceRequest for the
 // academic namespaces, including the required DeviceRequestInfo use-case.
-function createMdocDeviceRequest() {
+// `requestedNameSpaces` is `{ namespace: [field, ...] }`; defaults to the
+// academic set (used by the interactive verifier flow).
+function createMdocDeviceRequest(requestedNameSpaces, docType) {
+  const source = requestedNameSpaces || ACADEMIC_NAME_SPACES;
   const nameSpaces = {};
-  for (const [namespace, fields] of Object.entries(ACADEMIC_NAME_SPACES)) {
+  for (const [namespace, fields] of Object.entries(source)) {
     nameSpaces[namespace] = {};
     for (const field of fields) nameSpaces[namespace][field] = true;
   }
 
-  const itemsRequest = { docType: ACADEMIC_DOC_TYPE, nameSpaces };
+  const itemsRequest = { docType: docType || ACADEMIC_DOC_TYPE, nameSpaces };
   const docRequests = [{
     itemsRequest: new cbor2.Tag(24, cbor2.encode(itemsRequest)),
   }];
@@ -131,7 +134,7 @@ export class PresentationSessionService {
     this.sessions = new Map();
   }
 
-  async create({ relyingPartyId, origin }) {
+  async create({ relyingPartyId, origin, nameSpaces, docType }) {
     if (!relyingPartyId || !origin) throw new Error('relyingPartyId and origin are required');
     let parsedOrigin;
     try { parsedOrigin = new URL(origin); } catch { throw new Error('origin must be an absolute URL'); }
@@ -148,7 +151,7 @@ export class PresentationSessionService {
         requests: [{
           protocol: 'org-iso-mdoc',
           data: {
-            deviceRequest: createMdocDeviceRequest(),
+            deviceRequest: createMdocDeviceRequest(nameSpaces, docType),
             encryptionInfo: createEncryptionInfo(nonce, jwk),
           },
         }],
@@ -186,7 +189,15 @@ export class PresentationSessionService {
       throw new Error('A valid org-iso-mdoc credential response is required');
     }
 
-    const result = await processCredentials(credential, {
+    // The browser DCAPI surfaces `credential.data` as an object with a
+    // base64url `response`; the wallet's direct HTTP submission sends the
+    // base64url response string itself. Normalise both to the DCAPI shape.
+    const credentialForVerifier =
+      typeof credential.data === 'string'
+        ? { ...credential, data: { response: credential.data } }
+        : credential;
+
+    const result = await processCredentials(credentialForVerifier, {
       nonce: session.nonce,
       jwk: session.jwk,
       origin: session.origin,
@@ -211,6 +222,10 @@ export class PresentationSessionService {
         degreeLevel: claims.degree_level || null,
         graduationDate: claims.graduation_date || null,
       },
+      // Full disclosed element values (flattened, keyed by element identifier)
+      // so callers such as the issuer's "share" flow can persist every
+      // selectively-disclosed field, not just the academic subset above.
+      allClaims: claims,
     };
   }
 

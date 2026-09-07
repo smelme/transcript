@@ -68,3 +68,6 @@ test-results/
 *.key
 secrets/
 .keys/
+
+# Runtime share persistence
+issuer-service/data/

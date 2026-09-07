@@ -44,9 +44,47 @@ data class IssuanceResponse(
     val error: String? = null,
 )
 
+@Serializable
+data class ShareCreateRequest(
+    val accessToken: String,
+    val credentialId: String,
+    val categories: List<String>,
+    val recipientName: String,
+    val recipientEmail: String,
+    val message: String = "",
+)
+
+@Serializable
+data class ShareCreateResponse(
+    val success: Boolean = false,
+    val shareId: String? = null,
+    val status: String? = null,
+    val deviceRequest: String? = null,
+    val encryptionInfo: String? = null,
+    val origin: String? = null,
+    val error: String? = null,
+)
+
+@Serializable
+data class ShareCredential(val protocol: String, val data: String)
+
+@Serializable
+data class ShareSubmitRequest(
+    val accessToken: String,
+    val credential: ShareCredential,
+)
+
+@Serializable
+data class ShareSubmitResponse(
+    val success: Boolean = false,
+    val shareId: String? = null,
+    val status: String? = null,
+    val error: String? = null,
+)
+
 /**
  * HTTP client for the issuer's wallet-facing endpoints:
- *   POST /auth/otp, POST /auth/token, POST /wallet/issuance
+ *   POST /auth/otp, POST /auth/token, POST /wallet/issuance, POST /shares
  */
 class IssuerClient(private val baseUrl: String) {
 
@@ -72,5 +110,17 @@ class IssuerClient(private val baseUrl: String) {
         client.post("$baseUrl/wallet/issuance") {
             contentType(ContentType.Application.Json)
             setBody(IssuanceRequest(offerUrl, accessToken, cwt))
+        }.body()
+
+    suspend fun createShare(request: ShareCreateRequest): ShareCreateResponse =
+        client.post("$baseUrl/shares") {
+            contentType(ContentType.Application.Json)
+            setBody(request)
+        }.body()
+
+    suspend fun submitShare(shareId: String, request: ShareSubmitRequest): ShareSubmitResponse =
+        client.post("$baseUrl/shares/${shareId}/response") {
+            contentType(ContentType.Application.Json)
+            setBody(request)
         }.body()
 }
