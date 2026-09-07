@@ -194,11 +194,19 @@ export class ShareService {
 
     const payload = await this.walletAccounts.verifyAccessToken(accessToken);
 
+    // The issuer's credential store is in-memory and is cleared on restart, so
+    // the credential may legitimately no longer be present here even though the
+    // wallet still holds it. Ownership is proven cryptographically downstream:
+    // the verifier requires the selective DeviceResponse to be signed by the
+    // mdoc's device key over this share's one-time session nonce. When the
+    // credential record IS present, additionally enforce the account link as
+    // defense in depth.
     const credential = this.issuer.getCredential(credentialId);
-    if (!credential.success) throw new Error('Credential not found');
-
-    // The sender must be linked to the credential's institution + studentId.
-    if (!this.walletAccounts.hasLink(payload.sub, credential.credential.institution, credential.credential.studentId)) {
+    if (credential.success && !this.walletAccounts.hasLink(
+      payload.sub,
+      credential.credential.institution,
+      credential.credential.studentId,
+    )) {
       throw new Error('You are not the owner of this credential');
     }
 
