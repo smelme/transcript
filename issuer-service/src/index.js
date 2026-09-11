@@ -936,13 +936,38 @@ class IssuerService {
     }
   }
 
-  getStatistics() {
+  /**
+   * Statistics for the whole platform, or for a single client organisation when
+   * one is named. An organisation's figures are derived from the credentials it
+   * issued, so they can never include anybody else's.
+   */
+  getStatistics(institution = null) {
+    if (!institution) {
+      return {
+        issuerId: this.issuerId,
+        issuerName: this.issuerName,
+        ...this.statistics,
+        // The counters above are per-process and reset on restart; the store is the
+        // durable truth, so the totals are taken from it.
+        totalIssued: this.credentials.size,
+        totalRevoked: this.revokedCredentials.size,
+        credentialsInSystem: this.credentials.size,
+        activeCredentials: this.credentials.size - this.revokedCredentials.size
+      };
+    }
+
+    const mine = Array.from(this.credentials.values()).filter(
+      (credential) => credential.institution === institution,
+    );
+    const revoked = mine.filter((credential) => credential.status === 'revoked').length;
     return {
       issuerId: this.issuerId,
       issuerName: this.issuerName,
-      ...this.statistics,
-      credentialsInSystem: this.credentials.size,
-      activeCredentials: this.credentials.size - this.revokedCredentials.size
+      institution,
+      totalIssued: mine.length,
+      totalRevoked: revoked,
+      credentialsInSystem: mine.length,
+      activeCredentials: mine.length - revoked,
     };
   }
 
@@ -954,6 +979,14 @@ class IssuerService {
     }
     if (filters.studentId) {
       log = log.filter(entry => entry.studentId === filters.studentId);
+    }
+    // Organisation scope: only events about that organisation's own credentials.
+    if (filters.institution) {
+      log = log.filter(
+        (entry) =>
+          entry.credentialId
+          && this.credentials.get(entry.credentialId)?.institution === filters.institution,
+      );
     }
     if (filters.limit) {
       log = log.slice(-filters.limit);
@@ -1224,21 +1257,24 @@ app.get('/credentials/:id/mdoc', (req, res) => {
   res.status(result.success ? 200 : 404).json(result);
 });
 
-// Statistics
-app.get('/statistics', (req, res) => {
-  const stats = issuer.getStatistics();
-  res.json({ success: true, statistics: stats });
+// Statistics. A platform administrator sees the whole network; an
+// organisation-scoped administrator sees only its own numbers.
+app.get('/statistics', async (req, res) => {
+  if (!(await requireAdmin(req, res))) return;
+  res.json({ success: true, statistics: issuer.getStatistics(req.admin.institution || null) });
 });
 
-// Audit log
-app.get('/audit-log', (req, res) => {
+// Audit log, scoped the same way: an organisation only ever sees events about the
+// credentials it issued.
+app.get('/audit-log', async (req, res) => {
+  if (!(await requireAdmin(req, res))) return;
   const filters = {
     action: req.query.action,
     studentId: req.query.studentId,
-    limit: parseInt(req.query.limit) || 100
+    limit: parseInt(req.query.limit) || 100,
+    institution: req.admin.institution || null,
   };
-  const result = issuer.getAuditLog(filters);
-  res.json(result);
+  res.json(issuer.getAuditLog(filters));
 });
 
 // ── Wallet account provisioning (invitation + email OTP) ───────────────────
@@ -1324,18 +1360,16 @@ app.post('/admin/auth/password', async (req, res) => {
   }
 });
 
+// Managing administrators is platform administration: an organisation-scoped
+// administrator can neither list nor create them.
 app.get('/admin/users', async (req, res) => {
-  if (!(await requireAdmin(req, res))) return;
+  if (!(await requirePlatformAdmin(req, res))) return;
   res.json({ success: true, users: adminAuth.listAdmins() });
 });
 
 app.post('/admin/users', async (req, res) => {
-  if (!(await requireAdmin(req, res))) return;
-  // An organisation-scoped administrator may only create administrators for its
-  // own organisation; a platform administrator may create either.
-  const institution = req.admin.institution
-    ? req.admin.institution
-    : (req.body?.institution ? String(req.body.institution).trim() : null);
+  if (!(await requirePlatformAdmin(req, res))) return;
+  const institution = req.body?.institution ? String(req.body.institution).trim() : null;
   if (institution) clientOrgs.ensureOrg(institution);
   try {
     res.status(201).json({
@@ -1353,7 +1387,7 @@ app.post('/admin/users', async (req, res) => {
 });
 
 app.post('/admin/users/:id/active', async (req, res) => {
-  if (!(await requireAdmin(req, res))) return;
+  if (!(await requirePlatformAdmin(req, res))) return;
   try {
     res.json({ success: true, user: adminAuth.setActive(req.params.id, !!req.body?.active) });
   } catch (e) {
@@ -1367,7 +1401,14 @@ app.post('/admin/users/:id/active', async (req, res) => {
 // manage its own keys; a platform administrator can manage any organisation's.
 app.get('/admin/orgs', async (req, res) => {
   if (!(await requireAdmin(req, res))) return;
-  res.json({ success: true, orgs: clientOrgs.listOrgs() });
+  // An organisation-scoped administrator only ever sees its own organisation.
+  const orgs = clientOrgs.listOrgs();
+  res.json({
+    success: true,
+    orgs: req.admin.institution
+      ? orgs.filter((org) => org.institution === req.admin.institution)
+      : orgs,
+  });
 });
 
 app.get('/admin/api-keys', async (req, res) => {
@@ -1485,8 +1526,25 @@ async function requireAdmin(req, res) {
   return false;
 }
 
+/**
+ * Require a platform administrator: one who is not scoped to a single client
+ * organisation. Network-wide data — wallet accounts, sharing, other
+ * organisations and administrator records — is only ever visible to them.
+ */
+async function requirePlatformAdmin(req, res) {
+  if (!(await requireAdmin(req, res))) return false;
+  if (req.admin.institution) {
+    res.status(403).json({
+      success: false,
+      error: 'This area is limited to the platform operator',
+    });
+    return false;
+  }
+  return true;
+}
+
 app.post('/admin/accounts/:sub/deactivate', async (req, res) => {
-  if (!(await requireAdmin(req, res))) return;
+  if (!(await requirePlatformAdmin(req, res))) return;
   try {
     res.json(walletAccounts.deactivateAccount(req.params.sub));
   } catch (e) {
@@ -1495,7 +1553,7 @@ app.post('/admin/accounts/:sub/deactivate', async (req, res) => {
 });
 
 app.post('/admin/accounts/:sub/activate', async (req, res) => {
-  if (!(await requireAdmin(req, res))) return;
+  if (!(await requirePlatformAdmin(req, res))) return;
   try {
     res.json(walletAccounts.activateAccount(req.params.sub));
   } catch (e) {
@@ -1504,7 +1562,7 @@ app.post('/admin/accounts/:sub/activate', async (req, res) => {
 });
 
 app.post('/admin/accounts/:sub/delete', async (req, res) => {
-  if (!(await requireAdmin(req, res))) return;
+  if (!(await requirePlatformAdmin(req, res))) return;
   try {
     res.json(walletAccounts.deleteAccount(req.params.sub));
   } catch (e) {
@@ -1514,7 +1572,7 @@ app.post('/admin/accounts/:sub/delete', async (req, res) => {
 
 // ── Management portal: accounts + shares ─────────────────────────────────
 app.get('/admin/accounts', async (req, res) => {
-  if (!(await requireAdmin(req, res))) return;
+  if (!(await requirePlatformAdmin(req, res))) return;
   try {
     res.json({ success: true, accounts: walletAccounts.listAccounts() });
   } catch (e) {
@@ -1522,8 +1580,10 @@ app.get('/admin/accounts', async (req, res) => {
   }
 });
 
+// A share is a holder disclosing their own credential; client organisations do not
+// administer sharing, so this is platform-only.
 app.delete('/shares/:id', async (req, res) => {
-  if (!(await requireAdmin(req, res))) return;
+  if (!(await requirePlatformAdmin(req, res))) return;
   try {
     res.json(shareService.revoke({ shareId: req.params.id, reason: req.body?.reason || null }));
   } catch (e) {
@@ -1870,7 +1930,11 @@ app.get('/shares/:id/pdf', (req, res) => {
   }
 });
 
-app.get('/shares', (req, res) => {
+// Listing shares spans every holder and every organisation, so it is limited to the
+// platform operator. Recipients still reach their own share through the tokenised
+// routes below.
+app.get('/shares', async (req, res) => {
+  if (!(await requirePlatformAdmin(req, res))) return;
   res.json({ success: true, shares: shareService.list() });
 });
 

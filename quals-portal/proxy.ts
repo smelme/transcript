@@ -26,5 +26,8 @@ export function proxy(req: NextRequest) {
 }
 
 export const config = {
-  matcher: ['/((?!api|_next/static|_next/image|favicon.ico).*)'],
+  // Gate everything except the API routes themselves (the session endpoint has to
+  // stay reachable) and static assets. Note the slash: a bare `api` would also
+  // exclude the `/api-keys` page, which must be gated like any other page.
+  matcher: ['/((?!api/|_next/static|_next/image|favicon.ico).*)'],
 };

@@ -58,13 +58,7 @@ export async function listCredentials(params: { studentId?: string; status?: str
   return data.credentials || [];
 }
 
-/* ── Client organisations and API keys ──────────────────────────────────── */
-
-export interface ClientOrg {
-  institution: string;
-  name: string;
-  createdAt?: string;
-}
+/* ── Client organisations and their API keys ────────────────────────────── */
 
 export interface ApiKey {
   keyId: string;
@@ -84,11 +78,6 @@ export interface CreatedApiKey {
   key: string;
   institution: string;
   error?: string;
-}
-
-export async function listOrgs(): Promise<ClientOrg[]> {
-  const data = await request<{ orgs?: ClientOrg[] }>('/admin/orgs');
-  return data.orgs || [];
 }
 
 export async function listApiKeys(): Promise<ApiKey[]> {

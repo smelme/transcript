@@ -15,8 +15,12 @@ import {
   type Statistics,
   type WalletAccount,
 } from './lib/api';
+import { isPlatformAdmin, useAdmin } from './components/session';
 
 export default function OverviewPage() {
+  const admin = useAdmin();
+  const platform = isPlatformAdmin(admin);
+
   const [stats, setStats] = useState<Statistics | null>(null);
   const [credentials, setCredentials] = useState<Credential[]>([]);
   const [shares, setShares] = useState<Share[]>([]);
@@ -26,27 +30,32 @@ export default function OverviewPage() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    // Wait until the session says which scope this administrator has: network-wide
+    // figures, shares and wallet accounts are not available to an organisation.
+    if (!admin) return;
     (async () => {
       try {
-        const [s, c, sh, a, log] = await Promise.all([
+        const [s, c, log] = await Promise.all([
           getStatistics(),
           listCredentials(),
-          listShares(),
-          listAccounts(),
           getAuditLog(15),
         ]);
         setStats(s);
         setCredentials(c);
-        setShares(sh);
-        setAccounts(a);
         setAudit(log.reverse());
+
+        if (platform) {
+          const [sh, a] = await Promise.all([listShares(), listAccounts()]);
+          setShares(sh);
+          setAccounts(a);
+        }
       } catch (e) {
         setError((e as Error).message);
       } finally {
         setLoading(false);
       }
     })();
-  }, []);
+  }, [admin, platform]);
 
   const activeShares = shares.filter((s) => s.status === 'shared').length;
   const revoked = credentials.filter((c) => c.status === 'revoked').length;
@@ -56,7 +65,11 @@ export default function OverviewPage() {
     <main>
       <PageHeader
         title="Overview"
-        subtitle="Issued credentials, active sharing and wallet accounts across the network."
+        subtitle={
+          platform
+            ? 'Issued credentials, active sharing and wallet accounts across the network.'
+            : `Credentials issued by ${admin?.institution ?? 'your organisation'}.`
+        }
         actions={
           <Link href="/credentials" className="btn btn-secondary">
             View credentials
@@ -75,8 +88,12 @@ export default function OverviewPage() {
               <Stat label="Credentials issued" value={stats?.totalIssued ?? credentials.length} hint="All time" />
               <Stat label="Active credentials" value={stats?.activeCredentials ?? credentials.length - revoked} hint="Currently valid" />
               <Stat label="Revoked" value={stats?.totalRevoked ?? revoked} hint="No longer valid" />
-              <Stat label="Active shares" value={activeShares} hint={`${shares.length} total`} />
-              <Stat label="Wallet accounts" value={activeAccounts} hint={`${accounts.length} total`} />
+              {platform && (
+                <>
+                  <Stat label="Active shares" value={activeShares} hint={`${shares.length} total`} />
+                  <Stat label="Wallet accounts" value={activeAccounts} hint={`${accounts.length} total`} />
+                </>
+              )}
             </div>
 
             <section className="card">

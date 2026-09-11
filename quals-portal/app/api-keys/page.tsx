@@ -2,28 +2,24 @@
 
 import { useEffect, useState } from 'react';
 import { PageHeader, StatusBadge, formatDate } from '../components/ui';
-import {
-  createApiKey,
-  listApiKeys,
-  listOrgs,
-  revokeApiKey,
-  type ApiKey,
-  type ClientOrg,
-} from '../lib/api';
+import { createApiKey, listApiKeys, revokeApiKey, type ApiKey } from '../lib/api';
+import { useAdmin } from '../components/session';
 
 /**
  * API keys belong to a client organisation and are how that organisation's own
  * systems issue credentials. A key is shown once, when it is created: only its
  * hash is stored, so it cannot be displayed again — if it is lost, revoke it and
  * create another.
+ *
+ * The page belongs to the organisation: a key is always created for the
+ * organisation the signed-in administrator belongs to, never for another one.
  */
 export default function ApiKeysPage() {
+  const admin = useAdmin();
   const [keys, setKeys] = useState<ApiKey[]>([]);
-  const [orgs, setOrgs] = useState<ClientOrg[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [name, setName] = useState('');
-  const [institution, setInstitution] = useState('');
   const [busy, setBusy] = useState(false);
   const [createdKey, setCreatedKey] = useState<{ key: string; institution: string } | null>(null);
   const [target, setTarget] = useState<ApiKey | null>(null);
@@ -31,10 +27,7 @@ export default function ApiKeysPage() {
   async function refresh() {
     setLoading(true);
     try {
-      const [nextKeys, nextOrgs] = await Promise.all([listApiKeys(), listOrgs()]);
-      setKeys(nextKeys);
-      setOrgs(nextOrgs);
-      if (!institution && nextOrgs.length) setInstitution(nextOrgs[0].institution);
+      setKeys(await listApiKeys());
       setError(null);
     } catch (e) {
       setError((e as Error).message);
@@ -53,7 +46,7 @@ export default function ApiKeysPage() {
     setBusy(true);
     setError(null);
     try {
-      const created = await createApiKey({ institution: institution || undefined, name: name || undefined });
+      const created = await createApiKey({ name: name || undefined });
       setCreatedKey({ key: created.key, institution: created.institution });
       setName('');
       await refresh();
@@ -82,7 +75,7 @@ export default function ApiKeysPage() {
     <main>
       <PageHeader
         title="API keys"
-        subtitle="Keys for client organisations to issue credentials through this service."
+        subtitle={`Keys that let ${admin?.institution ?? 'your organisation'} issue credentials through this service.`}
       />
 
       <div className="content stack">
@@ -116,14 +109,7 @@ export default function ApiKeysPage() {
           <form onSubmit={submit}>
             <div className="field">
               <label htmlFor="key-org">Organisation</label>
-              <select id="key-org" value={institution} onChange={(e) => setInstitution(e.target.value)}>
-                {orgs.length === 0 && <option value="">—</option>}
-                {orgs.map((org) => (
-                  <option key={org.institution} value={org.institution}>
-                    {org.name}
-                  </option>
-                ))}
-              </select>
+              <input id="key-org" value={admin?.institution ?? ''} readOnly disabled />
             </div>
             <div className="field" style={{ marginTop: 12 }}>
               <label htmlFor="key-name">Label</label>
@@ -139,8 +125,8 @@ export default function ApiKeysPage() {
             </button>
           </form>
           <p className="muted" style={{ marginTop: 12, fontSize: 13, lineHeight: 1.6 }}>
-            A credential issued with this key belongs to the organisation above, and only administrators
-            of that organisation can see or revoke it.
+            A credential issued with this key belongs to {admin?.institution ?? 'your organisation'},
+            and only its administrators can see or revoke it.
           </p>
         </section>
 

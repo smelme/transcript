@@ -77,3 +77,6 @@ secrets/
 # Runtime share persistence
 /issuer-service/data/
 /verifier-service/data/
+
+# TypeScript incremental build state
+*.tsbuildinfo

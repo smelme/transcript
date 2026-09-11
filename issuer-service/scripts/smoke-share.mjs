@@ -147,7 +147,25 @@ if (!pdfRes.ok || pdfBytes.length < 100) throw new Error('PDF download failed');
 if (pdfBytes.subarray(0, 5).toString() !== '%PDF-') throw new Error('PDF magic bytes missing');
 console.log('pdf ok, bytes=', pdfBytes.length);
 
-// 10. List shares.
-const list = await fetch(`${ISSUER}/shares`).then((r) => r.json());
+// 10. List shares. Listing spans every holder and organisation, so it is a
+// platform-operator view: a client organisation never sees other holders' shares.
+const platformLogin = await fetch(`${ISSUER}/admin/auth/login`, {
+  method: 'POST',
+  headers: { 'content-type': 'application/json' },
+  body: JSON.stringify({
+    email: process.env.ADMIN_EMAIL || 'admin@quals.local',
+    password: process.env.ADMIN_PASSWORD || 'quals-admin-2026',
+  }),
+}).then((r) => r.json());
+if (!platformLogin.token) throw new Error('platform administrator sign-in failed');
+
+const anonymousList = await fetch(`${ISSUER}/shares`);
+if (anonymousList.status !== 401) {
+  throw new Error(`unauthenticated share listing was allowed (HTTP ${anonymousList.status})`);
+}
+
+const list = await fetch(`${ISSUER}/shares`, {
+  headers: { authorization: `Bearer ${platformLogin.token}` },
+}).then((r) => r.json());
 console.log('shares list count=', list.shares.length, 'status=', list.shares[0]?.status);
 console.log('SMOKE_TEST_PASSED');

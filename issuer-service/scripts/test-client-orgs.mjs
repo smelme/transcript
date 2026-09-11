@@ -169,5 +169,46 @@ check('listing credentials requires a sign-in of some kind', anonymousList.statu
 const batch = await call('POST', '/credentials/batch-issue', { credentials: [] }, platformAuth);
 check('batch issue no longer exists', batch.status === 404, `HTTP ${batch.status}`);
 
+// 10. An organisation's administrator only reaches its own console: the
+// network-wide views belong to the platform operator.
+const orgStats = await call('GET', '/statistics', null, adminA.auth);
+check(
+  'an organisation sees its own statistics only',
+  orgStats.status === 200 && orgStats.data.statistics?.institution === orgA,
+  JSON.stringify(orgStats.data.statistics),
+);
+
+const orgAudit = await call('GET', '/audit-log?limit=200', null, adminA.auth);
+const orgAuditIds = (orgAudit.data.auditLog || []).map((entry) => entry.credentialId).filter(Boolean);
+check('an organisation can read its audit log', orgAudit.status === 200, `HTTP ${orgAudit.status}`);
+check("the audit log carries the organisation's own events", orgAuditIds.includes(issuedA.data.credentialId));
+check(
+  "the audit log does not leak another organisation's events",
+  !orgAuditIds.includes(issuedB.data.credentialId),
+);
+
+const orgOrgs = await call('GET', '/admin/orgs', null, adminA.auth);
+check(
+  'an organisation only sees itself in the organisation list',
+  orgOrgs.status === 200 && (orgOrgs.data.orgs || []).every((org) => org.institution === orgA),
+  JSON.stringify((orgOrgs.data.orgs || []).map((org) => org.institution)),
+);
+
+for (const [label, path] of [
+  ['list wallet accounts', '/admin/accounts'],
+  ['list shares', '/shares'],
+  ['list administrators', '/admin/users'],
+]) {
+  const denied = await call('GET', path, null, adminA.auth);
+  check(`an organisation cannot ${label}`, denied.status === 403, `HTTP ${denied.status}`);
+  const permitted = await call('GET', path, null, platformAuth);
+  check(`the platform operator can ${label}`, permitted.status === 200, `HTTP ${permitted.status}`);
+}
+
+const anonymousStats = await call('GET', '/statistics');
+check('statistics require a sign-in', anonymousStats.status === 401, `HTTP ${anonymousStats.status}`);
+const anonymousAudit = await call('GET', '/audit-log');
+check('the audit log requires a sign-in', anonymousAudit.status === 401, `HTTP ${anonymousAudit.status}`);
+
 console.log(failures === 0 ? '\nCLIENT_ORGS_PASSED' : `\n${failures} CHECK(S) FAILED`);
 process.exit(failures === 0 ? 0 : 1);
