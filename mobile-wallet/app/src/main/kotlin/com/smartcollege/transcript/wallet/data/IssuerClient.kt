@@ -21,7 +21,23 @@ data class OtpResponse(val success: Boolean = false, val otp: String? = null, va
 data class TokenRequest(val email: String, val otp: String)
 
 @Serializable
-data class TokenResponse(val success: Boolean = false, val accessToken: String? = null, val sub: String? = null, val email: String? = null, val error: String? = null)
+data class TokenResponse(
+    val success: Boolean = false,
+    val accessToken: String? = null,
+    val refreshToken: String? = null,
+    val sub: String? = null,
+    val email: String? = null,
+    val error: String? = null,
+)
+
+@Serializable
+data class RefreshRequest(val refreshToken: String)
+
+@Serializable
+data class SignOutRequest(val refreshToken: String)
+
+@Serializable
+data class SimpleResponse(val success: Boolean = false, val error: String? = null)
 
 @Serializable
 data class IssuanceRequest(val offerUrl: String, val accessToken: String, val cwt: String)
@@ -104,6 +120,18 @@ class IssuerClient(private val baseUrl: String) {
         client.post("$baseUrl/auth/token") {
             contentType(ContentType.Application.Json)
             setBody(TokenRequest(email, otp))
+        }.body()
+
+    suspend fun refresh(refreshToken: String): TokenResponse =
+        client.post("$baseUrl/auth/refresh") {
+            contentType(ContentType.Application.Json)
+            setBody(RefreshRequest(refreshToken))
+        }.body()
+
+    suspend fun signOut(refreshToken: String): SimpleResponse =
+        client.post("$baseUrl/auth/signout") {
+            contentType(ContentType.Application.Json)
+            setBody(SignOutRequest(refreshToken))
         }.body()
 
     suspend fun issue(offerUrl: String, accessToken: String, cwt: String): IssuanceResponse =

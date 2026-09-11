@@ -13,6 +13,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.pointer.pointerInput
@@ -30,6 +31,7 @@ import com.smartcollege.transcript.wallet.ui.OfferScanScreen
 import com.smartcollege.transcript.wallet.ui.QualsTheme
 import com.smartcollege.transcript.wallet.ui.ShareFlowScreen
 import com.smartcollege.transcript.wallet.ui.SignInScreen
+import kotlinx.coroutines.launch
 
 class MainActivity : FragmentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -73,6 +75,7 @@ fun WalletApp(repository: WalletRepository, activity: FragmentActivity) {
     // claim coroutine before it can reach the network.
     var scannerOpen by remember { mutableStateOf(false) }
     val lifecycleOwner = LocalLifecycleOwner.current
+    val scope = rememberCoroutineScope()
 
     // Re-lock after this many ms of inactivity while the wallet is in the
     // foreground, so a phone left open on the credential list re-requires
@@ -183,12 +186,17 @@ fun WalletApp(repository: WalletRepository, activity: FragmentActivity) {
                 onScan = { screen = Screen.Scan },
                 onOpen = { screen = Screen.Detail(it) },
                 onSignOut = {
-                    repository.signOut()
+                    val refreshToken = repository.signOut()
                     // Clear the system registry so Chrome can't keep offering
                     // the previous account's credentials after sign-out.
                     repository.registerWithSystem(activity.applicationContext)
                     signedIn = false
                     screen = Screen.SignIn
+                    // Best-effort: revoke the refresh token server-side so it
+                    // can never be used for token exchange again.
+                    if (refreshToken != null) {
+                        scope.launch { repository.revokeRefreshToken(refreshToken) }
+                    }
                 },
             )
             is Screen.Detail -> CredentialDetailScreen(

@@ -21,6 +21,7 @@ import {
 import { WalletAccountService } from './wallet-account-service.js';
 import { ShareService } from './share-service.js';
 import * as emailService from './email-service.js';
+import { getDb } from '../../db.js';
 
 dotenv.config({
   path: path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../.env'),
@@ -42,6 +43,9 @@ class IssuerService {
       byType: {}
     };
     this.revokedCredentials = new Set();
+
+    // Shared database handle for credential metadata (NOT the mdoc bytes).
+    this.db = getDb();
 
     // ISO 18013-5 mdoc signing material
     this.mdocSigner = this.loadMdocSigner(options);
@@ -141,6 +145,79 @@ class IssuerService {
         }
       }
     });
+
+    this.loadPersistedCredentials();
+  }
+
+  // ── Persistence (credential metadata; the mdoc bytes are NEVER stored) ──
+  loadPersistedCredentials() {
+    try {
+      const rows = this.db.prepare('SELECT * FROM credentials').all();
+      for (const row of rows) {
+        if (row.status === 'revoked') {
+          this.revokedCredentials.add(row.credential_id);
+          continue;
+        }
+        let credential = null;
+        if (row.metadata_json) {
+          try { credential = JSON.parse(row.metadata_json); } catch { credential = null; }
+        }
+        if (!credential) {
+          credential = {
+            credentialId: row.credential_id,
+            issuerId: row.issuer_id || this.issuerId,
+            issuerName: this.issuerName,
+            docType: row.doc_type,
+            institution: row.institution,
+            studentId: row.student_id,
+            credentialType: 'PhotoID',
+            status: row.status,
+            deviceBound: !!row.device_bound,
+            createdAt: row.created_at,
+          };
+        }
+        credential.status = row.status;
+        this.credentials.set(row.credential_id, credential);
+      }
+    } catch (e) {
+      console.error('[issuer] failed to load persisted credentials:', e.message);
+    }
+  }
+
+  _persistCredential(credential) {
+    try {
+      this.db.prepare(`
+        INSERT INTO credentials
+          (credential_id, issuer_id, doc_type, institution, student_id, status, device_bound, created_at, metadata_json)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ON CONFLICT(credential_id) DO UPDATE SET
+          status = excluded.status,
+          metadata_json = excluded.metadata_json
+      `).run(
+        credential.credentialId,
+        credential.issuerId || this.issuerId,
+        credential.docType || null,
+        credential.institution || null,
+        credential.studentId || null,
+        credential.status || 'active',
+        credential.deviceBound ? 1 : 0,
+        credential.createdAt || new Date().toISOString(),
+        JSON.stringify(credential),
+      );
+    } catch (e) {
+      console.error('[issuer] failed to persist credential:', e.message);
+    }
+  }
+
+  _markCredentialRevoked(credentialId, reason) {
+    try {
+      this.db.prepare(`
+        UPDATE credentials SET status = 'revoked', revoked_at = ?, revoke_reason = ?
+        WHERE credential_id = ?
+      `).run(new Date().toISOString(), reason || null, credentialId);
+    } catch (e) {
+      console.error('[issuer] failed to mark credential revoked:', e.message);
+    }
   }
 
   // Load ISO 18013-5 mdoc signing key and certificate (managed by key-management)
@@ -366,8 +443,9 @@ class IssuerService {
         (this.statistics.byStudent[credentialData.studentId] || 0) + 1;
     }
 
-    // Store credential
+    // Store credential (metadata persisted; mdoc payload stays in-memory only)
     this.credentials.set(credentialId, credential);
+    this._persistCredential(credential);
 
     // Update statistics
     this.statistics.totalIssued++;
@@ -517,6 +595,7 @@ class IssuerService {
     };
 
     this.credentials.set(credentialId, credential);
+    this._persistCredential(credential);
     this.storeMdocSession(credentialId, mdoc.base64url);
     this.statistics.totalIssued++;
     this.statistics.byType['PhotoID'] = (this.statistics.byType['PhotoID'] || 0) + 1;
@@ -577,11 +656,42 @@ class IssuerService {
   }
 
   getCredential(credentialId) {
-    const credential = this.credentials.get(credentialId);
+    let credential = this.credentials.get(credentialId);
+
+    // Fall back to the shared database so credentials issued by another
+    // instance (or before a restart) are still resolvable.
+    if (!credential) {
+      try {
+        const row = this.db
+          .prepare('SELECT * FROM credentials WHERE credential_id = ?')
+          .get(credentialId);
+        if (row) {
+          credential = row.metadata_json ? JSON.parse(row.metadata_json) : null;
+          if (!credential) {
+            credential = {
+              credentialId: row.credential_id,
+              issuerId: row.issuer_id || this.issuerId,
+              docType: row.doc_type,
+              institution: row.institution,
+              studentId: row.student_id,
+              credentialType: 'PhotoID',
+              deviceBound: !!row.device_bound,
+              createdAt: row.created_at,
+            };
+          }
+          credential.status = row.status;
+          this.credentials.set(credentialId, credential);
+          if (row.status === 'revoked') this.revokedCredentials.add(credentialId);
+        }
+      } catch (e) {
+        console.error('[issuer] credential lookup failed:', e.message);
+      }
+    }
+
     if (!credential) {
       return { success: false, error: 'Credential not found' };
     }
-    if (this.revokedCredentials.has(credentialId)) {
+    if (this.revokedCredentials.has(credentialId) || credential.status === 'revoked') {
       return { success: false, error: 'Credential has been revoked' };
     }
     return { success: true, credential };
@@ -622,6 +732,7 @@ class IssuerService {
     this.revokedCredentials.add(credentialId);
     credential.status = 'revoked';
     credential.revocationReason = reason;
+    this._markCredentialRevoked(credentialId, reason);
 
     this.statistics.totalRevoked++;
 
@@ -920,6 +1031,63 @@ app.post('/auth/otp', async (req, res) => {
 app.post('/auth/token', async (req, res) => {
   try {
     res.json(await walletAccounts.exchangeToken(req.body || {}));
+  } catch (e) {
+    res.status(400).json({ success: false, error: e.message });
+  }
+});
+
+// Refresh an expired access token using the long-lived refresh token.
+app.post('/auth/refresh', async (req, res) => {
+  try {
+    res.json(await walletAccounts.refresh(req.body || {}));
+  } catch (e) {
+    res.status(401).json({ success: false, error: e.message });
+  }
+});
+
+// Sign out: invalidate the refresh token (access token expires on its own).
+app.post('/auth/signout', (req, res) => {
+  try {
+    res.json(walletAccounts.signOut(req.body || {}));
+  } catch (e) {
+    res.status(400).json({ success: false, error: e.message });
+  }
+});
+
+// ── Remote account administration ────────────────────────────────────────
+// Deactivate / reactivate / delete a wallet account. A deactivated or deleted
+// account can no longer exchange its refresh token. Requires an admin key.
+function requireAdmin(req, res) {
+  const expected = process.env.ADMIN_API_KEY || 'dev-admin-key';
+  if ((req.headers['x-admin-key'] || '') !== expected) {
+    res.status(403).json({ success: false, error: 'Invalid admin key' });
+    return false;
+  }
+  return true;
+}
+
+app.post('/admin/accounts/:sub/deactivate', (req, res) => {
+  if (!requireAdmin(req, res)) return;
+  try {
+    res.json(walletAccounts.deactivateAccount(req.params.sub));
+  } catch (e) {
+    res.status(400).json({ success: false, error: e.message });
+  }
+});
+
+app.post('/admin/accounts/:sub/activate', (req, res) => {
+  if (!requireAdmin(req, res)) return;
+  try {
+    res.json(walletAccounts.activateAccount(req.params.sub));
+  } catch (e) {
+    res.status(400).json({ success: false, error: e.message });
+  }
+});
+
+app.post('/admin/accounts/:sub/delete', (req, res) => {
+  if (!requireAdmin(req, res)) return;
+  try {
+    res.json(walletAccounts.deleteAccount(req.params.sub));
   } catch (e) {
     res.status(400).json({ success: false, error: e.message });
   }

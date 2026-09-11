@@ -2,6 +2,7 @@ import crypto from 'crypto';
 import { v4 as uuidv4 } from 'uuid';
 import * as cbor2 from 'cbor2';
 import { generateNonce, generateJWK, processCredentials } from 'id-verifier';
+import { getDb } from '../../db.js';
 
 /**
  * Ephemeral state for one W3C Digital Credentials API (org-iso-mdoc)
@@ -134,7 +135,7 @@ export class PresentationSessionService {
     this.sessions = new Map();
   }
 
-  async create({ relyingPartyId, origin, nameSpaces, docType }) {
+  async create({ relyingPartyId, origin, nameSpaces, docType, credentialId }) {
     if (!relyingPartyId || !origin) throw new Error('relyingPartyId and origin are required');
     let parsedOrigin;
     try { parsedOrigin = new URL(origin); } catch { throw new Error('origin must be an absolute URL'); }
@@ -163,6 +164,7 @@ export class PresentationSessionService {
       nonce,
       jwk,
       expiresAtMs,
+      credentialId: credentialId || null,
     });
     return { sessionId, expiresAt: new Date(expiresAtMs).toISOString(), request };
   }
@@ -210,6 +212,7 @@ export class PresentationSessionService {
     }
 
     this.enforcePinnedIssuer(result);
+    this.enforceCredentialStatus(session);
 
     const claims = result.claims || {};
     const givenName = claims.given_name || claims.given_name_unicode || '';
@@ -227,6 +230,18 @@ export class PresentationSessionService {
       // selectively-disclosed field, not just the academic subset above.
       allClaims: claims,
     };
+  }
+
+  enforceCredentialStatus(session) {
+    // General DCAPI presentment does not carry a credentialId (the mdoc itself
+    // does not contain it); the status check applies to share sessions, which
+    // are minted against a specific credential in the issuer's registry.
+    if (!session.credentialId) return;
+    const row = getDb()
+      .prepare('SELECT status FROM credentials WHERE credential_id = ?')
+      .get(session.credentialId);
+    if (!row) throw new Error('Credential does not exist in the issuer registry');
+    if (row.status !== 'active') throw new Error(`Credential is ${row.status}`);
   }
 
   enforcePinnedIssuer(result) {

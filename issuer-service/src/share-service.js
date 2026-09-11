@@ -140,7 +140,7 @@ export class ShareService {
   }
 
   // ── Helpers ──────────────────────────────────────────────────────────────
-  async verifierCreateSession(nameSpaces) {
+  async verifierCreateSession(nameSpaces, credentialId = null) {
     const response = await fetch(`${this.verifierApiUrl}/presentation/sessions`, {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
@@ -149,6 +149,7 @@ export class ShareService {
         origin: this.origin,
         nameSpaces,
         docType: 'org.iso.23220.photoid.1',
+        credentialId,
       }),
     });
     const body = await response.json();
@@ -194,15 +195,13 @@ export class ShareService {
 
     const payload = await this.walletAccounts.verifyAccessToken(accessToken);
 
-    // The issuer's credential store is in-memory and is cleared on restart, so
-    // the credential may legitimately no longer be present here even though the
-    // wallet still holds it. Ownership is proven cryptographically downstream:
-    // the verifier requires the selective DeviceResponse to be signed by the
-    // mdoc's device key over this share's one-time session nonce. When the
-    // credential record IS present, additionally enforce the account link as
-    // defense in depth.
+    // Ownership: the credential must exist (persisted in the issuer registry)
+    // and the sender's account must be linked to its institution + studentId.
+    // The verifier additionally rejects revoked/missing credentials during
+    // verification (defense in depth).
     const credential = this.issuer.getCredential(credentialId);
-    if (credential.success && !this.walletAccounts.hasLink(
+    if (!credential.success) throw new Error(credential.error || 'Credential not found');
+    if (!this.walletAccounts.hasLink(
       payload.sub,
       credential.credential.institution,
       credential.credential.studentId,
@@ -220,8 +219,9 @@ export class ShareService {
       }
     }
 
-    // Mint a one-time verifier request for exactly these namespaces.
-    const verifierSession = await this.verifierCreateSession(nameSpaces);
+    // Mint a one-time verifier request for exactly these namespaces. The
+    // credentialId lets the verifier enforce the credential's lifecycle state.
+    const verifierSession = await this.verifierCreateSession(nameSpaces, credentialId);
     const data = verifierSession.request.digital.requests[0].data;
 
     const shareId = uuidv4();

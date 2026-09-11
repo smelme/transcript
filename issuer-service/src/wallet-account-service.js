@@ -1,6 +1,7 @@
 import crypto from 'crypto';
 import { v4 as uuidv4 } from 'uuid';
 import { SignJWT, jwtVerify, importPKCS8, importSPKI } from 'jose';
+import { getDb, sha256Hex, parseTtlMs } from '../../db.js';
 
 /**
  * WalletAccountService — invitation-based wallet account provisioning.
@@ -12,9 +13,16 @@ import { SignJWT, jwtVerify, importPKCS8, importSPKI } from 'jose';
  * Trust flows one way: a trusted institute asserts "email <-> studentId" at
  * invitation time; the user only proves email ownership (OTP) to gain access.
  *
- * In this development build, OTPs are returned in the response for testing; a
- * production deployment must send them via email/SMS instead.
+ * Accounts, links and refresh tokens are persisted in the shared database so
+ * they survive restarts. Short-lived OTPs remain in memory only. Access tokens
+ * are short-lived ES256 JWTs; refresh tokens are opaque values stored only as
+ * a SHA-256 hash, rotated on every refresh, and revoked on sign-out or remote
+ * deactivation/deletion.
  */
+
+const ACCESS_TOKEN_TTL = process.env.ACCESS_TOKEN_TTL || '10m';
+const REFRESH_TOKEN_TTL = process.env.REFRESH_TOKEN_TTL || '1y';
+
 export class WalletAccountService {
   constructor({
     signerKeyPem,
@@ -22,7 +30,8 @@ export class WalletAccountService {
     issuerName,
     siteUrl,
     otpTtlMs = 10 * 60 * 1000,
-    tokenTtl = process.env.ACCESS_TOKEN_TTL || '24h',
+    tokenTtl = ACCESS_TOKEN_TTL,
+    refreshTtl = REFRESH_TOKEN_TTL,
     emailSender = null,
   } = {}) {
     this.issuerId = issuerId;
@@ -30,12 +39,12 @@ export class WalletAccountService {
     this.siteUrl = siteUrl;
     this.otpTtlMs = otpTtlMs;
     this.tokenTtl = tokenTtl;
+    this.refreshTtlMs = parseTtlMs(refreshTtl);
     this.signerKeyPem = signerKeyPem;
     this.emailSender = emailSender;
 
-    this.accounts = new Map(); // email -> account
-    this.subIndex = new Map(); // sub -> email
-    this.otps = new Map();     // email -> { code, expiresAt }
+    this.otps = new Map(); // email -> { code, expiresAt } (in-memory, short-lived)
+    this.db = getDb();
 
     if (signerKeyPem) {
       const privateKey = crypto.createPrivateKey(signerKeyPem);
@@ -55,23 +64,72 @@ export class WalletAccountService {
     return String(crypto.randomInt(0, 1000000)).padStart(6, '0');
   }
 
+  // ── Account persistence helpers ──────────────────────────────────────────
+  _accountByEmail(email) {
+    return this.db.prepare('SELECT * FROM wallet_accounts WHERE email = ?').get(email) || null;
+  }
+
+  _accountBySub(sub) {
+    return this.db.prepare('SELECT * FROM wallet_accounts WHERE sub = ?').get(sub) || null;
+  }
+
+  _linksFor(sub) {
+    return this.db
+      .prepare('SELECT institution, student_id FROM account_links WHERE sub = ? ORDER BY created_at')
+      .all(sub)
+      .map((row) => ({ institution: row.institution, studentId: row.student_id }));
+  }
+
   _findOrCreateAccount(email) {
     const normalized = this._normalize(email);
-    let account = this.accounts.get(normalized);
+    let account = this._accountByEmail(normalized);
     let created = false;
     if (!account) {
-      account = {
-        sub: uuidv4(),
-        email: normalized,
-        emailVerified: false,
-        links: [], // { institution, studentId }
-        createdAt: new Date().toISOString(),
-      };
-      this.accounts.set(normalized, account);
-      this.subIndex.set(account.sub, normalized);
+      const sub = uuidv4();
+      this.db
+        .prepare('INSERT INTO wallet_accounts (sub, email, email_verified, active, created_at) VALUES (?, ?, 0, 1, ?)')
+        .run(sub, normalized, new Date().toISOString());
+      account = this._accountByEmail(normalized);
       created = true;
     }
     return { account, created };
+  }
+
+  _addLink(sub, institution, studentId) {
+    this.db
+      .prepare('INSERT OR IGNORE INTO account_links (sub, institution, student_id, created_at) VALUES (?, ?, ?, ?)')
+      .run(sub, institution, studentId, new Date().toISOString());
+  }
+
+  _revokeAllRefreshTokens(sub) {
+    this.db
+      .prepare('UPDATE refresh_tokens SET revoked_at = ? WHERE sub = ? AND revoked_at IS NULL')
+      .run(new Date().toISOString(), sub);
+  }
+
+  _issueRefreshToken(sub) {
+    const raw = crypto.randomBytes(32).toString('base64url');
+    const hash = sha256Hex(raw);
+    const expiresAt = new Date(Date.now() + this.refreshTtlMs).toISOString();
+    this.db
+      .prepare('INSERT INTO refresh_tokens (token_hash, sub, expires_at, created_at) VALUES (?, ?, ?, ?)')
+      .run(hash, sub, expiresAt, new Date().toISOString());
+    return raw;
+  }
+
+  async _signAccessToken(account) {
+    const privateKey = await importPKCS8(this.signerKeyPem, 'ES256');
+    return new SignJWT({
+      email: account.email,
+      scope: 'credential_issuance',
+    })
+      .setProtectedHeader({ alg: 'ES256' })
+      .setSubject(account.sub)
+      .setIssuer(this.issuerId)
+      .setAudience(this.issuerId)
+      .setIssuedAt()
+      .setExpirationTime(this.tokenTtl)
+      .sign(privateKey);
   }
 
   /**
@@ -84,10 +142,10 @@ export class WalletAccountService {
     const sid = String(studentId || '').trim();
     if (!sid) throw new Error('studentId is required');
 
-    const linkExists = account.links.some(
+    const linkExists = this._linksFor(account.sub).some(
       (l) => l.institution === inst && l.studentId === sid
     );
-    if (!linkExists) account.links.push({ institution: inst, studentId: sid });
+    if (!linkExists) this._addLink(account.sub, inst, sid);
 
     const otp = this._issueOtp(account.email);
     // For an invitation the recipient-facing institute name is what they should
@@ -142,15 +200,14 @@ export class WalletAccountService {
       return { success: false, error: 'Invalid OTP' };
     }
     this.otps.delete(normalized);
-    const account = this.accounts.get(normalized);
-    if (account) account.emailVerified = true;
+    this.db.prepare('UPDATE wallet_accounts SET email_verified = 1 WHERE email = ?').run(normalized);
     return { success: true, email: normalized };
   }
 
   /** Wallet sign-in step 1: request a fresh OTP for an invited email. */
   async requestSignInOtp({ email }) {
     const normalized = this._normalize(email);
-    const account = this.accounts.get(normalized);
+    const account = this._accountByEmail(normalized);
     if (!account) {
       throw new Error('No wallet account for this email — an institute must invite you first');
     }
@@ -159,28 +216,69 @@ export class WalletAccountService {
     return { success: true, otpSent: sent.success, otp: sent.success ? undefined : otp };
   }
 
-  /** Wallet sign-in step 2: exchange OTP for an access token (ES256 JWT). */
+  /** Wallet sign-in step 2: exchange OTP for an access + refresh token pair. */
   async exchangeToken({ email, otp }) {
     const verified = this.verifyOtp({ email, otp });
     if (!verified.success) throw new Error(verified.error);
-    const account = this.accounts.get(verified.email);
+    const account = this._accountByEmail(verified.email);
     if (!account) throw new Error('No wallet account for this email');
+    if (!account.active || account.deleted_at) throw new Error('Account is not active');
     if (!this.signerKeyPem) throw new Error('Signer key not configured');
 
-    const privateKey = await importPKCS8(this.signerKeyPem, 'ES256');
-    const accessToken = await new SignJWT({
-      email: account.email,
-      scope: 'credential_issuance',
-    })
-      .setProtectedHeader({ alg: 'ES256' })
-      .setSubject(account.sub)
-      .setIssuer(this.issuerId)
-      .setAudience(this.issuerId)
-      .setIssuedAt()
-      .setExpirationTime(this.tokenTtl)
-      .sign(privateKey);
+    const accessToken = await this._signAccessToken(account);
+    const refreshToken = this._issueRefreshToken(account.sub);
 
-    return { success: true, accessToken, tokenType: 'Bearer', sub: account.sub, email: account.email };
+    return {
+      success: true,
+      accessToken,
+      refreshToken,
+      tokenType: 'Bearer',
+      sub: account.sub,
+      email: account.email,
+    };
+  }
+
+  /** Exchange a valid refresh token for a fresh access + refresh token pair. */
+  async refresh({ refreshToken }) {
+    if (!refreshToken) throw new Error('refreshToken is required');
+    const hash = sha256Hex(refreshToken);
+    const row = this.db.prepare('SELECT * FROM refresh_tokens WHERE token_hash = ?').get(hash);
+    if (!row || row.revoked_at) throw new Error('Refresh token is invalid');
+    if (Date.now() > new Date(row.expires_at).getTime()) throw new Error('Refresh token expired');
+
+    const account = this._accountBySub(row.sub);
+    if (!account || !account.active || account.deleted_at) {
+      this._revokeAllRefreshTokens(row.sub);
+      throw new Error('Account is not active');
+    }
+    if (!this.signerKeyPem) throw new Error('Signer key not configured');
+
+    // Rotate: revoke the presented refresh token and issue a fresh pair.
+    this.db
+      .prepare('UPDATE refresh_tokens SET revoked_at = ? WHERE token_hash = ?')
+      .run(new Date().toISOString(), hash);
+
+    const accessToken = await this._signAccessToken(account);
+    const newRefreshToken = this._issueRefreshToken(account.sub);
+
+    return {
+      success: true,
+      accessToken,
+      refreshToken: newRefreshToken,
+      tokenType: 'Bearer',
+      sub: account.sub,
+      email: account.email,
+    };
+  }
+
+  /** Sign out: invalidate the presented refresh token. */
+  signOut({ refreshToken }) {
+    if (!refreshToken) throw new Error('refreshToken is required');
+    const hash = sha256Hex(refreshToken);
+    this.db
+      .prepare('UPDATE refresh_tokens SET revoked_at = ? WHERE token_hash = ?')
+      .run(new Date().toISOString(), hash);
+    return { success: true };
   }
 
   /** Verify an access token and return its claims ({ sub, email, scope, ... }). */
@@ -196,9 +294,7 @@ export class WalletAccountService {
 
   /** All institute links for a wallet subject. */
   getLinks(sub) {
-    const email = this.subIndex.get(sub);
-    const account = email && this.accounts.get(email);
-    return account ? account.links : [];
+    return this._linksFor(sub);
   }
 
   /** True if this wallet subject is linked to (institution, studentId). */
@@ -206,6 +302,32 @@ export class WalletAccountService {
     return this.getLinks(sub).some(
       (l) => l.institution === String(institution) && l.studentId === String(studentId)
     );
+  }
+
+  // ── Remote account administration ────────────────────────────────────────
+  /** Remotely deactivate an account and invalidate every refresh token. */
+  deactivateAccount(sub) {
+    const result = this.db.prepare('UPDATE wallet_accounts SET active = 0 WHERE sub = ?').run(sub);
+    if (result.changes === 0) throw new Error('Account not found');
+    this._revokeAllRefreshTokens(sub);
+    return { success: true, sub, active: false };
+  }
+
+  /** Reactivate an account (does not restore previously revoked refresh tokens). */
+  activateAccount(sub) {
+    const result = this.db.prepare('UPDATE wallet_accounts SET active = 1 WHERE sub = ?').run(sub);
+    if (result.changes === 0) throw new Error('Account not found');
+    return { success: true, sub, active: true };
+  }
+
+  /** Soft-delete an account and invalidate every refresh token. */
+  deleteAccount(sub) {
+    const result = this.db
+      .prepare('UPDATE wallet_accounts SET active = 0, deleted_at = ? WHERE sub = ?')
+      .run(new Date().toISOString(), sub);
+    if (result.changes === 0) throw new Error('Account not found');
+    this._revokeAllRefreshTokens(sub);
+    return { success: true, sub, deleted: true };
   }
 }
 

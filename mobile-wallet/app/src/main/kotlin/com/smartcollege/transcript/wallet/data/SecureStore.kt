@@ -97,6 +97,10 @@ class SecureStore(context: Context) {
     fun accessToken(): String? = prefs.getString(KEY_TOKEN, null)
     fun clearAccessToken() = prefs.edit().remove(KEY_TOKEN).apply()
 
+    fun saveRefreshToken(token: String) = prefs.edit().putString(KEY_REFRESH_TOKEN, token).apply()
+    fun refreshToken(): String? = prefs.getString(KEY_REFRESH_TOKEN, null)
+    fun clearRefreshToken() = prefs.edit().remove(KEY_REFRESH_TOKEN).apply()
+
     /** Persist which wallet account (email) currently owns the session. */
     fun saveOwnerEmail(email: String) = prefs.edit().putString(KEY_OWNER_EMAIL, email.trim().lowercase()).apply()
     fun ownerEmail(): String? = prefs.getString(KEY_OWNER_EMAIL, null)
@@ -239,6 +243,7 @@ class SecureStore(context: Context) {
         private const val MDOC_PREFIX = "enc:v1:"
         private const val PREFS_FILE = "transcript-wallet-secure"
         private const val KEY_TOKEN = "access_token"
+        private const val KEY_REFRESH_TOKEN = "refresh_token"
         private const val KEY_OWNER_EMAIL = "owner_email"
         private const val KEY_IDS = "credential_ids"
     }

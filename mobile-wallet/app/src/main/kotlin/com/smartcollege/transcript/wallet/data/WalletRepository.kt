@@ -1,6 +1,11 @@
 package com.smartcollege.transcript.wallet.data
 
 import android.content.Context
+import android.util.Base64
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonPrimitive
+import kotlinx.serialization.json.long
 
 data class StoredCredential(
     val credentialId: String,
@@ -23,18 +28,19 @@ class WalletRepository(private val client: IssuerClient, private val store: Secu
         response.otp
     }
 
-    /** Exchange the emailed OTP for an access token and persist it. */
+    /** Exchange the emailed OTP for an access + refresh token pair and persist it. */
     suspend fun signIn(email: String, otp: String): Result<String> = runCatching {
         val response = client.exchangeToken(email, otp)
         val token = requireNotNull(response.accessToken) { response.error ?: "Sign-in failed" }
         store.saveAccessToken(token)
+        response.refreshToken?.let { store.saveRefreshToken(it) }
         store.saveOwnerEmail(response.email ?: email)
         token
     }
 
     /** Claim an issuance offer: one BFF call, the mdoc is returned and stored. */
     suspend fun claim(offerUrl: String): Result<StoredCredential> = runCatching {
-        val token = store.accessToken() ?: error("Not signed in")
+        val token = freshAccessToken()
         val offer = Cwt.parseOffer(offerUrl) ?: error("Invalid credential offer")
         val deviceKey = store.getOrCreateDeviceKey()
         val cwt = Cwt.build(store.devicePrivateKey(), deviceKey.publicJwk, offer.issuerId, offer.nonce)
@@ -83,7 +89,7 @@ class WalletRepository(private val client: IssuerClient, private val store: Secu
         recipientEmail: String,
         message: String,
     ): Result<ShareCreateResponse> = runCatching {
-        val token = store.accessToken() ?: error("Not signed in")
+        val token = freshAccessToken()
         val response = client.createShare(
             ShareCreateRequest(
                 accessToken = token,
@@ -110,7 +116,7 @@ class WalletRepository(private val client: IssuerClient, private val store: Secu
         encryptionInfo: String,
         origin: String,
     ): Result<Unit> = runCatching {
-        val token = store.accessToken() ?: error("Not signed in")
+        val token = freshAccessToken()
         val mdoc = store.mdoc(credentialId) ?: error("Credential could not be unlocked")
         val envelope = com.smartcollege.transcript.wallet.presentation.MdocResponseBuilder.build(
             deviceRequestBase64Url = deviceRequest,
@@ -131,9 +137,62 @@ class WalletRepository(private val client: IssuerClient, private val store: Secu
 
     fun isSignedIn(): Boolean = store.accessToken() != null
 
-    /** Clear the access token and owner so the wallet returns to the sign-in screen. */
-    fun signOut() {
+    /**
+     * Returns a usable access token, transparently refreshing it with the
+     * stored refresh token when the short-lived (10m) access token has expired.
+     */
+    private suspend fun freshAccessToken(): String {
+        val current = store.accessToken() ?: error("Not signed in")
+        if (!isExpired(current)) return current
+
+        val refresh = store.refreshToken() ?: run {
+            clearSession()
+            error("Session expired — please sign in again")
+        }
+        val response = runCatching { client.refresh(refresh) }.getOrElse {
+            clearSession()
+            error("Session expired — please sign in again")
+        }
+        val newAccess = response.accessToken ?: run {
+            clearSession()
+            error(response.error ?: "Session expired — please sign in again")
+        }
+        store.saveAccessToken(newAccess)
+        response.refreshToken?.let { store.saveRefreshToken(it) }
+        return newAccess
+    }
+
+    /** True when the JWT `exp` claim is at or before now (with a 5s leeway). */
+    private fun isExpired(jwt: String): Boolean {
+        val exp = runCatching {
+            val payload = jwt.split('.').getOrNull(1) ?: return@runCatching null
+            val decoded = String(
+                Base64.decode(payload, Base64.URL_SAFE or Base64.NO_WRAP or Base64.NO_PADDING),
+                Charsets.UTF_8,
+            )
+            Json.parseToJsonElement(decoded).jsonObject["exp"]?.jsonPrimitive?.long
+        }.getOrNull() ?: return false // unreadable token: let the server decide
+        return exp <= (System.currentTimeMillis() / 1000) + 5
+    }
+
+    private fun clearSession() {
         store.clearAccessToken()
+        store.clearRefreshToken()
         store.clearOwnerEmail()
+    }
+
+    /**
+     * Clear the local session and return the refresh token so the caller can
+     * revoke it server-side (best effort).
+     */
+    fun signOut(): String? {
+        val refreshToken = store.refreshToken()
+        clearSession()
+        return refreshToken
+    }
+
+    /** Best-effort server-side refresh-token revocation on sign-out. */
+    suspend fun revokeRefreshToken(refreshToken: String) {
+        runCatching { client.signOut(refreshToken) }
     }
 }
