@@ -177,10 +177,10 @@ class IssuerService {
     try {
       const rows = this.db.prepare('SELECT * FROM credentials').all();
       for (const row of rows) {
-        if (row.status === 'revoked') {
-          this.revokedCredentials.add(row.credential_id);
-          continue;
-        }
+        // Revoked credentials are loaded as well as tracked: the portal lists them
+        // (carrying status 'revoked') so an organisation keeps the full history of
+        // what it issued rather than watching revoked rows disappear on restart.
+        if (row.status === 'revoked') this.revokedCredentials.add(row.credential_id);
         let credential = null;
         if (row.metadata_json) {
           try { credential = JSON.parse(row.metadata_json); } catch { credential = null; }
@@ -859,8 +859,9 @@ class IssuerService {
       if (filters.studentId && cred.studentId !== filters.studentId) return false;
       if (filters.type && cred.credentialType !== filters.type) return false;
       if (filters.status && cred.status !== filters.status) return false;
-      if (!this.revokedCredentials.has(cred.credentialId)) return true;
-      return false;
+      // Revoked credentials stay visible (carrying status 'revoked') so the portal
+      // keeps a complete history of what was issued; pass ?status=active to narrow.
+      return true;
     });
 
     const page = filters.page || 1;
@@ -1171,10 +1172,10 @@ app.get('/credentials', async (req, res) => {
     page: parseInt(req.query.page) || 1,
     pageSize: parseInt(req.query.pageSize) || 20
   };
-  if (scope.kind === 'admin') {
-    if (scope.institution) filters.institution = scope.institution;
-  } else {
+  if (scope.kind === 'holder') {
     filters.owners = scope.owners;
+  } else if (scope.institution) {
+    filters.institution = scope.institution;
   }
 
   res.json(issuer.listCredentials(filters));
@@ -1186,10 +1187,10 @@ app.get('/credentials/student/:studentId', async (req, res) => {
   if (!scope) return;
 
   const filters = { studentId: req.params.studentId };
-  if (scope.kind === 'admin') {
-    if (scope.institution) filters.institution = scope.institution;
-  } else {
+  if (scope.kind === 'holder') {
     filters.owners = scope.owners;
+  } else if (scope.institution) {
+    filters.institution = scope.institution;
   }
 
   res.json(issuer.listCredentials(filters));
@@ -1435,6 +1436,11 @@ async function resolveCredentialScope(req, res) {
   const token = header.startsWith('Bearer ') ? header.slice(7) : null;
 
   if (token) {
+    // A client organisation's API key may read its own credentials, which is how a
+    // client's own systems reconcile what has been issued to their students.
+    const organisation = clientOrgs.authenticate(token);
+    if (organisation) return { kind: 'org', institution: organisation.institution };
+
     try {
       const admin = await adminAuth.verifyAdminToken(token);
       return { kind: 'admin', institution: admin.institution || null };
@@ -1885,6 +1891,31 @@ if (isMain) {
   // Make sure the portal has at least one administrator to sign in with.
   adminAuth.ensureSeedAdmin().catch((e) => {
     console.error('[admin-auth] failed to seed administrator:', e.message);
+  });
+
+  // Optional: an administrator scoped to the example academy, so that organisation
+  // can sign in on its own to see its credentials and manage its API keys. Created
+  // only when ACADEMY_ADMIN_EMAIL and ACADEMY_ADMIN_PASSWORD are configured, and
+  // only once.
+  async function seedAcademyAdmin() {
+    const email = String(process.env.ACADEMY_ADMIN_EMAIL || '').trim().toLowerCase();
+    const password = process.env.ACADEMY_ADMIN_PASSWORD || '';
+    if (!email || !password) return null;
+    if (adminAuth.listAdmins().some((admin) => admin.email === email)) return null;
+
+    const institution = process.env.ACADEMY_NAME || 'Smart Academy';
+    try {
+      clientOrgs.ensureOrg(institution);
+      await adminAuth.createAdmin({ email, password, role: 'admin', institution });
+      console.log(`[issuer] Created administrator ${email} for ${institution}.`);
+    } catch (e) {
+      console.error('[issuer] could not create the academy administrator:', e.message);
+    }
+    return null;
+  }
+
+  seedAcademyAdmin().catch((e) => {
+    console.error('[issuer] failed to seed the academy administrator:', e.message);
   });
 
   const server = app.listen(PORT, () => {
