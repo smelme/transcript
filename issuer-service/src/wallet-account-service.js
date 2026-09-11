@@ -2,6 +2,7 @@ import crypto from 'crypto';
 import { v4 as uuidv4 } from 'uuid';
 import { SignJWT, jwtVerify, importPKCS8, importSPKI } from 'jose';
 import { getDb, sha256Hex, parseTtlMs } from '../../db.js';
+import { devOtpAllowed } from './email-service.js';
 
 /**
  * WalletAccountService — invitation-based wallet account provisioning.
@@ -22,6 +23,13 @@ import { getDb, sha256Hex, parseTtlMs } from '../../db.js';
 
 const ACCESS_TOKEN_TTL = process.env.ACCESS_TOKEN_TTL || '10m';
 const REFRESH_TOKEN_TTL = process.env.REFRESH_TOKEN_TTL || '1y';
+
+// Throttling for one-time codes: limits how often a code can be requested and
+// how many wrong guesses are tolerated before the address is locked out.
+const OTP_MAX_SENDS = parseInt(process.env.OTP_MAX_SENDS || '5', 10);
+const OTP_SEND_WINDOW_MS = parseInt(process.env.OTP_SEND_WINDOW_MS || String(15 * 60 * 1000), 10);
+const OTP_MAX_ATTEMPTS = parseInt(process.env.OTP_MAX_ATTEMPTS || '5', 10);
+const OTP_LOCKOUT_MS = parseInt(process.env.OTP_LOCKOUT_MS || String(15 * 60 * 1000), 10);
 
 export class WalletAccountService {
   constructor({
@@ -44,6 +52,8 @@ export class WalletAccountService {
     this.emailSender = emailSender;
 
     this.otps = new Map(); // email -> { code, expiresAt } (in-memory, short-lived)
+    this.otpSends = new Map(); // email -> [timestamps] (send throttling)
+    this.otpFailures = new Map(); // email -> { count, lockedUntil }
     this.db = getDb();
 
     if (signerKeyPem) {
@@ -165,7 +175,8 @@ export class WalletAccountService {
       institution: inst,
       studentId: sid,
       otpSent: sent.success,
-      otp: sent.success ? undefined : otp, // dev fallback when email is not configured
+      // Development-only fallback; never returned in production.
+      otp: sent.success || !devOtpAllowed() ? undefined : otp,
     };
   }
 
@@ -209,7 +220,47 @@ export class WalletAccountService {
     }));
   }
 
+  // ── One-time-code throttling ─────────────────────────────────────────────
+  /** Refuse to send more than OTP_MAX_SENDS codes per address per window. */
+  _registerOtpSend(email) {
+    const now = Date.now();
+    const recent = (this.otpSends.get(email) || []).filter((t) => now - t < OTP_SEND_WINDOW_MS);
+    if (recent.length >= OTP_MAX_SENDS) {
+      const waitMs = OTP_SEND_WINDOW_MS - (now - recent[0]);
+      const minutes = Math.max(1, Math.ceil(waitMs / 60000));
+      throw new Error(`Too many codes requested. Please try again in ${minutes} minute(s).`);
+    }
+    recent.push(now);
+    this.otpSends.set(email, recent);
+  }
+
+  /** Lockout message if this address is temporarily blocked, else null. */
+  _lockoutMessage(email) {
+    const record = this.otpFailures.get(email);
+    if (record?.lockedUntil && record.lockedUntil > Date.now()) {
+      const minutes = Math.max(1, Math.ceil((record.lockedUntil - Date.now()) / 60000));
+      return `Too many incorrect codes. Please try again in ${minutes} minute(s).`;
+    }
+    return null;
+  }
+
+  _registerOtpFailure(email) {
+    const record = this.otpFailures.get(email) || { count: 0, lockedUntil: 0 };
+    record.count += 1;
+    if (record.count >= OTP_MAX_ATTEMPTS) {
+      record.lockedUntil = Date.now() + OTP_LOCKOUT_MS;
+      record.count = 0;
+      this.otps.delete(email);
+    }
+    this.otpFailures.set(email, record);
+  }
+
+  _clearOtpFailures(email) {
+    this.otpFailures.delete(email);
+  }
+
   _issueOtp(email) {
+    this._registerOtpSend(email);
     const code = this._genOtp();
     this.otps.set(email, { code, expiresAt: Date.now() + this.otpTtlMs });
     return code;
@@ -230,6 +281,8 @@ export class WalletAccountService {
   /** Verify an email OTP (marks the account's email as verified). */
   verifyOtp({ email, otp }) {
     const normalized = this._normalize(email);
+    const locked = this._lockoutMessage(normalized);
+    if (locked) return { success: false, error: locked };
     const record = this.otps.get(normalized);
     if (!record) return { success: false, error: 'No OTP issued for this email' };
     if (Date.now() > record.expiresAt) {
@@ -237,9 +290,14 @@ export class WalletAccountService {
       return { success: false, error: 'OTP expired' };
     }
     if (record.code !== String(otp || '')) {
-      return { success: false, error: 'Invalid OTP' };
+      this._registerOtpFailure(normalized);
+      const nowLocked = this._lockoutMessage(normalized);
+      if (nowLocked) return { success: false, error: nowLocked };
+      const left = OTP_MAX_ATTEMPTS - (this.otpFailures.get(normalized)?.count || 0);
+      return { success: false, error: `Incorrect code. ${left} attempt(s) remaining.` };
     }
     this.otps.delete(normalized);
+    this._clearOtpFailures(normalized);
     this.db.prepare('UPDATE wallet_accounts SET email_verified = 1 WHERE email = ?').run(normalized);
     return { success: true, email: normalized };
   }
@@ -253,7 +311,11 @@ export class WalletAccountService {
     }
     const otp = this._issueOtp(normalized);
     const sent = await this._sendOtpEmail(normalized, otp, 'signin');
-    return { success: true, otpSent: sent.success, otp: sent.success ? undefined : otp };
+    return {
+      success: true,
+      otpSent: sent.success,
+      otp: sent.success || !devOtpAllowed() ? undefined : otp,
+    };
   }
 
   /** Wallet sign-in step 2: exchange OTP for an access + refresh token pair. */

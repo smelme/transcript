@@ -3,6 +3,7 @@ import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { renderSharePdf } from './pdf.js';
+import { devOtpAllowed } from './email-service.js';
 
 /**
  * Selective-disclosure "share" flow for recipients that cannot integrate with
@@ -351,7 +352,12 @@ export class ShareService {
         console.error('[share] OTP email failed:', e.message);
       }
     }
-    return { success: true, otpSent, otp: otpSent ? undefined : otp };
+    return {
+      success: true,
+      otpSent,
+      // Development-only fallback; never returned in production.
+      otp: otpSent || !devOtpAllowed() ? undefined : otp,
+    };
   }
 
   verifyOtp({ shareId, email, otp }) {

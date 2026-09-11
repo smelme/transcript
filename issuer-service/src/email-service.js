@@ -22,6 +22,19 @@ export function isEmailConfigured() {
   return !!(apiKey && fromEmail);
 }
 
+/**
+ * Whether one-time codes may be returned in API responses as a development
+ * fallback when email delivery is unavailable.
+ *
+ * This is OFF in production: a mail outage must never silently downgrade into
+ * handing the code back to the caller. Override explicitly with ALLOW_DEV_OTP.
+ */
+export function devOtpAllowed() {
+  if (process.env.ALLOW_DEV_OTP === 'true') return true;
+  if (process.env.ALLOW_DEV_OTP === 'false') return false;
+  return process.env.NODE_ENV !== 'production';
+}
+
 export async function sendEmail({ to, subject, html }) {
   const config = getBrevoConfig();
   if (!(config.apiKey && config.fromEmail)) {
@@ -183,4 +196,4 @@ export async function sendCredentialsReadyEmail({ email, institution, claimUrl, 
   return sendEmail({ to: email, subject, html });
 }
 
-export default { isEmailConfigured, sendEmail, sendOtpEmail, sendCredentialsReadyEmail };
+export default { isEmailConfigured, devOtpAllowed, sendEmail, sendOtpEmail, sendCredentialsReadyEmail };

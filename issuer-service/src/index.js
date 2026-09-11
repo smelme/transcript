@@ -29,7 +29,8 @@ dotenv.config({
   path: path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../.env'),
 });
 
-// In-memory storage for this service (would use P0-4 Storage in production)
+// Credential metadata is persisted in the shared SQLite database (see db.js);
+// mdoc payloads stay in memory only.
 class IssuerService {
   constructor(options = {}) {
     this.issuerId = options.issuerId || `issuer-${uuidv4()}`;
@@ -1020,9 +1021,29 @@ function parseSessionIdFromOffer(offerUrl) {
 }
 
 // Create Express app
+// Browser origin allow-list. Override with CORS_ORIGINS (comma-separated) or
+// set CORS_ORIGINS=* to allow any origin (not recommended outside development).
+const CORS_ORIGINS = (
+  process.env.CORS_ORIGINS ||
+  'http://localhost:3002,http://localhost:3003,http://localhost:3004,' +
+    'http://127.0.0.1:3002,http://127.0.0.1:3003,http://127.0.0.1:3004'
+)
+  .split(',')
+  .map((origin) => origin.trim())
+  .filter(Boolean);
+
 const app = express();
 app.use(helmet());
-app.use(cors());
+app.use(
+  cors({
+    origin(origin, callback) {
+      // Server-to-server and same-origin requests carry no Origin header.
+      if (!origin) return callback(null, true);
+      if (CORS_ORIGINS.includes('*') || CORS_ORIGINS.includes(origin)) return callback(null, true);
+      return callback(null, false);
+    },
+  }),
+);
 app.use(express.json({ limit: '10mb' }));
 
 // Middleware to log requests
