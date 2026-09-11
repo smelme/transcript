@@ -1,5 +1,6 @@
 package com.smartcollege.transcript.wallet
 
+import android.content.Intent
 import android.os.Bundle
 import androidx.activity.compose.setContent
 import androidx.biometric.BiometricManager
@@ -29,11 +30,19 @@ import com.smartcollege.transcript.wallet.ui.CredentialDetailScreen
 import com.smartcollege.transcript.wallet.ui.CredentialListScreen
 import com.smartcollege.transcript.wallet.ui.OfferScanScreen
 import com.smartcollege.transcript.wallet.ui.QualsTheme
+import com.smartcollege.transcript.wallet.ui.ReceiveOfferScreen
 import com.smartcollege.transcript.wallet.ui.ShareFlowScreen
 import com.smartcollege.transcript.wallet.ui.SignInScreen
 import kotlinx.coroutines.launch
 
 class MainActivity : FragmentActivity() {
+    /**
+     * A credential offer opened via deeplink (same-device issuance). Populated
+     * from the launch intent and updated by [onNewIntent] when the wallet is
+     * already running.
+     */
+    private val incomingOffer = mutableStateOf<String?>(null)
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
@@ -41,9 +50,16 @@ class MainActivity : FragmentActivity() {
         val client = IssuerClient(BuildConfig.ISSUER_BASE_URL)
         val repository = WalletRepository(client, store)
 
+        incomingOffer.value = extractOfferUrl(intent)
+
         setContent {
             QualsTheme {
-                WalletApp(repository, this)
+                WalletApp(
+                    repository = repository,
+                    activity = this,
+                    initialOfferUrl = incomingOffer.value,
+                    onOfferConsumed = { incomingOffer.value = null },
+                )
             }
         }
 
@@ -51,6 +67,20 @@ class MainActivity : FragmentActivity() {
         // they cannot be read at cold start (before the user authenticates).
         // Re-publishing to the Android Credential Manager happens after a
         // successful biometric unlock in WalletApp, and after each claim.
+    }
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        val offer = extractOfferUrl(intent)
+        if (offer != null) incomingOffer.value = offer
+    }
+
+    /** The OpenID4VCI credential-offer URI from a VIEW intent, if any. */
+    private fun extractOfferUrl(intent: Intent?): String? {
+        if (intent?.action != Intent.ACTION_VIEW) return null
+        val data = intent.dataString ?: return null
+        return if (data.startsWith("openid-credential-offer:")) data else null
     }
 }
 
@@ -60,10 +90,16 @@ sealed interface Screen {
     data object List : Screen
     data class Detail(val credentialId: String) : Screen
     data class Share(val credentialId: String) : Screen
+    data class Receive(val offerUrl: String) : Screen
 }
 
 @Composable
-fun WalletApp(repository: WalletRepository, activity: FragmentActivity) {
+fun WalletApp(
+    repository: WalletRepository,
+    activity: FragmentActivity,
+    initialOfferUrl: String? = null,
+    onOfferConsumed: () -> Unit = {},
+) {
     var hasCredentials by remember { mutableStateOf(repository.credentialIds().isNotEmpty()) }
     var signedIn by remember { mutableStateOf(repository.isSignedIn()) }
     var unlocked by remember { mutableStateOf(false) }
@@ -147,6 +183,15 @@ fun WalletApp(repository: WalletRepository, activity: FragmentActivity) {
         mutableStateOf<Screen>(if (signedIn) Screen.List else Screen.SignIn)
     }
 
+    // A deeplink offer (same-device issuance) takes precedence once the wallet
+    // is signed in and unlocked; otherwise the user is sent through sign-in
+    // first and lands here afterwards.
+    LaunchedEffect(initialOfferUrl, signedIn, unlocked) {
+        if (!initialOfferUrl.isNullOrBlank() && signedIn && unlocked) {
+            screen = Screen.Receive(initialOfferUrl)
+        }
+    }
+
     // Any pointer activity inside the wallet resets the idle auto-lock timer.
     Box(
         Modifier
@@ -213,6 +258,19 @@ fun WalletApp(repository: WalletRepository, activity: FragmentActivity) {
                 current.credentialId,
                 onDone = { screen = Screen.List },
                 onBack = { screen = Screen.Detail(current.credentialId) },
+            )
+            is Screen.Receive -> ReceiveOfferScreen(
+                repository = repository,
+                offerUrl = current.offerUrl,
+                onDone = {
+                    hasCredentials = repository.credentialIds().isNotEmpty()
+                    onOfferConsumed()
+                    screen = Screen.List
+                },
+                onCancel = {
+                    onOfferConsumed()
+                    screen = if (signedIn) Screen.List else Screen.SignIn
+                },
             )
         }
     }

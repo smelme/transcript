@@ -25,10 +25,17 @@ function ClaimFlow() {
   const [offer, setOffer] = useState<{ qrDataUrl?: string; offerUrl?: string } | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [isMobile, setIsMobile] = useState(false);
+  const [showQr, setShowQr] = useState(false);
 
   useEffect(() => {
     setEmail(invitedEmail);
   }, [invitedEmail]);
+
+  useEffect(() => {
+    const ua = typeof navigator === 'undefined' ? '' : navigator.userAgent;
+    setIsMobile(/Android|iPhone|iPad|iPod|Mobile/i.test(ua));
+  }, []);
 
   const loadCredentials = useCallback(async (accessToken: string) => {
     const list = await listAcademyCredentials(accessToken);
@@ -263,28 +270,34 @@ function ClaimFlow() {
         {offer && (
           <>
             <h1 style={{ fontSize: 30, letterSpacing: '-0.02em', margin: '14px 0 12px' }}>
-              Scan with your wallet
+              {isMobile && !showQr ? 'Add to your wallet' : 'Scan with your wallet'}
             </h1>
             <p style={{ fontSize: 16, lineHeight: 1.65, color: 'var(--muted)', marginBottom: 28 }}>
-              Open the Quals wallet app, scan this code, and your credential will be added to your
-              device.
+              {isMobile && !showQr
+                ? 'Tap the button below to open the Quals wallet app and add this credential to your device.'
+                : 'Open the Quals wallet app, scan this code, and your credential will be added to your device.'}
             </p>
 
-            <div style={{ display: 'flex', gap: 32, flexWrap: 'wrap', alignItems: 'flex-start' }}>
-              {offer.qrDataUrl && (
-                <div className="qr-wrap">
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img src={offer.qrDataUrl} alt="Credential offer QR code" />
-                  <div className="qr-caption">Smart Academy · Quals wallet</div>
-                </div>
-              )}
-              <div style={{ maxWidth: 320, flex: '1 1 260px' }}>
-                <ol style={{ paddingLeft: 18, color: 'var(--muted)', lineHeight: 1.9, fontSize: 14 }}>
-                  <li>Open the Quals wallet app on your phone.</li>
-                  <li>Choose to add a credential and scan this code.</li>
-                  <li>Authenticate with your biometrics to store it.</li>
-                </ol>
+            {isMobile && !showQr ? (
+              <div className="panel" style={{ maxWidth: 520 }}>
+                <a href={offer.offerUrl} className="btn btn-dark" style={{ width: '100%', justifyContent: 'center' }}>
+                  Open in Quals wallet
+                </a>
+                <p className="muted" style={{ fontSize: 13, margin: '16px 0 0', lineHeight: 1.6 }}>
+                  If the wallet does not open, make sure the Quals app is installed on this device.
+                  You can also scan the code from another screen.
+                </p>
                 <div style={{ marginTop: 18, display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+                  <button type="button" className="btn btn-outline" onClick={() => setShowQr(true)}>
+                    Show QR code
+                  </button>
+                  <button
+                    type="button"
+                    className="btn btn-outline"
+                    onClick={() => navigator.clipboard.writeText(offer.offerUrl || '')}
+                  >
+                    Copy offer link
+                  </button>
                   <button
                     type="button"
                     className="btn btn-outline"
@@ -293,20 +306,54 @@ function ClaimFlow() {
                       if (token) loadCredentials(token).catch(() => undefined);
                     }}
                   >
-                    Add another credential
+                    Back
                   </button>
-                  {offer.offerUrl && (
+                </div>
+              </div>
+            ) : (
+              <div style={{ display: 'flex', gap: 32, flexWrap: 'wrap', alignItems: 'flex-start' }}>
+                {offer.qrDataUrl && (
+                  <div className="qr-wrap">
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img src={offer.qrDataUrl} alt="Credential offer QR code" />
+                    <div className="qr-caption">Smart Academy · Quals wallet</div>
+                  </div>
+                )}
+                <div style={{ maxWidth: 320, flex: '1 1 260px' }}>
+                  <ol style={{ paddingLeft: 18, color: 'var(--muted)', lineHeight: 1.9, fontSize: 14 }}>
+                    <li>Open the Quals wallet app on your phone.</li>
+                    <li>Choose to add a credential and scan this code.</li>
+                    <li>Authenticate with your biometrics to store it.</li>
+                  </ol>
+                  <div style={{ marginTop: 18, display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+                    {isMobile && (
+                      <a href={offer.offerUrl} className="btn btn-dark">
+                        Open in Quals wallet
+                      </a>
+                    )}
                     <button
                       type="button"
                       className="btn btn-outline"
-                      onClick={() => navigator.clipboard.writeText(offer.offerUrl || '')}
+                      onClick={() => {
+                        setOffer(null);
+                        if (token) loadCredentials(token).catch(() => undefined);
+                      }}
                     >
-                      Copy offer link
+                      Add another credential
                     </button>
-                  )}
+                    {offer.offerUrl && (
+                      <button
+                        type="button"
+                        className="btn btn-outline"
+                        onClick={() => navigator.clipboard.writeText(offer.offerUrl || '')}
+                      >
+                        Copy offer link
+                      </button>
+                    )}
+                  </div>
                 </div>
               </div>
-            </div>
+            )}
           </>
         )}
 
