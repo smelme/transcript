@@ -39,13 +39,24 @@ const cwt = buildCwt({
 
 const claim = (await post('/wallet/issuance', { offerUrl: session.offerUrl, accessToken: token.accessToken, cwt })).data;
 
-// Revoke it.
+// Revoke it. Revocation is admin-only, so authenticate as an administrator.
+const adminLogin = (await post('/admin/auth/login', {
+  email: process.env.ADMIN_EMAIL || 'admin@quals.local',
+  password: process.env.ADMIN_PASSWORD || 'quals-admin-2026',
+})).data;
 const del = await fetch(`${ISSUER}/credentials/${claim.credentialId}`, {
   method: 'DELETE',
-  headers: { 'content-type': 'application/json' },
+  headers: {
+    'content-type': 'application/json',
+    authorization: `Bearer ${adminLogin.token}`,
+  },
   body: JSON.stringify({ reason: 'test revocation' }),
 });
 console.log('revoke status', del.status);
+if (del.status !== 200) {
+  console.log(`FAIL  revoking requires an authenticated administrator — HTTP ${del.status}`);
+  process.exit(1);
+}
 
 const share = await post('/shares', {
   accessToken: token.accessToken,

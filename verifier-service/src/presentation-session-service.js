@@ -132,50 +132,6 @@ function buildSessionTranscript(origin, nonceHex, jwk) {
   return new Uint8Array(cbor2.encode([null, null, handover]));
 }
 
-/** Collapse whitespace so a name typed with double spaces still matches. */
-const normalizeName = (value) => String(value ?? '').trim().replace(/\s+/g, ' ');
-
-/**
- * Registry entries whose stored claim values match the disclosed ones.
- *
- * Used only to enforce revocation when presentment carries no credential id, so
- * it is deliberately conservative: a match can only ever cause a rejection, and
- * never an acceptance that the signature and trust checks would not already
- * allow. The name is required (without it every credential of an institution
- * would match); the qualification elements narrow it down when disclosed.
- */
-function findRegistryMatches(claims = {}) {
-  const name = normalizeName([claims.given_name, claims.family_name].filter(Boolean).join(' '));
-  if (!name) return [];
-
-  const institution = claims.institution_name || null;
-  const degreeLevel = claims.degree_level || null;
-  const graduationDate = claims.graduation_date || null;
-
-  let rows;
-  try {
-    rows = getDb().prepare('SELECT credential_id, status, metadata_json FROM credentials').all();
-  } catch (e) {
-    console.warn('[presentation] could not read the credential registry:', e.message);
-    return [];
-  }
-
-  return rows.filter((row) => {
-    let metadata;
-    try {
-      metadata = JSON.parse(row.metadata_json || '{}');
-    } catch {
-      return false;
-    }
-    if (normalizeName(metadata.full_name) !== name) return false;
-    const qualification = metadata.education_qualification || {};
-    if (institution && qualification.institution_name !== institution) return false;
-    if (degreeLevel && qualification.degree_level !== degreeLevel) return false;
-    if (graduationDate && qualification.graduation_date !== graduationDate) return false;
-    return true;
-  });
-}
-
 export class PresentationSessionService {
   constructor({ ttlMs = 5 * 60 * 1000, now = () => Date.now(), dataDir, statusListFetch } = {}) {
     this.ttlMs = ttlMs;
@@ -288,7 +244,6 @@ export class PresentationSessionService {
     const claims = result.claims || {};
     await this.enforceCredentialStatus(
       session,
-      claims,
       (result.processedDocuments || []).map((processed) => processed.document),
     );
 
@@ -310,20 +265,19 @@ export class PresentationSessionService {
   }
 
   /**
-   * Reject a presented credential whose status is not valid.
+   * Reject a presented credential unless its status is known to be valid.
    *
-   * Three ways the credential can be identified, in order of preference:
-   *   1. the status reference inside the signed MSO (`status.status_list`), which
-   *      is claim-free and is what ISO/IEC 18013-5 provides for exactly this;
-   *   2. the credential id a share session was minted against;
-   *   3. the disclosed claims, as a fallback for credentials issued before status
-   *      lists existed.
+   * The status comes from the reference inside the credential's own signed MSO
+   * (`status` -> `status_list` -> `{ idx, uri }`), which every presentation
+   * carries because the MSO is not subject to selective disclosure. Share
+   * sessions are additionally minted against a credential id, which is used when
+   * the credential carries no reference of its own.
    *
-   * A credential matching nothing in the registry is accepted with a warning
-   * rather than rejected - that is how a credential from another issuer is
-   * treated. Configure TRUSTED_ACADEMIC_ISSUER_SHA256 to reject unknown issuers.
+   * A credential that provides neither is rejected: with no status reference
+   * there is no way to tell a revoked credential from a valid one, and accepting
+   * it anyway would defeat revocation.
    */
-  async enforceCredentialStatus(session, claims = {}, documents = []) {
+  async enforceCredentialStatus(session, documents = []) {
     for (const document of documents) {
       const status = extractMsoStatus(document);
       if (!status) continue;
@@ -345,18 +299,9 @@ export class PresentationSessionService {
       return;
     }
 
-    const matches = findRegistryMatches(claims);
-    if (matches.length === 0) {
-      console.warn(
-        '[presentation] presented credential matches no entry in the issuer registry - revocation could not be checked',
-      );
-      return;
-    }
-    // The registry only holds the elements this request discloses, so more than
-    // one entry can match. Reject when any candidate is not active: for
-    // revocation checks, failing closed is the only safe direction.
-    const notActive = matches.find((row) => row.status !== 'active');
-    if (notActive) throw new Error(`Credential is ${notActive.status}`);
+    throw new Error(
+      'Credential does not reference a status list, so its revocation status cannot be checked',
+    );
   }
 
   enforcePinnedIssuer(result) {

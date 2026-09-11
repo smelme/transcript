@@ -98,7 +98,9 @@ function hpkeEncrypt(recipientJwk, info, plaintext) {
 }
 
 // Builds a self-consistent academic mdoc document and its device key pair.
-export function buildAcademicCredential({ signerKeyPem, certDer }) {
+// `status` is the credential's status-list reference (`{ idx, uri }`), which a
+// real issuance embeds in the MSO; pass it to exercise the revocation path.
+export function buildAcademicCredential({ signerKeyPem, certDer, status = null }) {
   const device = generateDeviceKeyPair();
   const namespaces = {
     'org.iso.23220.photoid.1': [
@@ -117,6 +119,7 @@ export function buildAcademicCredential({ signerKeyPem, certDer }) {
     signerKeyPem,
     certDer,
     deviceJwk: device.publicJwk,
+    status,
   });
   return { ...generated, device };
 }

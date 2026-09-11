@@ -59,6 +59,17 @@ function mdocWithStatus(idx) {
   return { issuerSigned, document: { issuerSigned } };
 }
 
+/** A document whose mdoc carries no status reference at all. */
+function documentWithoutStatus() {
+  const mdoc = generateIssuerSigned({
+    docType: 'org.iso.23220.photoid.1',
+    namespaces: { 'org.iso.23220.photoid.1': [['given_name', new Cbor().tstr('No').encode()]] },
+    signerKeyPem,
+    certDer,
+  });
+  return { issuerSigned: cbor2.decode(Buffer.from(mdoc.base64url, 'base64url')) };
+}
+
 /** A status list JWS marking `REVOKED_INDEX` as revoked, signed by `keyPem`. */
 function signedStatusList({ keyPem = signerKeyPem, entries = { [REVOKED_INDEX]: STATUS_INVALID } } = {}) {
   return signStatusListJws(encodeStatusListPayload(packStatusList(entries)), keyPem);
@@ -73,15 +84,7 @@ test('the MSO carries the status reference and it survives encoding', () => {
 });
 
 test('a credential issued without a status reference reports none', () => {
-  const mdoc = generateIssuerSigned({
-    docType: 'org.iso.23220.photoid.1',
-    namespaces: { 'org.iso.23220.photoid.1': [['given_name', new Cbor().tstr('No').encode()]] },
-    signerKeyPem,
-    certDer,
-  });
-  const document = { issuerSigned: cbor2.decode(Buffer.from(mdoc.base64url, 'base64url')) };
-
-  assert.equal(extractMsoStatus(document), null);
+  assert.equal(extractMsoStatus(documentWithoutStatus()), null);
 });
 
 test('the issuer public key is recovered from the credential it signed', () => {
@@ -131,17 +134,14 @@ test('a tampered list is rejected', async () => {
   );
 });
 
-test('presentment is rejected on the MSO status alone, without matching claims', async () => {
-  // The disclosed claims match nothing in the registry, so the claim-matching
-  // fallback would let the presentation through. Only the MSO status can reject
-  // it - which is the whole point of carrying the reference in the mdoc.
+test('presentment is rejected on the MSO status alone, without any claims', async () => {
   const service = new PresentationSessionService({
     statusListFetch: servingStatusList(signedStatusList()),
   });
   const { document } = mdocWithStatus(REVOKED_INDEX);
 
   await assert.rejects(
-    () => service.enforceCredentialStatus({}, { given_name: 'Nobody', family_name: 'Matches' }, [document]),
+    () => service.enforceCredentialStatus({}, [document]),
     /Credential is revoked/,
   );
 });
@@ -152,7 +152,18 @@ test('presentment proceeds when the status list says the credential is valid', a
   });
   const { document } = mdocWithStatus(ACTIVE_INDEX);
 
-  await service.enforceCredentialStatus({}, { given_name: 'Nobody', family_name: 'Matches' }, [document]);
+  await service.enforceCredentialStatus({}, [document]);
+});
+
+test('a credential with no status reference cannot be checked, so it is rejected', async () => {
+  const service = new PresentationSessionService({
+    statusListFetch: servingStatusList(signedStatusList()),
+  });
+
+  await assert.rejects(
+    () => service.enforceCredentialStatus({}, [documentWithoutStatus()]),
+    /does not reference a status list/,
+  );
 });
 
 test('an unreachable status list fails the presentation rather than passing it', async () => {
@@ -162,7 +173,7 @@ test('an unreachable status list fails the presentation rather than passing it',
   const { document } = mdocWithStatus(ACTIVE_INDEX);
 
   await assert.rejects(
-    () => service.enforceCredentialStatus({}, {}, [document]),
+    () => service.enforceCredentialStatus({}, [document]),
     /could not be retrieved/,
   );
 });

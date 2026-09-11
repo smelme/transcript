@@ -98,9 +98,10 @@ check('revoked refresh token is not restored on reactivation', reactivated.statu
 const { PresentationSessionService } = await import('../../verifier-service/src/presentation-session-service.js');
 const sessions = new PresentationSessionService();
 
-// The status check is async (a credential's MSO may reference a status list).
-const enforced = async (session, claims = {}, documents = []) => {
-  try { await sessions.enforceCredentialStatus(session, claims, documents); return null; }
+// The status check is async: it resolves the credential's status-list reference
+// from the presented documents (empty here, so only the session id applies).
+const enforced = async (session, documents = []) => {
+  try { await sessions.enforceCredentialStatus(session, documents); return null; }
   catch (e) { return e.message; }
 };
 
@@ -122,65 +123,15 @@ writeDb.prepare(
 const activeThrew = await enforced({ credentialId: activeId });
 check('verifier accepts an active credential', activeThrew === null, activeThrew || '');
 
-// 6. DCAPI presentment carries no credential id (an mdoc does not contain one),
-//    so the verifier identifies the credential from the disclosed claims.
-const dapiClaims = (name) => ({
-  given_name: name.split(' ')[0],
-  family_name: name.split(' ').slice(1).join(' '),
-  institution_name: 'Smart Academy',
-  degree_level: 'Master',
-  graduation_date: '2025-06-30',
-});
-const dapiMetadata = (name) => JSON.stringify({
-  full_name: name,
-  education_qualification: {
-    institution_name: 'Smart Academy',
-    degree_level: 'Master',
-    graduation_date: '2025-06-30',
-  },
-});
-const insertCredential = writeDb.prepare(
-  `INSERT INTO credentials (credential_id, issuer_id, institution, student_id, status, created_at, metadata_json)
-   VALUES (?, 'issuer-001', 'Smart Academy', 'S-DAPI', ?, ?, ?)`,
+// 6. A credential that carries no status reference (and no session credential
+//    id) cannot have its revocation checked, so the presentation is refused
+//    rather than waved through.
+const uncheckedThrew = await enforced({}, []);
+check(
+  'verifier refuses a credential whose status cannot be checked',
+  /does not reference a status list/.test(uncheckedThrew || ''),
+  uncheckedThrew || '',
 );
-const seed = (status, name) => insertCredential.run(
-  `dapi-${status}-${name.replace(/\s+/g, '-').toLowerCase()}-${Date.now()}`,
-  status,
-  new Date().toISOString(),
-  dapiMetadata(name),
-);
-seed('revoked', 'Dapi Revoked');
-seed('active', 'Dapi Active');
-
-const dapiRevokedThrew = await enforced({}, dapiClaims('Dapi Revoked'));check('verifier rejects a revoked credential presented over DCAPI', !!dapiRevokedThrew, dapiRevokedThrew || '');
-
-const dapiActiveThrew = await enforced({}, dapiClaims('Dapi Active'));
-check('verifier accepts an active credential presented over DCAPI', dapiActiveThrew === null, dapiActiveThrew || '');
-
-const foreignThrew = await enforced({}, {
-  given_name: 'Erika',
-  family_name: 'Mustermann',
-  institution_name: 'University of Auckland',
-  degree_level: 'Master',
-  graduation_date: '2025-06-30',
-});
-check('verifier leaves a credential matching no registry entry alone', foreignThrew === null, foreignThrew || '');
-
-seed('active', 'Dapi Ambiguous');
-seed('revoked', 'Dapi Ambiguous');
-const ambiguousThrew = await enforced({}, dapiClaims('Dapi Ambiguous'));
-check('verifier rejects when an ambiguous match includes a revoked credential', !!ambiguousThrew, ambiguousThrew || '');
-
-// A mismatch here fails OPEN, so spacing must not defeat the comparison.
-seed('revoked', 'Dapi  Spaced');
-const spacedThrew = await enforced({}, {
-  given_name: 'Dapi',
-  family_name: 'Spaced',
-  institution_name: 'Smart Academy',
-  degree_level: 'Master',
-  graduation_date: '2025-06-30',
-});
-check('verifier matches the name despite inconsistent spacing', !!spacedThrew, spacedThrew || '');
 
 writeDb.close();
 db.close();

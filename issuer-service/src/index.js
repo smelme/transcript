@@ -1180,8 +1180,11 @@ app.get('/credentials/student/:studentId', (req, res) => {
   res.json(result);
 });
 
-// Revoke credential
-app.delete('/credentials/:id', (req, res) => {
+// Revoke credential. Revocation is a privileged, destructive action: a leaked
+// or guessed credential id must not let an unauthenticated caller disable
+// somebody's credential.
+app.delete('/credentials/:id', async (req, res) => {
+  if (!(await requireAdmin(req, res))) return;
   const result = issuer.revokeCredential(req.params.id, req.body.reason);
   res.status(result.success ? 200 : 404).json(result);
 });

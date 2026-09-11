@@ -5,9 +5,25 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { PresentationSessionService } from '../src/presentation-session-service.js';
 import { buildAcademicCredential, buildEncryptedDeviceResponse } from './helpers/test-wallet.js';
+import { packStatusList, encodeStatusListPayload, signStatusListJws } from '../../status-list-core.js';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const keyDir = path.resolve(here, '../../key-management/keys');
+
+// Status-list reference embedded in the credentials built below, and a service
+// that serves the list from memory exactly as the issuer would sign it.
+const STATUS_URI = 'https://issuer.example/status-list/quals-1';
+const STATUS_INDEX = 0;
+
+function serviceWithStatusList(issuerKeys, entries = {}) {
+  const jws = signStatusListJws(
+    encodeStatusListPayload(packStatusList(entries)),
+    issuerKeys.signerKeyPem,
+  );
+  return new PresentationSessionService({
+    statusListFetch: async () => ({ ok: true, status: 200, text: async () => jws }),
+  });
+}
 
 function loadIssuerKeys() {
   return {
@@ -18,7 +34,10 @@ function loadIssuerKeys() {
 
 async function present(service, session, issuerKeys) {
   const record = service.sessions.get(session.sessionId);
-  const credential = buildAcademicCredential(issuerKeys);
+  const credential = buildAcademicCredential({
+    ...issuerKeys,
+    status: { idx: STATUS_INDEX, uri: STATUS_URI },
+  });
   const response = await buildEncryptedDeviceResponse({
     origin: record.origin,
     nonceHex: record.nonce,
@@ -32,7 +51,7 @@ async function present(service, session, issuerKeys) {
 
 test('verifies a complete encrypted org-iso-mdoc DeviceResponse', async () => {
   const issuerKeys = loadIssuerKeys();
-  const service = new PresentationSessionService();
+  const service = serviceWithStatusList(issuerKeys);
   const session = await service.create({ relyingPartyId: 'myjob', origin: 'https://myjob.example' });
   const { response } = await present(service, session, issuerKeys);
 

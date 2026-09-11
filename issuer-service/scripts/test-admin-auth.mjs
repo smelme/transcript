@@ -4,6 +4,7 @@
 //   - admin endpoints reject anonymous callers
 //   - a wallet access token cannot be used as an admin token
 //   - signing out invalidates every token issued to that administrator
+//   - credential revocation is admin-only
 const ISSUER = process.env.ISSUER_URL || 'http://127.0.0.1:3000';
 
 let failures = 0;
@@ -28,6 +29,19 @@ const password = process.env.ADMIN_PASSWORD || 'quals-admin-2026';
 // 1. Anonymous access is refused.
 const anon = await call('GET', '/admin/accounts');
 check('admin endpoints reject anonymous callers', anon.status === 401, `HTTP ${anon.status}`);
+
+// 1b. Revocation is privileged as well: an anonymous caller must not be able to
+//     disable somebody else's credential.
+const anonRevoke = await call(
+  'DELETE',
+  '/credentials/00000000-0000-0000-0000-000000000000',
+  { reason: 'anonymous attempt' },
+);
+check(
+  'revoking a credential requires administrator sign-in',
+  anonRevoke.status === 401,
+  `HTTP ${anonRevoke.status}`,
+);
 
 // 2. Wrong password is refused.
 const bad = await call('POST', '/admin/auth/login', { email, password: 'not-the-password' });
