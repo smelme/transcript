@@ -5,6 +5,8 @@
 //   - remote deactivation invalidates the refresh token
 //   - credential metadata persists and revoked credentials are rejected
 //   - the verifier rejects a revoked or missing credential
+//   - the verifier enforces revocation on DCAPI presentment too, where the
+//     credential has to be identified from the disclosed claims
 import Database from 'better-sqlite3';
 import path from 'path';
 import { fileURLToPath } from 'url';
@@ -122,8 +124,61 @@ const activeThrew = (() => {
   catch (e) { return e.message; }
 })();
 check('verifier accepts an active credential', activeThrew === null, activeThrew || '');
-check('verifier skips the status check when no credentialId is present (general DCAPI)',
-  (() => { try { sessions.enforceCredentialStatus({}); return true; } catch { return false; } })());
+
+// 6. DCAPI presentment carries no credential id (an mdoc does not contain one),
+//    so the verifier identifies the credential from the disclosed claims.
+const dapiClaims = (name) => ({
+  given_name: name.split(' ')[0],
+  family_name: name.split(' ').slice(1).join(' '),
+  institution_name: 'Smart Academy',
+  degree_level: 'Master',
+  graduation_date: '2025-06-30',
+});
+const dapiMetadata = (name) => JSON.stringify({
+  full_name: name,
+  education_qualification: {
+    institution_name: 'Smart Academy',
+    degree_level: 'Master',
+    graduation_date: '2025-06-30',
+  },
+});
+const insertCredential = writeDb.prepare(
+  `INSERT INTO credentials (credential_id, issuer_id, institution, student_id, status, created_at, metadata_json)
+   VALUES (?, 'issuer-001', 'Smart Academy', 'S-DAPI', ?, ?, ?)`,
+);
+const seed = (status, name) => insertCredential.run(
+  `dapi-${status}-${name.replace(/\s+/g, '-').toLowerCase()}-${Date.now()}`,
+  status,
+  new Date().toISOString(),
+  dapiMetadata(name),
+);
+seed('revoked', 'Dapi Revoked');
+seed('active', 'Dapi Active');
+
+const enforced = (session, claims) => {
+  try { sessions.enforceCredentialStatus(session, claims); return null; }
+  catch (e) { return e.message; }
+};
+
+const dapiRevokedThrew = enforced({}, dapiClaims('Dapi Revoked'));
+check('verifier rejects a revoked credential presented over DCAPI', !!dapiRevokedThrew, dapiRevokedThrew || '');
+
+const dapiActiveThrew = enforced({}, dapiClaims('Dapi Active'));
+check('verifier accepts an active credential presented over DCAPI', dapiActiveThrew === null, dapiActiveThrew || '');
+
+const foreignThrew = enforced({}, {
+  given_name: 'Erika',
+  family_name: 'Mustermann',
+  institution_name: 'University of Auckland',
+  degree_level: 'Master',
+  graduation_date: '2025-06-30',
+});
+check('verifier leaves a credential matching no registry entry alone', foreignThrew === null, foreignThrew || '');
+
+seed('active', 'Dapi Ambiguous');
+seed('revoked', 'Dapi Ambiguous');
+const ambiguousThrew = enforced({}, dapiClaims('Dapi Ambiguous'));
+check('verifier rejects when an ambiguous match includes a revoked credential', !!ambiguousThrew, ambiguousThrew || '');
 
 writeDb.close();
 db.close();

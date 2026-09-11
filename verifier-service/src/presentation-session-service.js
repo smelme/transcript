@@ -142,6 +142,47 @@ function extractLeafCertificateDer(document) {
   }
 }
 
+/**
+ * Registry entries whose stored claim values match the disclosed ones.
+ *
+ * Used only to enforce revocation when presentment carries no credential id, so
+ * it is deliberately conservative: a match can only ever cause a rejection, and
+ * never an acceptance that the signature and trust checks would not already
+ * allow. The name is required (without it every credential of an institution
+ * would match); the qualification elements narrow it down when disclosed.
+ */
+function findRegistryMatches(claims = {}) {
+  const name = [claims.given_name, claims.family_name].filter(Boolean).join(' ').trim();
+  if (!name) return [];
+
+  const institution = claims.institution_name || null;
+  const degreeLevel = claims.degree_level || null;
+  const graduationDate = claims.graduation_date || null;
+
+  let rows;
+  try {
+    rows = getDb().prepare('SELECT credential_id, status, metadata_json FROM credentials').all();
+  } catch (e) {
+    console.warn('[presentation] could not read the credential registry:', e.message);
+    return [];
+  }
+
+  return rows.filter((row) => {
+    let metadata;
+    try {
+      metadata = JSON.parse(row.metadata_json || '{}');
+    } catch {
+      return false;
+    }
+    if ((metadata.full_name || '').trim() !== name) return false;
+    const qualification = metadata.education_qualification || {};
+    if (institution && qualification.institution_name !== institution) return false;
+    if (degreeLevel && qualification.degree_level !== degreeLevel) return false;
+    if (graduationDate && qualification.graduation_date !== graduationDate) return false;
+    return true;
+  });
+}
+
 export class PresentationSessionService {
   constructor({ ttlMs = 5 * 60 * 1000, now = () => Date.now(), dataDir } = {}) {
     this.ttlMs = ttlMs;
@@ -249,9 +290,9 @@ export class PresentationSessionService {
     }
 
     this.enforcePinnedIssuer(result);
-    this.enforceCredentialStatus(session);
-
     const claims = result.claims || {};
+    this.enforceCredentialStatus(session, claims);
+
     const givenName = claims.given_name || claims.given_name_unicode || '';
     const familyName = claims.family_name || claims.family_name_unicode || '';
     return {
@@ -269,16 +310,39 @@ export class PresentationSessionService {
     };
   }
 
-  enforceCredentialStatus(session) {
-    // General DCAPI presentment does not carry a credentialId (the mdoc itself
-    // does not contain it); the status check applies to share sessions, which
-    // are minted against a specific credential in the issuer's registry.
-    if (!session.credentialId) return;
-    const row = getDb()
-      .prepare('SELECT status FROM credentials WHERE credential_id = ?')
-      .get(session.credentialId);
-    if (!row) throw new Error('Credential does not exist in the issuer registry');
-    if (row.status !== 'active') throw new Error(`Credential is ${row.status}`);
+  /**
+   * Reject a presented credential unless the issuer's registry says it is active.
+   *
+   * Share sessions are minted against one credential in the registry, so the id
+   * is known up front. DCAPI presentment is not: the browser hands the verifier
+   * nothing but the mdoc, and the mdoc carries no id, so the credential has to be
+   * identified from the disclosed claims. A credential that matches nothing in
+   * the registry (a foreign issuer, or anything predating it) is accepted with a
+   * warning rather than rejected - configure TRUSTED_ACADEMIC_ISSUER_SHA256 to
+   * reject unknown issuers outright.
+   */
+  enforceCredentialStatus(session, claims = {}) {
+    if (session.credentialId) {
+      const row = getDb()
+        .prepare('SELECT status FROM credentials WHERE credential_id = ?')
+        .get(session.credentialId);
+      if (!row) throw new Error('Credential does not exist in the issuer registry');
+      if (row.status !== 'active') throw new Error(`Credential is ${row.status}`);
+      return;
+    }
+
+    const matches = findRegistryMatches(claims);
+    if (matches.length === 0) {
+      console.warn(
+        '[presentation] presented credential matches no entry in the issuer registry - revocation could not be checked',
+      );
+      return;
+    }
+    // The registry only holds the elements this request discloses, so more than
+    // one entry can match. Reject when any candidate is not active: for
+    // revocation checks, failing closed is the only safe direction.
+    const notActive = matches.find((row) => row.status !== 'active');
+    if (notActive) throw new Error(`Credential is ${notActive.status}`);
   }
 
   enforcePinnedIssuer(result) {
