@@ -3,16 +3,22 @@ import { NextRequest, NextResponse } from 'next/server';
 /**
  * Server-side proxy from the portal to the issuer service.
  *
- * The admin key is attached here, on the server, so it is never shipped to the
- * browser. Configure with ISSUER_API_URL and ADMIN_API_KEY.
+ * The signed-in administrator's token is read from the httpOnly session cookie
+ * and forwarded as a Bearer token, so it never reaches client-side script and
+ * the issuer can attribute every action to an administrator.
  */
 
 const ISSUER_API_URL = process.env.ISSUER_API_URL || 'http://localhost:3000';
-const ADMIN_KEY = process.env.ADMIN_API_KEY || 'dev-admin-key';
+const COOKIE = 'quals_session';
 
 export const dynamic = 'force-dynamic';
 
 async function proxy(req: NextRequest, ctx: { params: Promise<{ path: string[] }> }) {
+  const token = req.cookies.get(COOKIE)?.value;
+  if (!token) {
+    return NextResponse.json({ success: false, error: 'Administrator sign-in required' }, { status: 401 });
+  }
+
   const { path } = await ctx.params;
   const target = `${ISSUER_API_URL}/${path.join('/')}${req.nextUrl.search}`;
 
@@ -25,7 +31,7 @@ async function proxy(req: NextRequest, ctx: { params: Promise<{ path: string[] }
       headers: {
         accept: 'application/json',
         'content-type': req.headers.get('content-type') || 'application/json',
-        'x-admin-key': ADMIN_KEY,
+        authorization: `Bearer ${token}`,
       },
       body: body && body.length > 0 ? body : undefined,
       cache: 'no-store',

@@ -21,6 +21,7 @@ import {
 } from '../../mdoc-core.js';
 import { WalletAccountService } from './wallet-account-service.js';
 import { ShareService } from './share-service.js';
+import { AdminAuthService } from './admin-auth.js';
 import { generateAcademicRecord } from './credential-generator.js';
 import * as emailService from './email-service.js';
 import { getDb } from '../../db.js';
@@ -974,6 +975,12 @@ const walletAccounts = new WalletAccountService({
   emailSender: emailService.sendOtpEmail,
 });
 
+// Management-portal administrators (email + password, separate from holders).
+const adminAuth = new AdminAuthService({
+  signerKeyPem: loadWalletTokenSigner(),
+  issuerId: issuer.issuerId,
+});
+
 // Selective-disclosure "share" flow (alternative to DCAPI integration).
 const shareService = new ShareService({
   issuerService: issuer,
@@ -1179,20 +1186,100 @@ app.post('/auth/signout', (req, res) => {
   }
 });
 
+// ── Administrator authentication (Quals management portal) ───────────────
+// Sign-in endpoints are public; everything else under /admin requires either a
+// valid admin session token or (only when explicitly configured) the shared
+// break-glass key in ADMIN_API_KEY.
+app.post('/admin/auth/login', async (req, res) => {
+  try {
+    res.json(await adminAuth.login(req.body || {}));
+  } catch (e) {
+    res.status(401).json({ success: false, error: e.message });
+  }
+});
+
+app.post('/admin/auth/logout', async (req, res) => {
+  if (!(await requireAdmin(req, res))) return;
+  try {
+    res.json(adminAuth.signOut(req.admin.id));
+  } catch (e) {
+    res.status(400).json({ success: false, error: e.message });
+  }
+});
+
+app.get('/admin/auth/me', async (req, res) => {
+  if (!(await requireAdmin(req, res))) return;
+  res.json({ success: true, admin: req.admin });
+});
+
+app.post('/admin/auth/password', async (req, res) => {
+  if (!(await requireAdmin(req, res))) return;
+  try {
+    res.json(await adminAuth.changePassword(req.admin.id, req.body?.newPassword));
+  } catch (e) {
+    res.status(400).json({ success: false, error: e.message });
+  }
+});
+
+app.get('/admin/users', async (req, res) => {
+  if (!(await requireAdmin(req, res))) return;
+  res.json({ success: true, users: adminAuth.listAdmins() });
+});
+
+app.post('/admin/users', async (req, res) => {
+  if (!(await requireAdmin(req, res))) return;
+  try {
+    res.status(201).json({
+      success: true,
+      user: await adminAuth.createAdmin({
+        email: req.body?.email,
+        password: req.body?.password,
+        role: req.body?.role,
+      }),
+    });
+  } catch (e) {
+    res.status(400).json({ success: false, error: e.message });
+  }
+});
+
+app.post('/admin/users/:id/active', async (req, res) => {
+  if (!(await requireAdmin(req, res))) return;
+  try {
+    res.json({ success: true, user: adminAuth.setActive(req.params.id, !!req.body?.active) });
+  } catch (e) {
+    res.status(400).json({ success: false, error: e.message });
+  }
+});
+
 // ── Remote account administration ────────────────────────────────────────
 // Deactivate / reactivate / delete a wallet account. A deactivated or deleted
-// account can no longer exchange its refresh token. Requires an admin key.
-function requireAdmin(req, res) {
-  const expected = process.env.ADMIN_API_KEY || 'dev-admin-key';
-  if ((req.headers['x-admin-key'] || '') !== expected) {
-    res.status(403).json({ success: false, error: 'Invalid admin key' });
-    return false;
+// account can no longer exchange its refresh token.
+async function requireAdmin(req, res) {
+  const header = req.headers.authorization || '';
+  const token = header.startsWith('Bearer ') ? header.slice(7) : null;
+  if (token) {
+    try {
+      req.admin = await adminAuth.verifyAdminToken(token);
+      return true;
+    } catch (e) {
+      res.status(401).json({ success: false, error: e.message });
+      return false;
+    }
   }
-  return true;
+
+  // Break-glass: only honoured when a key is explicitly configured.
+  const sharedKey = process.env.ADMIN_API_KEY;
+  if (sharedKey && (req.headers['x-admin-key'] || '') === sharedKey) {
+    req.admin = { id: 'shared-key', email: 'shared-key', role: 'break-glass', active: true };
+    return true;
+  }
+
+  res.status(401).json({ success: false, error: 'Administrator sign-in required' });
+  return false;
 }
 
-app.post('/admin/accounts/:sub/deactivate', (req, res) => {
-  if (!requireAdmin(req, res)) return;
+app.post('/admin/accounts/:sub/deactivate', async (req, res) => {
+  if (!(await requireAdmin(req, res))) return;
   try {
     res.json(walletAccounts.deactivateAccount(req.params.sub));
   } catch (e) {
@@ -1200,8 +1287,8 @@ app.post('/admin/accounts/:sub/deactivate', (req, res) => {
   }
 });
 
-app.post('/admin/accounts/:sub/activate', (req, res) => {
-  if (!requireAdmin(req, res)) return;
+app.post('/admin/accounts/:sub/activate', async (req, res) => {
+  if (!(await requireAdmin(req, res))) return;
   try {
     res.json(walletAccounts.activateAccount(req.params.sub));
   } catch (e) {
@@ -1209,8 +1296,8 @@ app.post('/admin/accounts/:sub/activate', (req, res) => {
   }
 });
 
-app.post('/admin/accounts/:sub/delete', (req, res) => {
-  if (!requireAdmin(req, res)) return;
+app.post('/admin/accounts/:sub/delete', async (req, res) => {
+  if (!(await requireAdmin(req, res))) return;
   try {
     res.json(walletAccounts.deleteAccount(req.params.sub));
   } catch (e) {
@@ -1219,8 +1306,8 @@ app.post('/admin/accounts/:sub/delete', (req, res) => {
 });
 
 // ── Management portal: accounts + shares ─────────────────────────────────
-app.get('/admin/accounts', (req, res) => {
-  if (!requireAdmin(req, res)) return;
+app.get('/admin/accounts', async (req, res) => {
+  if (!(await requireAdmin(req, res))) return;
   try {
     res.json({ success: true, accounts: walletAccounts.listAccounts() });
   } catch (e) {
@@ -1228,8 +1315,8 @@ app.get('/admin/accounts', (req, res) => {
   }
 });
 
-app.delete('/shares/:id', (req, res) => {
-  if (!requireAdmin(req, res)) return;
+app.delete('/shares/:id', async (req, res) => {
+  if (!(await requireAdmin(req, res))) return;
   try {
     res.json(shareService.revoke({ shareId: req.params.id, reason: req.body?.reason || null }));
   } catch (e) {
@@ -1592,6 +1679,11 @@ const PORT = process.env.PORT || 3000;
 const isMain = process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href;
 
 if (isMain) {
+  // Make sure the portal has at least one administrator to sign in with.
+  adminAuth.ensureSeedAdmin().catch((e) => {
+    console.error('[admin-auth] failed to seed administrator:', e.message);
+  });
+
   const server = app.listen(PORT, () => {
     console.log(`Issuer Service listening on port ${PORT}`);
     console.log(`API available at http://localhost:${PORT}`);

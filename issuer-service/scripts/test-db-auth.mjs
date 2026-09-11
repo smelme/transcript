@@ -14,6 +14,8 @@ const REPO_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..
 const DB_PATH = process.env.DATABASE_PATH || path.join(REPO_ROOT, 'data', 'transcript.db');
 
 const ADMIN_KEY = process.env.ADMIN_API_KEY || 'dev-admin-key';
+const ADMIN_EMAIL = process.env.ADMIN_EMAIL || 'admin@quals.local';
+const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'quals-admin-2026';
 let failures = 0;
 const check = (name, cond, extra = '') => {
   console.log(`${cond ? 'PASS' : 'FAIL'}  ${name}${extra ? ` — ${extra}` : ''}`);
@@ -73,12 +75,20 @@ const afterSignout = await call('POST', '/auth/refresh', { refreshToken: refresh
 check('refresh after sign-out is rejected', afterSignout.status === 401, `HTTP ${afterSignout.status}`);
 
 // 4. Remote deactivation invalidates refresh tokens.
+// Administrative actions now require an authenticated administrator session.
+const adminLogin = (await call('POST', '/admin/auth/login', {
+  email: ADMIN_EMAIL,
+  password: ADMIN_PASSWORD,
+})).data;
+if (!adminLogin.token) throw new Error('Could not sign in as an administrator');
+const adminAuth = { authorization: `Bearer ${adminLogin.token}` };
+
 const invite2 = (await call('POST', '/invitations', { email, studentId: 'S-LIFE', institution: 'Smart Academy' })).data;
 const tokenRes2 = (await call('POST', '/auth/token', { email, otp: invite2.otp })).data;
-await call('POST', `/admin/accounts/${encodeURIComponent(tokenRes2.sub)}/deactivate`, {}, { 'x-admin-key': ADMIN_KEY });
+await call('POST', `/admin/accounts/${encodeURIComponent(tokenRes2.sub)}/deactivate`, {}, adminAuth);
 const afterDeactivate = await call('POST', '/auth/refresh', { refreshToken: tokenRes2.refreshToken });
 check('refresh after remote deactivation is rejected', afterDeactivate.status === 401, `HTTP ${afterDeactivate.status}`);
-await call('POST', `/admin/accounts/${encodeURIComponent(tokenRes2.sub)}/activate`, {}, { 'x-admin-key': ADMIN_KEY });
+await call('POST', `/admin/accounts/${encodeURIComponent(tokenRes2.sub)}/activate`, {}, adminAuth);
 const reactivated = await call('POST', '/auth/refresh', { refreshToken: tokenRes2.refreshToken });
 check('revoked refresh token is not restored on reactivation', reactivated.status === 401, `HTTP ${reactivated.status}`);
 

@@ -86,6 +86,19 @@ function migrate(database) {
 
     CREATE INDEX IF NOT EXISTS idx_issuance_sessions_owner ON issuance_sessions (institution, student_id);
     CREATE INDEX IF NOT EXISTS idx_issuance_sessions_email ON issuance_sessions (email);
+
+    -- Management-portal administrators. Passwords are stored as scrypt hashes;
+    -- session_version is bumped on sign-out or password change to invalidate
+    -- every outstanding admin token for that account.
+    CREATE TABLE IF NOT EXISTS admin_users (
+      id              TEXT PRIMARY KEY,
+      email           TEXT NOT NULL UNIQUE,
+      password_hash   TEXT NOT NULL,
+      role            TEXT NOT NULL DEFAULT 'admin',
+      active          INTEGER NOT NULL DEFAULT 1,
+      session_version INTEGER NOT NULL DEFAULT 1,
+      created_at      TEXT NOT NULL
+    );
   `);
 }
 
