@@ -94,44 +94,57 @@ await call('POST', `/admin/accounts/${encodeURIComponent(tokenRes2.sub)}/activat
 const reactivated = await call('POST', '/auth/refresh', { refreshToken: tokenRes2.refreshToken });
 check('revoked refresh token is not restored on reactivation', reactivated.status === 401, `HTTP ${reactivated.status}`);
 
-// 5. Verifier rejects revoked / missing credentials.
+// 5. The verifier's status decision comes from the credential's own signed status
+//    reference and nothing else. The issuer registry is deliberately NOT consulted:
+//    a verifier only ever has the credential and the issuer's published list, so a
+//    credential with no reference is refused however the registry describes it.
 const { PresentationSessionService } = await import('../../verifier-service/src/presentation-session-service.js');
 const sessions = new PresentationSessionService();
 
-// The status check is async: it resolves the credential's status-list reference
-// from the presented documents (empty here, so only the session id applies).
-const enforced = async (session, documents = []) => {
-  try { await sessions.enforceCredentialStatus(session, documents); return null; }
+// The status check is async and takes the presented documents alone.
+const enforced = async (documents = []) => {
+  try { await sessions.enforceCredentialStatus(documents); return null; }
   catch (e) { return e.message; }
 };
 
-const missingThrew = await enforced({ credentialId: `missing-${Date.now()}` });
-check('verifier rejects a credential missing from the registry', !!missingThrew, missingThrew || '');
-
-const revokedId = `revoked-${Date.now()}`;
+// Registry rows are written here to show they change nothing: the same refusal
+// comes back whether the row says the credential is active or revoked.
 const writeDb = new Database(DB_PATH);
-writeDb.prepare(
-  "INSERT INTO credentials (credential_id, issuer_id, institution, student_id, status, created_at) VALUES (?, 'issuer-001', 'Smart Academy', 'S-LIFE', 'revoked', ?)"
-).run(revokedId, new Date().toISOString());
-const revokedThrew = await enforced({ credentialId: revokedId });
-check('verifier rejects a revoked credential', !!revokedThrew, revokedThrew || '');
+const insertCredential = (credentialId, status) =>
+  writeDb.prepare(
+    "INSERT INTO credentials (credential_id, issuer_id, institution, student_id, status, created_at) VALUES (?, 'issuer-001', 'Smart Academy', 'S-LIFE', ?, ?)"
+  ).run(credentialId, status, new Date().toISOString());
 
 const activeId = `active-${Date.now()}`;
-writeDb.prepare(
-  "INSERT INTO credentials (credential_id, issuer_id, institution, student_id, status, created_at) VALUES (?, 'issuer-001', 'Smart Academy', 'S-LIFE', 'active', ?)"
-).run(activeId, new Date().toISOString());
-const activeThrew = await enforced({ credentialId: activeId });
-check('verifier accepts an active credential', activeThrew === null, activeThrew || '');
+insertCredential(activeId, 'active');
+const activeThrew = await enforced([]);
+check(
+  'a credential with no status reference is refused even when the registry says it is active',
+  /does not reference a status list/.test(activeThrew || ''),
+  activeThrew || '',
+);
 
-// 6. A credential that carries no status reference (and no session credential
-//    id) cannot have its revocation checked, so the presentation is refused
-//    rather than waved through.
-const uncheckedThrew = await enforced({}, []);
+const revokedId = `revoked-${Date.now()}`;
+insertCredential(revokedId, 'revoked');
+const revokedThrew = await enforced([]);
+check(
+  'a revoked credential with no status reference is refused',
+  /does not reference a status list/.test(revokedThrew || ''),
+  revokedThrew || '',
+);
+
+// 6. An empty presentation cannot have its status checked either.
+const uncheckedThrew = await enforced();
 check(
   'verifier refuses a credential whose status cannot be checked',
   /does not reference a status list/.test(uncheckedThrew || ''),
   uncheckedThrew || '',
 );
+
+// The registry rows above exist only to prove they make no difference.
+writeDb.prepare(
+  'DELETE FROM credentials WHERE credential_id IN (?, ?)',
+).run(activeId, revokedId);
 
 writeDb.close();
 db.close();

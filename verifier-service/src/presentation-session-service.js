@@ -2,7 +2,6 @@ import crypto from 'crypto';
 import { v4 as uuidv4 } from 'uuid';
 import * as cbor2 from 'cbor2';
 import { generateNonce, generateJWK, processCredentials } from 'id-verifier';
-import { getDb } from '../../db.js';
 import { ReaderAuthService } from './reader-auth.js';
 import {
   StatusListClient,
@@ -242,8 +241,9 @@ export class PresentationSessionService {
 
     this.enforcePinnedIssuer(result);
     const claims = result.claims || {};
+    // Awaited: a status failure must reject the presentation, not escape as an
+    // unhandled rejection while verification carries on.
     await this.enforceCredentialStatus(
-      session,
       (result.processedDocuments || []).map((processed) => processed.document),
     );
 
@@ -269,39 +269,31 @@ export class PresentationSessionService {
    *
    * The status comes from the reference inside the credential's own signed MSO
    * (`status` -> `status_list` -> `{ idx, uri }`), which every presentation
-   * carries because the MSO is not subject to selective disclosure. Share
-   * sessions are additionally minted against a credential id, which is used when
-   * the credential carries no reference of its own.
+   * carries because the MSO is not subject to selective disclosure.
    *
-   * A credential that provides neither is rejected: with no status reference
-   * there is no way to tell a revoked credential from a valid one, and accepting
-   * it anyway would defeat revocation.
+   * There is deliberately no fallback and no other source. A credential that
+   * carries no reference cannot have its revocation status established, and
+   * accepting it anyway would defeat revocation entirely, so it is refused
+   * however the issuer's own records describe it. Credentials issued before this
+   * issuer published a status list must be re-issued before they can be
+   * presented.
    */
-  async enforceCredentialStatus(session, documents = []) {
+  async enforceCredentialStatus(documents = []) {
+    const noReference = new Error(
+      'Credential does not reference a status list, so its revocation status cannot be checked',
+    );
+    if (!documents.length) throw noReference;
+
     for (const document of documents) {
       const status = extractMsoStatus(document);
-      if (!status) continue;
+      if (!status) throw noReference;
       const bit = await this.statusList.statusAt(
         status.uri,
         status.idx,
         issuerPublicKeyFrom(document),
       );
       if (bit !== STATUS_VALID) throw new Error('Credential is revoked');
-      return;
     }
-
-    if (session.credentialId) {
-      const row = getDb()
-        .prepare('SELECT status FROM credentials WHERE credential_id = ?')
-        .get(session.credentialId);
-      if (!row) throw new Error('Credential does not exist in the issuer registry');
-      if (row.status !== 'active') throw new Error(`Credential is ${row.status}`);
-      return;
-    }
-
-    throw new Error(
-      'Credential does not reference a status list, so its revocation status cannot be checked',
-    );
   }
 
   enforcePinnedIssuer(result) {

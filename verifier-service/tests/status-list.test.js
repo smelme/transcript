@@ -141,7 +141,7 @@ test('presentment is rejected on the MSO status alone, without any claims', asyn
   const { document } = mdocWithStatus(REVOKED_INDEX);
 
   await assert.rejects(
-    () => service.enforceCredentialStatus({}, [document]),
+    () => service.enforceCredentialStatus([document]),
     /Credential is revoked/,
   );
 });
@@ -152,7 +152,7 @@ test('presentment proceeds when the status list says the credential is valid', a
   });
   const { document } = mdocWithStatus(ACTIVE_INDEX);
 
-  await service.enforceCredentialStatus({}, [document]);
+  await service.enforceCredentialStatus([document]);
 });
 
 test('a credential with no status reference cannot be checked, so it is rejected', async () => {
@@ -161,9 +161,19 @@ test('a credential with no status reference cannot be checked, so it is rejected
   });
 
   await assert.rejects(
-    () => service.enforceCredentialStatus({}, [documentWithoutStatus()]),
+    () => service.enforceCredentialStatus([documentWithoutStatus()]),
     /does not reference a status list/,
   );
+});
+
+test('status is resolved without the issuer database', () => {
+  // A verifier holds the credential and the issuer's published list, nothing more.
+  const here = path.dirname(fileURLToPath(import.meta.url));
+  const source = fs.readFileSync(
+    path.join(here, '..', 'src', 'presentation-session-service.js'),
+    'utf8',
+  );
+  assert.ok(!/db\.js/.test(source), 'the verifier must not depend on the issuer database');
 });
 
 test('an unreachable status list fails the presentation rather than passing it', async () => {
@@ -173,7 +183,7 @@ test('an unreachable status list fails the presentation rather than passing it',
   const { document } = mdocWithStatus(ACTIVE_INDEX);
 
   await assert.rejects(
-    () => service.enforceCredentialStatus({}, [document]),
+    () => service.enforceCredentialStatus([document]),
     /could not be retrieved/,
   );
 });
