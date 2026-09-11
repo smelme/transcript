@@ -142,6 +142,9 @@ function extractLeafCertificateDer(document) {
   }
 }
 
+/** Collapse whitespace so a name typed with double spaces still matches. */
+const normalizeName = (value) => String(value ?? '').trim().replace(/\s+/g, ' ');
+
 /**
  * Registry entries whose stored claim values match the disclosed ones.
  *
@@ -152,7 +155,7 @@ function extractLeafCertificateDer(document) {
  * would match); the qualification elements narrow it down when disclosed.
  */
 function findRegistryMatches(claims = {}) {
-  const name = [claims.given_name, claims.family_name].filter(Boolean).join(' ').trim();
+  const name = normalizeName([claims.given_name, claims.family_name].filter(Boolean).join(' '));
   if (!name) return [];
 
   const institution = claims.institution_name || null;
@@ -174,7 +177,7 @@ function findRegistryMatches(claims = {}) {
     } catch {
       return false;
     }
-    if ((metadata.full_name || '').trim() !== name) return false;
+    if (normalizeName(metadata.full_name) !== name) return false;
     const qualification = metadata.education_qualification || {};
     if (institution && qualification.institution_name !== institution) return false;
     if (degreeLevel && qualification.degree_level !== degreeLevel) return false;

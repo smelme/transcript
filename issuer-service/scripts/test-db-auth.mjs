@@ -180,6 +180,17 @@ seed('revoked', 'Dapi Ambiguous');
 const ambiguousThrew = enforced({}, dapiClaims('Dapi Ambiguous'));
 check('verifier rejects when an ambiguous match includes a revoked credential', !!ambiguousThrew, ambiguousThrew || '');
 
+// A mismatch here fails OPEN, so spacing must not defeat the comparison.
+seed('revoked', 'Dapi  Spaced');
+const spacedThrew = enforced({}, {
+  given_name: 'Dapi',
+  family_name: 'Spaced',
+  institution_name: 'Smart Academy',
+  degree_level: 'Master',
+  graduation_date: '2025-06-30',
+});
+check('verifier matches the name despite inconsistent spacing', !!spacedThrew, spacedThrew || '');
+
 writeDb.close();
 db.close();
 
