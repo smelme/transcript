@@ -58,6 +58,55 @@ export async function listCredentials(params: { studentId?: string; status?: str
   return data.credentials || [];
 }
 
+/* ── Client organisations and API keys ──────────────────────────────────── */
+
+export interface ClientOrg {
+  institution: string;
+  name: string;
+  createdAt?: string;
+}
+
+export interface ApiKey {
+  keyId: string;
+  institution: string;
+  name?: string | null;
+  /** Only the leading characters are kept; the secret is never stored. */
+  prefix: string;
+  createdAt?: string;
+  lastUsedAt?: string | null;
+  revokedAt?: string | null;
+  active: boolean;
+}
+
+export interface CreatedApiKey {
+  success: boolean;
+  keyId: string;
+  key: string;
+  institution: string;
+  error?: string;
+}
+
+export async function listOrgs(): Promise<ClientOrg[]> {
+  const data = await request<{ orgs?: ClientOrg[] }>('/admin/orgs');
+  return data.orgs || [];
+}
+
+export async function listApiKeys(): Promise<ApiKey[]> {
+  const data = await request<{ keys?: ApiKey[] }>('/admin/api-keys');
+  return data.keys || [];
+}
+
+export function createApiKey(payload: { institution?: string; name?: string }): Promise<CreatedApiKey> {
+  return request<CreatedApiKey>('/admin/api-keys', {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  });
+}
+
+export function revokeApiKey(keyId: string): Promise<{ success: boolean; error?: string }> {
+  return request<{ success: boolean; error?: string }>(`/admin/api-keys/${keyId}`, { method: 'DELETE' });
+}
+
 export function revokeCredential(credentialId: string, reason: string) {
   return request<{ success: boolean; error?: string }>(`/credentials/${credentialId}`, {
     method: 'DELETE',

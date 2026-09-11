@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
 import Nav from './nav';
 
-type Admin = { email: string; role: string };
+type Admin = { email: string; role: string; institution?: string | null };
 
 export default function Shell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
@@ -59,6 +59,9 @@ export default function Shell({ children }: { children: React.ReactNode }) {
                 {admin.email}
               </div>
               <div className="session-role">{admin.role}</div>
+              <div className="session-role">
+                {admin.institution ? admin.institution : 'All organisations'}
+              </div>
             </div>
           )}
           <button type="button" className="signout" onClick={signOut} disabled={signingOut}>

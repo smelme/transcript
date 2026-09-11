@@ -30,17 +30,6 @@ export interface IssueResult {
   error?: string;
 }
 
-export interface Credential {
-  credentialId: string;
-  credentialType?: string;
-  status?: string;
-  docType?: string;
-  full_name?: string;
-  issuing_authority?: string;
-  createdAt?: string;
-  [key: string]: unknown;
-}
-
 export interface MdocResult {
   success: boolean;
   credentialId?: string;
@@ -60,18 +49,6 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
     headers: { 'Content-Type': 'application/json', ...(init?.headers || {}) },
   });
   return (await res.json()) as T;
-}
-
-export function issueCredential(payload: PhotoIDRequest): Promise<IssueResult> {
-  return request<IssueResult>('/credentials/issue', {
-    method: 'POST',
-    body: JSON.stringify(payload),
-  });
-}
-
-export async function listCredentials(): Promise<Credential[]> {
-  const data = await request<{ credentials?: Credential[] }>('/credentials');
-  return data.credentials || [];
 }
 
 export function getCredentialMdoc(credentialId: string): Promise<MdocResult> {

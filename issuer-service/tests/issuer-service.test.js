@@ -1,6 +1,35 @@
-import { test } from 'node:test';
+import { test, beforeEach } from 'node:test';
 import assert from 'node:assert';
-import { IssuerService } from '../src/index.js';
+import os from 'node:os';
+import path from 'node:path';
+import fs from 'node:fs';
+
+// Point the shared database at a throwaway file *before* the service is loaded.
+// IssuerService loads persisted credentials on startup, so a developer's
+// populated dev database would otherwise leak into these in-memory assertions
+// (they expect a clean store) and report failures that do not exist in CI.
+const testDbPath = path.join(os.tmpdir(), `issuer-unit-${process.pid}.db`);
+process.env.DATABASE_PATH = testDbPath;
+for (const suffix of ['', '-shm', '-wal']) {
+  fs.rmSync(`${testDbPath}${suffix}`, { force: true });
+}
+process.on('exit', () => {
+  for (const suffix of ['', '-shm', '-wal']) {
+    // The database handle is still open while this runs, so removal can fail;
+    // the file is in the OS temp directory either way.
+    try { fs.rmSync(`${testDbPath}${suffix}`, { force: true }); } catch { /* leave it to the OS */ }
+  }
+});
+
+const { IssuerService } = await import('../src/index.js');
+const { getDb } = await import('../../db.js');
+
+// Every test asserts against an empty store, but issued credentials are
+// persisted and a new IssuerService loads them on construction - so without this
+// each test would inherit the credentials the previous one issued.
+beforeEach(() => {
+  getDb().prepare('DELETE FROM credentials').run();
+});
 
 test('Issuer Service - Create Instance', () => {
   const issuer = new IssuerService();
@@ -257,61 +286,6 @@ test('Issuer Service - Cannot Get Revoked Credential', () => {
   
   assert.strictEqual(retrieved.success, false);
   assert.ok(retrieved.error.includes('revoked'));
-});
-
-test('Issuer Service - Batch Issue Success', () => {
-  const issuer = new IssuerService();
-  
-  const batch = [
-    {
-      studentId: 'STU-001',
-      name: { givenName: 'John', familyName: 'Doe' },
-      institution: 'University',
-      courses: [{ courseCode: 'CS101', courseName: 'Intro to CS', credits: 3 }]
-    },
-    {
-      studentId: 'STU-002',
-      name: { givenName: 'Jane', familyName: 'Smith' },
-      institution: 'University',
-      courses: [{ courseCode: 'MATH101', courseName: 'Calculus', credits: 4 }]
-    }
-  ];
-
-  const result = issuer.batchIssue(batch);
-  assert.strictEqual(result.success, true);
-  assert.strictEqual(result.issued, 2);
-  assert.strictEqual(result.total, 2);
-  assert.strictEqual(result.results.length, 2);
-});
-
-test('Issuer Service - Batch Issue With Errors', () => {
-  const issuer = new IssuerService();
-  
-  const batch = [
-    {
-      studentId: 'STU-001',
-      name: { givenName: 'John', familyName: 'Doe' },
-      institution: 'University',
-      courses: [{ courseCode: 'CS101', courseName: 'Intro to CS', credits: 3 }]
-    },
-    {
-      // Missing required fields
-      name: { givenName: 'Jane', familyName: 'Smith' }
-    },
-    {
-      studentId: 'STU-003',
-      name: { givenName: 'Bob', familyName: 'Johnson' },
-      institution: 'University',
-      courses: [{ courseCode: 'CS201', courseName: 'Advanced CS', credits: 3 }]
-    }
-  ];
-
-  const result = issuer.batchIssue(batch);
-  assert.strictEqual(result.success, false);
-  assert.strictEqual(result.issued, 2);
-  assert.strictEqual(result.total, 3);
-  assert.ok(result.errors);
-  assert.strictEqual(result.errors.length, 1);
 });
 
 test('Issuer Service - Generate QR Code', async () => {

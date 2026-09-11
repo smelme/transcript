@@ -103,7 +103,7 @@ export class AdminAuthService {
     return admin;
   }
 
-  async createAdmin({ email, password, role = 'admin' }) {
+  async createAdmin({ email, password, role = 'admin', institution = null }) {
     const normalized = String(email || '').trim().toLowerCase();
     if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(normalized)) {
       throw new Error('A valid email address is required');
@@ -117,9 +117,16 @@ export class AdminAuthService {
     const passwordHash = await hashPassword(String(password));
     this.db
       .prepare(
-        'INSERT INTO admin_users (id, email, password_hash, role, active, created_at) VALUES (?, ?, ?, ?, 1, ?)',
+        'INSERT INTO admin_users (id, email, password_hash, role, active, created_at, institution) VALUES (?, ?, ?, ?, 1, ?, ?)',
       )
-      .run(id, normalized, passwordHash, String(role || 'admin'), new Date().toISOString());
+      .run(
+        id,
+        normalized,
+        passwordHash,
+        String(role || 'admin'),
+        new Date().toISOString(),
+        institution ? String(institution).trim() : null,
+      );
     return this._public(this._byId(id));
   }
 
@@ -131,6 +138,9 @@ export class AdminAuthService {
       role: row.role,
       active: !!row.active,
       createdAt: row.created_at,
+      // The client organisation this administrator is scoped to; null means a
+      // platform administrator, who sees every organisation.
+      institution: row.institution || null,
     };
   }
 

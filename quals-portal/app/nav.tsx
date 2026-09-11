@@ -8,6 +8,7 @@ const ITEMS = [
   { href: '/credentials', label: 'Credentials' },
   { href: '/shares', label: 'Sharing' },
   { href: '/accounts', label: 'Wallet accounts' },
+  { href: '/api-keys', label: 'API keys' },
   { href: '/audit', label: 'Audit log' },
 ];
 

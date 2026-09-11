@@ -98,9 +98,43 @@ function migrate(database) {
       role            TEXT NOT NULL DEFAULT 'admin',
       active          INTEGER NOT NULL DEFAULT 1,
       session_version INTEGER NOT NULL DEFAULT 1,
-      created_at      TEXT NOT NULL
+      created_at      TEXT NOT NULL,
+      institution     TEXT
     );
+
+    -- Client organisations that issue credentials through this service (an
+    -- example academy, a university, ...). The institution string is the scope
+    -- key: every credential already carries one, and an organisation may only
+    -- see and revoke credentials issued under its own.
+    CREATE TABLE IF NOT EXISTS client_orgs (
+      institution TEXT PRIMARY KEY,
+      name        TEXT NOT NULL,
+      created_at  TEXT NOT NULL
+    );
+
+    -- API keys used by a client organisation's own systems to issue credentials.
+    -- Only the SHA-256 of the key is stored: the key itself is shown once at
+    -- creation, so a database read cannot yield a usable credential.
+    CREATE TABLE IF NOT EXISTS api_keys (
+      key_id       TEXT PRIMARY KEY,
+      institution  TEXT NOT NULL,
+      name         TEXT,
+      key_hash     TEXT NOT NULL UNIQUE,
+      key_prefix   TEXT NOT NULL,
+      created_at   TEXT NOT NULL,
+      last_used_at TEXT,
+      revoked_at   TEXT
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_api_keys_institution ON api_keys (institution);
   `);
+
+  // Administrators belong to a client organisation; NULL means a platform
+  // administrator who spans every organisation. Added after the initial schema.
+  const adminColumns = database.prepare('PRAGMA table_info(admin_users)').all();
+  if (!adminColumns.some((column) => column.name === 'institution')) {
+    database.exec('ALTER TABLE admin_users ADD COLUMN institution TEXT');
+  }
 
   // The credential's index into the issuer's published status list, referenced
   // from the signed MSO (ISO/IEC 18013-5 `status` -> `status_list` -> `idx`).

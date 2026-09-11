@@ -22,6 +22,7 @@ import {
 import { WalletAccountService } from './wallet-account-service.js';
 import { ShareService } from './share-service.js';
 import { AdminAuthService } from './admin-auth.js';
+import { ClientOrgService } from './client-orgs.js';
 import { generateAcademicRecord } from './credential-generator.js';
 import * as emailService from './email-service.js';
 import { getDb } from '../../db.js';
@@ -162,7 +163,9 @@ class IssuerService {
             x: { type: 'string' },
             y: { type: 'string' }
           }
-        }
+        },
+        // Set from the calling client organisation's API key, never from the body.
+        institution: { type: 'string' }
       }
     });
 
@@ -402,6 +405,11 @@ class IssuerService {
         issuerId: this.issuerId,
         issuerDid: this.issuerDid,
         issuerName: this.issuerName,
+        // The client organisation that issued it; the scope for every portal view.
+        institution: credentialData.institution,
+        // Identifies the holder so a signed-in wallet can list its own
+        // credentials; the transcript element is the usual place to find it.
+        studentId: credentialData.studentId || credentialData.education_transcript?.student_id || null,
         docType: credentialData.docType,
         full_name: credentialData.full_name,
         date_of_birth: credentialData.date_of_birth,
@@ -842,6 +850,12 @@ class IssuerService {
 
   listCredentials(filters = {}) {
     const results = Array.from(this.credentials.values()).filter(cred => {
+      // Organisation scope: a client org only ever sees its own credentials.
+      if (filters.institution && cred.institution !== filters.institution) return false;
+      // Holder scope: a wallet sees only credentials linked to its own account.
+      if (filters.owners && !filters.owners.some(
+        (owner) => owner.institution === cred.institution && owner.studentId === cred.studentId,
+      )) return false;
       if (filters.studentId && cred.studentId !== filters.studentId) return false;
       if (filters.type && cred.credentialType !== filters.type) return false;
       if (filters.status && cred.status !== filters.status) return false;
@@ -888,28 +902,6 @@ class IssuerService {
     });
 
     return { success: true, credentialId, status: 'revoked' };
-  }
-
-  batchIssue(credentialsData) {
-    const results = [];
-    const errors = [];
-
-    credentialsData.forEach((data, index) => {
-      const result = this.issue(data);
-      if (result.success) {
-        results.push(result);
-      } else {
-        errors.push({ index, error: result.error });
-      }
-    });
-
-    return {
-      success: errors.length === 0,
-      issued: results.length,
-      total: credentialsData.length,
-      results,
-      errors: errors.length > 0 ? errors : undefined
-    };
   }
 
   async generateQR(credentialId) {
@@ -1011,6 +1003,13 @@ const walletAccounts = new WalletAccountService({
   siteUrl: process.env.ISSUER_FRONTEND_URL || process.env.ISSUER_BASE_URL,
   emailSender: emailService.sendOtpEmail,
 });
+
+// Client organisations and the API keys their own systems use to issue.
+const clientOrgs = new ClientOrgService({});
+
+// The example academy is the organisation the self-service flows issue under, so
+// register it up front for the portal's organisation picker.
+clientOrgs.ensureOrg(process.env.ACADEMY_NAME || 'Smart Academy');
 
 // Management-portal administrators (email + password, separate from holders).
 const adminAuth = new AdminAuthService({
@@ -1143,15 +1142,12 @@ app.get('/status-list/:listId', (req, res) => {
   }
 });
 
-// Issue credential
-app.post('/credentials/issue', (req, res) => {
-  const result = issuer.issue(req.body);
-  res.status(result.success ? 201 : 400).json(result);
-});
-
-// Batch issue credentials
-app.post('/credentials/batch-issue', (req, res) => {
-  const result = issuer.batchIssue(req.body.credentials || []);
+// Issue credential. Only a client organisation may call this, authenticated with
+// an API key issued through the management portal; the credential is stamped with
+// that organisation, so it can only ever see and revoke its own credentials.
+app.post('/credentials/issue', async (req, res) => {
+  if (!(await requireApiKey(req, res))) return;
+  const result = issuer.issue({ ...req.body, institution: req.clientOrg.institution });
   res.status(result.success ? 201 : 400).json(result);
 });
 
@@ -1162,7 +1158,12 @@ app.get('/credentials/:id', (req, res) => {
 });
 
 // List credentials
-app.get('/credentials', (req, res) => {
+// List credentials. Always scoped to the caller: an administrator sees their
+// organisation's credentials, a signed-in holder sees their own.
+app.get('/credentials', async (req, res) => {
+  const scope = await resolveCredentialScope(req, res);
+  if (!scope) return;
+
   const filters = {
     studentId: req.query.studentId,
     type: req.query.type,
@@ -1170,21 +1171,42 @@ app.get('/credentials', (req, res) => {
     page: parseInt(req.query.page) || 1,
     pageSize: parseInt(req.query.pageSize) || 20
   };
-  const result = issuer.listCredentials(filters);
-  res.json(result);
+  if (scope.kind === 'admin') {
+    if (scope.institution) filters.institution = scope.institution;
+  } else {
+    filters.owners = scope.owners;
+  }
+
+  res.json(issuer.listCredentials(filters));
 });
 
-// List by student
-app.get('/credentials/student/:studentId', (req, res) => {
-  const result = issuer.listCredentials({ studentId: req.params.studentId });
-  res.json(result);
+// List by student (scoped the same way: a holder cannot read another's).
+app.get('/credentials/student/:studentId', async (req, res) => {
+  const scope = await resolveCredentialScope(req, res);
+  if (!scope) return;
+
+  const filters = { studentId: req.params.studentId };
+  if (scope.kind === 'admin') {
+    if (scope.institution) filters.institution = scope.institution;
+  } else {
+    filters.owners = scope.owners;
+  }
+
+  res.json(issuer.listCredentials(filters));
 });
 
-// Revoke credential. Revocation is a privileged, destructive action: a leaked
-// or guessed credential id must not let an unauthenticated caller disable
-// somebody's credential.
+// Revoke credential. Privileged, destructive and irreversible, so it requires an
+// administrator - and an organisation-scoped administrator may only revoke the
+// credentials their own organisation issued.
 app.delete('/credentials/:id', async (req, res) => {
   if (!(await requireAdmin(req, res))) return;
+
+  const existing = issuer.getCredential(req.params.id);
+  if (!existing.success) return res.status(404).json(existing);
+  if (req.admin.institution && existing.credential.institution !== req.admin.institution) {
+    return res.status(403).json({ success: false, error: 'Credential belongs to another organisation' });
+  }
+
   const result = issuer.revokeCredential(req.params.id, req.body.reason);
   res.status(result.success ? 200 : 404).json(result);
 });
@@ -1308,6 +1330,12 @@ app.get('/admin/users', async (req, res) => {
 
 app.post('/admin/users', async (req, res) => {
   if (!(await requireAdmin(req, res))) return;
+  // An organisation-scoped administrator may only create administrators for its
+  // own organisation; a platform administrator may create either.
+  const institution = req.admin.institution
+    ? req.admin.institution
+    : (req.body?.institution ? String(req.body.institution).trim() : null);
+  if (institution) clientOrgs.ensureOrg(institution);
   try {
     res.status(201).json({
       success: true,
@@ -1315,6 +1343,7 @@ app.post('/admin/users', async (req, res) => {
         email: req.body?.email,
         password: req.body?.password,
         role: req.body?.role,
+        institution,
       }),
     });
   } catch (e) {
@@ -1331,9 +1360,101 @@ app.post('/admin/users/:id/active', async (req, res) => {
   }
 });
 
+// ── Client organisations and their API keys ──────────────────────────────
+// Each client organisation issues credentials with its own API key and only ever
+// sees the credentials issued under it. An organisation-scoped administrator can
+// manage its own keys; a platform administrator can manage any organisation's.
+app.get('/admin/orgs', async (req, res) => {
+  if (!(await requireAdmin(req, res))) return;
+  res.json({ success: true, orgs: clientOrgs.listOrgs() });
+});
+
+app.get('/admin/api-keys', async (req, res) => {
+  if (!(await requireAdmin(req, res))) return;
+  res.json({ success: true, keys: clientOrgs.listApiKeys(req.admin.institution || null) });
+});
+
+app.post('/admin/api-keys', async (req, res) => {
+  if (!(await requireAdmin(req, res))) return;
+
+  const requested = req.body?.institution ? String(req.body.institution).trim() : null;
+  const institution = req.admin.institution || requested;
+  if (!institution) {
+    return res.status(400).json({ success: false, error: 'institution is required' });
+  }
+  if (req.admin.institution && requested && requested !== req.admin.institution) {
+    return res.status(403).json({ success: false, error: 'Cannot create API keys for another organisation' });
+  }
+
+  try {
+    // The key is returned once, here; only its hash is stored.
+    res.status(201).json(clientOrgs.createApiKey({ institution, name: req.body?.name }));
+  } catch (e) {
+    res.status(400).json({ success: false, error: e.message });
+  }
+});
+
+app.delete('/admin/api-keys/:keyId', async (req, res) => {
+  if (!(await requireAdmin(req, res))) return;
+  const result = clientOrgs.revokeApiKey(req.params.keyId, req.admin.institution || null);
+  res.status(result.success ? 200 : 404).json(result);
+});
+
 // ── Remote account administration ────────────────────────────────────────
 // Deactivate / reactivate / delete a wallet account. A deactivated or deleted
 // account can no longer exchange its refresh token.
+/**
+ * Authenticate a client organisation by API key.
+ *
+ * A key is minted through the management portal and belongs to a single
+ * organisation; anything issued with it is stamped with that organisation, which
+ * is what scopes every portal view of the resulting credential.
+ */
+async function requireApiKey(req, res) {
+  const header = req.headers.authorization || '';
+  const presented = header.startsWith('Bearer ') ? header.slice(7) : req.headers['x-api-key'];
+  const org = clientOrgs.authenticate(presented);
+  if (!org) {
+    res.status(401).json({ success: false, error: 'A valid client API key is required' });
+    return false;
+  }
+  req.clientOrg = org;
+  return true;
+}
+
+/**
+ * Work out who is reading credentials and what they may see.
+ *
+ * A management-portal administrator is scoped to their organisation (a platform
+ * administrator, with none, sees every organisation). A signed-in holder is
+ * scoped to the credentials linked to their own account. Responds and returns
+ * null when neither applies.
+ */
+async function resolveCredentialScope(req, res) {
+  const header = req.headers.authorization || '';
+  const token = header.startsWith('Bearer ') ? header.slice(7) : null;
+
+  if (token) {
+    try {
+      const admin = await adminAuth.verifyAdminToken(token);
+      return { kind: 'admin', institution: admin.institution || null };
+    } catch { /* not an administrator session */ }
+
+    try {
+      const claims = await walletAccounts.verifyAccessToken(token);
+      return { kind: 'holder', owners: walletAccounts.getLinks(claims.sub) };
+    } catch { /* not a holder access token either */ }
+  }
+
+  const sharedKey = process.env.ADMIN_API_KEY;
+  if (sharedKey && (req.headers['x-admin-key'] || '') === sharedKey) {
+    return { kind: 'admin', institution: null };
+  }
+
+  res.status(401).json({ success: false, error: 'Sign in required' });
+  return null;
+}
+
 async function requireAdmin(req, res) {
   const header = req.headers.authorization || '';
   const token = header.startsWith('Bearer ') ? header.slice(7) : null;
