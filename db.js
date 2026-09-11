@@ -50,7 +50,8 @@ function migrate(database) {
       created_at    TEXT NOT NULL,
       revoked_at    TEXT,
       revoke_reason TEXT,
-      metadata_json TEXT
+      metadata_json TEXT,
+      status_index  INTEGER
     );
 
     CREATE INDEX IF NOT EXISTS idx_credentials_student ON credentials (institution, student_id);
@@ -100,6 +101,19 @@ function migrate(database) {
       created_at      TEXT NOT NULL
     );
   `);
+
+  // The credential's index into the issuer's published status list, referenced
+  // from the signed MSO (ISO/IEC 18013-5 `status` -> `status_list` -> `idx`).
+  // Added after the initial schema, so existing databases need the column too.
+  // SQLite UNIQUE permits repeated NULLs, so credentials issued before status
+  // lists existed simply have no index and cannot be resolved that way.
+  const credentialColumns = database.prepare('PRAGMA table_info(credentials)').all();
+  if (!credentialColumns.some((column) => column.name === 'status_index')) {
+    database.exec('ALTER TABLE credentials ADD COLUMN status_index INTEGER');
+  }
+  database.exec(
+    'CREATE UNIQUE INDEX IF NOT EXISTS idx_credentials_status_index ON credentials (status_index)',
+  );
 }
 
 export function getDb() {

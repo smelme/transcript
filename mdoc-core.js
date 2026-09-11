@@ -263,6 +263,7 @@ export function generateIssuerSigned({
   validUntil = nowPlusSeconds(2 * 365 * 24 * 3600),
   expectedUpdate = nowPlusSeconds(365 * 24 * 3600),
   deviceJwk = null,
+  status = null,
 }) {
   const signerKey = crypto.createPrivateKey(signerKeyPem);
   if (!deviceJwk) {
@@ -306,8 +307,8 @@ export function generateIssuerSigned({
     valueDigestsMap.tstr(ns).raw(inner.encode());
   }
 
-  const mso = new Cbor()
-    .map(6)
+  const msoBuilder = new Cbor()
+    .map(status ? 7 : 6)
     .tstr('version').tstr('1.0')
     .tstr('digestAlgorithm').tstr('SHA-256')
     .tstr('docType').tstr(docType)
@@ -317,8 +318,22 @@ export function generateIssuerSigned({
     .tstr('signed').raw(dateTime(signed))
     .tstr('validFrom').raw(dateTime(validFrom))
     .tstr('validUntil').raw(dateTime(validUntil))
-    .tstr('expectedUpdate').raw(dateTime(expectedUpdate))
-    .encode();
+    .tstr('expectedUpdate').raw(dateTime(expectedUpdate));
+
+  // Optional revocation reference, in the shape ISO/IEC 18013-5 defines for
+  // the MSO: status -> status_list -> { idx, uri }. It travels inside the signed
+  // MSO, so a verifier can resolve the credential's status without relying on - or
+  // even asking for - any disclosed claim. `idx` is the credential's index into
+  // the status list published at `uri`.
+  if (status) {
+    msoBuilder
+      .tstr('status').map(1)
+      .tstr('status_list').map(2)
+      .tstr('idx').uint(status.idx)
+      .tstr('uri').tstr(status.uri);
+  }
+
+  const mso = msoBuilder.encode();
 
   // MobileSecurityObjectBytes = #6.24(bstr .cbor MSO)
   const msoBytes = new Cbor().tag(T24).bstr(mso).encode();

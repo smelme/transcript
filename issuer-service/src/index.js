@@ -25,10 +25,26 @@ import { AdminAuthService } from './admin-auth.js';
 import { generateAcademicRecord } from './credential-generator.js';
 import * as emailService from './email-service.js';
 import { getDb } from '../../db.js';
+import {
+  packStatusList,
+  encodeStatusListPayload,
+  signStatusListJws,
+  STATUS_VALID,
+  STATUS_INVALID,
+} from '../../status-list-core.js';
 
 dotenv.config({
   path: path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../.env'),
 });
+
+// Published status list. Each credential carries its index into this list inside
+// its signed MSO (`status` -> `status_list`), which lets a verifier resolve
+// revocation without the presentation disclosing any claim. The base URL must be
+// reachable by verifiers (e.g. https://api.quals.example in production).
+const STATUS_LIST_ID = process.env.STATUS_LIST_ID || 'quals-1';
+const STATUS_LIST_BASE_URL = (
+  process.env.STATUS_LIST_BASE_URL || `http://127.0.0.1:${process.env.PORT || 3000}`
+).replace(/\/+$/, '');
 
 // Credential metadata is persisted in the shared SQLite database (see db.js);
 // mdoc payloads stay in memory only.
@@ -188,12 +204,25 @@ class IssuerService {
     }
   }
 
+  /** URI of the status list this issuer publishes (referenced from each MSO). */
+  statusListUri() {
+    return `${STATUS_LIST_BASE_URL}/status-list/${STATUS_LIST_ID}`;
+  }
+
+  /** Next free index in the published status list. Gaps are harmless. */
+  _allocateStatusIndex() {
+    const row = this.db
+      .prepare('SELECT COALESCE(MAX(status_index), 0) + 1 AS next FROM credentials')
+      .get();
+    return row.next;
+  }
+
   _persistCredential(credential) {
     try {
       this.db.prepare(`
         INSERT INTO credentials
-          (credential_id, issuer_id, doc_type, institution, student_id, status, device_bound, created_at, metadata_json)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+          (credential_id, issuer_id, doc_type, institution, student_id, status, device_bound, created_at, metadata_json, status_index)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         ON CONFLICT(credential_id) DO UPDATE SET
           status = excluded.status,
           metadata_json = excluded.metadata_json
@@ -207,6 +236,7 @@ class IssuerService {
         credential.deviceBound ? 1 : 0,
         credential.createdAt || new Date().toISOString(),
         JSON.stringify(credential),
+        credential.statusIndex ?? null,
       );
     } catch (e) {
       console.error('[issuer] failed to persist credential:', e.message);
@@ -247,7 +277,7 @@ class IssuerService {
   // Build and sign an ISO 18013-5 IssuerSigned mdoc for a Photo ID credential.
   // `deviceJwk` (optional) is the holder's EC P-256 public JWK; when provided it
   // is embedded in the MSO deviceKeyInfo as the device's mdoc authentication key.
-  buildPhotoIDMdoc(credentialData, deviceJwk = null) {
+  buildPhotoIDMdoc(credentialData, deviceJwk = null, statusIndex = null) {
     const namespaces = {};
     const fullName = (credentialData.full_name || '').trim();
     const parts = fullName.split(/\s+/);
@@ -300,6 +330,9 @@ class IssuerService {
       signerKeyPem: this.mdocSigner.signerKeyPem,
       certDer: this.mdocSigner.certDer,
       deviceJwk,
+      // Lets a verifier resolve this credential's status from the signed MSO
+      // alone, without the presentation having to disclose any claim.
+      status: statusIndex == null ? null : { idx: statusIndex, uri: this.statusListUri() },
     });
   }
 
@@ -392,7 +425,9 @@ class IssuerService {
       // The mdoc payload is held in-memory only (session store) — never persisted.
       if (this.mdocSigner) {
         try {
-          const mdoc = this.buildPhotoIDMdoc(credentialData, deviceKeyJwk);
+          const statusIndex = this._allocateStatusIndex();
+          credential.statusIndex = statusIndex;
+          const mdoc = this.buildPhotoIDMdoc(credentialData, deviceKeyJwk, statusIndex);
           if (mdoc) {
             mdocBase64url = mdoc.base64url;
             credential.mdocDocType = 'org.iso.23220.photoid.1';
@@ -679,7 +714,8 @@ class IssuerService {
     if (session.status === 'issued') {
       return { success: false, error: 'Issuance session already claimed' };
     }
-    const mdoc = this.buildPhotoIDMdoc(session.credentialData, deviceJwk);
+    const statusIndex = this._allocateStatusIndex();
+    const mdoc = this.buildPhotoIDMdoc(session.credentialData, deviceJwk, statusIndex);
     if (!mdoc) return { success: false, error: 'mdoc generation failed' };
 
     const credentialId = uuidv4();
@@ -694,6 +730,7 @@ class IssuerService {
       ...session.credentialData,
       credentialType: 'PhotoID',
       status: 'active',
+      statusIndex,
       deviceKey: deviceJwk,
       deviceBound: !!deviceJwk,
       createdAt: new Date().toISOString(),
@@ -1076,6 +1113,34 @@ app.use((req, res, next) => {
 // Health check
 app.get('/health', (req, res) => {
   res.json({ status: 'ok', issuerId: issuer.issuerId });
+});
+
+// Published status list, referenced from every credential's signed MSO
+// (`status` -> `status_list` -> `uri`). The bits are derived from the credential
+// registry on each request, so a revocation takes effect immediately, and the
+// response is a signed `statuslist+jwt` so a verifier can confirm it came from
+// the same key that signed the credential.
+app.get('/status-list/:listId', (req, res) => {
+  if (req.params.listId !== STATUS_LIST_ID) {
+    return res.status(404).json({ success: false, error: 'Unknown status list' });
+  }
+  if (!issuer.mdocSigner) {
+    return res.status(503).json({ success: false, error: 'Status list signing key unavailable' });
+  }
+  try {
+    const rows = getDb()
+      .prepare('SELECT status_index, status FROM credentials WHERE status_index IS NOT NULL')
+      .all();
+    const entries = {};
+    for (const row of rows) {
+      entries[row.status_index] = row.status === 'active' ? STATUS_VALID : STATUS_INVALID;
+    }
+    const payload = encodeStatusListPayload(packStatusList(entries));
+    const jws = signStatusListJws(payload, issuer.mdocSigner.signerKeyPem);
+    res.type('application/statuslist+jwt').send(jws);
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
 });
 
 // Issue credential

@@ -98,10 +98,13 @@ check('revoked refresh token is not restored on reactivation', reactivated.statu
 const { PresentationSessionService } = await import('../../verifier-service/src/presentation-session-service.js');
 const sessions = new PresentationSessionService();
 
-const missingThrew = (() => {
-  try { sessions.enforceCredentialStatus({ credentialId: `missing-${Date.now()}` }); return null; }
+// The status check is async (a credential's MSO may reference a status list).
+const enforced = async (session, claims = {}, documents = []) => {
+  try { await sessions.enforceCredentialStatus(session, claims, documents); return null; }
   catch (e) { return e.message; }
-})();
+};
+
+const missingThrew = await enforced({ credentialId: `missing-${Date.now()}` });
 check('verifier rejects a credential missing from the registry', !!missingThrew, missingThrew || '');
 
 const revokedId = `revoked-${Date.now()}`;
@@ -109,20 +112,14 @@ const writeDb = new Database(DB_PATH);
 writeDb.prepare(
   "INSERT INTO credentials (credential_id, issuer_id, institution, student_id, status, created_at) VALUES (?, 'issuer-001', 'Smart Academy', 'S-LIFE', 'revoked', ?)"
 ).run(revokedId, new Date().toISOString());
-const revokedThrew = (() => {
-  try { sessions.enforceCredentialStatus({ credentialId: revokedId }); return null; }
-  catch (e) { return e.message; }
-})();
+const revokedThrew = await enforced({ credentialId: revokedId });
 check('verifier rejects a revoked credential', !!revokedThrew, revokedThrew || '');
 
 const activeId = `active-${Date.now()}`;
 writeDb.prepare(
   "INSERT INTO credentials (credential_id, issuer_id, institution, student_id, status, created_at) VALUES (?, 'issuer-001', 'Smart Academy', 'S-LIFE', 'active', ?)"
 ).run(activeId, new Date().toISOString());
-const activeThrew = (() => {
-  try { sessions.enforceCredentialStatus({ credentialId: activeId }); return null; }
-  catch (e) { return e.message; }
-})();
+const activeThrew = await enforced({ credentialId: activeId });
 check('verifier accepts an active credential', activeThrew === null, activeThrew || '');
 
 // 6. DCAPI presentment carries no credential id (an mdoc does not contain one),
@@ -155,18 +152,12 @@ const seed = (status, name) => insertCredential.run(
 seed('revoked', 'Dapi Revoked');
 seed('active', 'Dapi Active');
 
-const enforced = (session, claims) => {
-  try { sessions.enforceCredentialStatus(session, claims); return null; }
-  catch (e) { return e.message; }
-};
+const dapiRevokedThrew = await enforced({}, dapiClaims('Dapi Revoked'));check('verifier rejects a revoked credential presented over DCAPI', !!dapiRevokedThrew, dapiRevokedThrew || '');
 
-const dapiRevokedThrew = enforced({}, dapiClaims('Dapi Revoked'));
-check('verifier rejects a revoked credential presented over DCAPI', !!dapiRevokedThrew, dapiRevokedThrew || '');
-
-const dapiActiveThrew = enforced({}, dapiClaims('Dapi Active'));
+const dapiActiveThrew = await enforced({}, dapiClaims('Dapi Active'));
 check('verifier accepts an active credential presented over DCAPI', dapiActiveThrew === null, dapiActiveThrew || '');
 
-const foreignThrew = enforced({}, {
+const foreignThrew = await enforced({}, {
   given_name: 'Erika',
   family_name: 'Mustermann',
   institution_name: 'University of Auckland',
@@ -177,12 +168,12 @@ check('verifier leaves a credential matching no registry entry alone', foreignTh
 
 seed('active', 'Dapi Ambiguous');
 seed('revoked', 'Dapi Ambiguous');
-const ambiguousThrew = enforced({}, dapiClaims('Dapi Ambiguous'));
+const ambiguousThrew = await enforced({}, dapiClaims('Dapi Ambiguous'));
 check('verifier rejects when an ambiguous match includes a revoked credential', !!ambiguousThrew, ambiguousThrew || '');
 
 // A mismatch here fails OPEN, so spacing must not defeat the comparison.
 seed('revoked', 'Dapi  Spaced');
-const spacedThrew = enforced({}, {
+const spacedThrew = await enforced({}, {
   given_name: 'Dapi',
   family_name: 'Spaced',
   institution_name: 'Smart Academy',

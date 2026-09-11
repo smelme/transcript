@@ -4,6 +4,13 @@ import * as cbor2 from 'cbor2';
 import { generateNonce, generateJWK, processCredentials } from 'id-verifier';
 import { getDb } from '../../db.js';
 import { ReaderAuthService } from './reader-auth.js';
+import {
+  StatusListClient,
+  extractMsoStatus,
+  extractLeafCertificateDer,
+  issuerPublicKeyFrom,
+} from './status-list.js';
+import { STATUS_VALID } from '../../status-list-core.js';
 
 /**
  * Ephemeral state for one W3C Digital Credentials API (org-iso-mdoc)
@@ -125,23 +132,6 @@ function buildSessionTranscript(origin, nonceHex, jwk) {
   return new Uint8Array(cbor2.encode([null, null, handover]));
 }
 
-// Extract the DER bytes of the IssuerAuth leaf certificate from a decoded
-// mdoc document, for the optional pinned-issuer check.
-function extractLeafCertificateDer(document) {
-  try {
-    const issuerAuth = document?.issuerSigned?.issuerAuth;
-    if (!Array.isArray(issuerAuth)) return null;
-    const unprotectedHeaders = issuerAuth[1];
-    const x5chain = unprotectedHeaders instanceof Map
-      ? unprotectedHeaders.get(33)
-      : unprotectedHeaders?.[33];
-    const leaf = Array.isArray(x5chain) ? x5chain[0] : x5chain;
-    return leaf ? Buffer.from(leaf) : null;
-  } catch {
-    return null;
-  }
-}
-
 /** Collapse whitespace so a name typed with double spaces still matches. */
 const normalizeName = (value) => String(value ?? '').trim().replace(/\s+/g, ' ');
 
@@ -187,12 +177,14 @@ function findRegistryMatches(claims = {}) {
 }
 
 export class PresentationSessionService {
-  constructor({ ttlMs = 5 * 60 * 1000, now = () => Date.now(), dataDir } = {}) {
+  constructor({ ttlMs = 5 * 60 * 1000, now = () => Date.now(), dataDir, statusListFetch } = {}) {
     this.ttlMs = ttlMs;
     this.now = now;
     this.sessions = new Map();
     // Authenticates this verifier's requests to the wallet.
     this.readerAuth = new ReaderAuthService({ dataDir });
+    // Resolves revocation from a credential's signed MSO (see status-list.js).
+    this.statusList = new StatusListClient({ fetchImpl: statusListFetch ?? globalThis.fetch, now });
   }
 
   /** The reader key a wallet can pin, so it can show who is asking. */
@@ -294,7 +286,11 @@ export class PresentationSessionService {
 
     this.enforcePinnedIssuer(result);
     const claims = result.claims || {};
-    this.enforceCredentialStatus(session, claims);
+    await this.enforceCredentialStatus(
+      session,
+      claims,
+      (result.processedDocuments || []).map((processed) => processed.document),
+    );
 
     const givenName = claims.given_name || claims.given_name_unicode || '';
     const familyName = claims.family_name || claims.family_name_unicode || '';
@@ -314,17 +310,32 @@ export class PresentationSessionService {
   }
 
   /**
-   * Reject a presented credential unless the issuer's registry says it is active.
+   * Reject a presented credential whose status is not valid.
    *
-   * Share sessions are minted against one credential in the registry, so the id
-   * is known up front. DCAPI presentment is not: the browser hands the verifier
-   * nothing but the mdoc, and the mdoc carries no id, so the credential has to be
-   * identified from the disclosed claims. A credential that matches nothing in
-   * the registry (a foreign issuer, or anything predating it) is accepted with a
-   * warning rather than rejected - configure TRUSTED_ACADEMIC_ISSUER_SHA256 to
-   * reject unknown issuers outright.
+   * Three ways the credential can be identified, in order of preference:
+   *   1. the status reference inside the signed MSO (`status.status_list`), which
+   *      is claim-free and is what ISO/IEC 18013-5 provides for exactly this;
+   *   2. the credential id a share session was minted against;
+   *   3. the disclosed claims, as a fallback for credentials issued before status
+   *      lists existed.
+   *
+   * A credential matching nothing in the registry is accepted with a warning
+   * rather than rejected - that is how a credential from another issuer is
+   * treated. Configure TRUSTED_ACADEMIC_ISSUER_SHA256 to reject unknown issuers.
    */
-  enforceCredentialStatus(session, claims = {}) {
+  async enforceCredentialStatus(session, claims = {}, documents = []) {
+    for (const document of documents) {
+      const status = extractMsoStatus(document);
+      if (!status) continue;
+      const bit = await this.statusList.statusAt(
+        status.uri,
+        status.idx,
+        issuerPublicKeyFrom(document),
+      );
+      if (bit !== STATUS_VALID) throw new Error('Credential is revoked');
+      return;
+    }
+
     if (session.credentialId) {
       const row = getDb()
         .prepare('SELECT status FROM credentials WHERE credential_id = ?')

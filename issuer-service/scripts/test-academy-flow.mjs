@@ -89,6 +89,57 @@ check('wallet can claim the academy credential', claim.success === true, claim.e
 check('claim returns an mdoc', typeof claim.mdocBase64url === 'string' && claim.mdocBase64url.length > 100);
 check('claim is device bound', claim.deviceBound === true);
 
+// 5d. The credential references the issuer's published status list from its
+//     signed MSO, so revocation is enforceable without any disclosed claim.
+const cbor2 = await import('cbor2');
+const { extractMsoStatus, issuerPublicKeyFrom } = await import('../../verifier-service/src/status-list.js');
+const { decodeStatusListPayload, verifyStatusListJws, readStatusBit, STATUS_INVALID } =
+  await import('../../status-list-core.js');
+
+// Decoded IssuerSigned, the same shape the verifier sees after decryption.
+const presentedDocument = { issuerSigned: cbor2.decode(Buffer.from(claim.mdocBase64url, 'base64url')) };
+const statusRef = extractMsoStatus(presentedDocument);
+check('credential MSO carries a status reference', !!statusRef, JSON.stringify(statusRef || null));
+check(
+  'status reference points at the issuer status list',
+  String(statusRef?.uri || '').endsWith('/status-list/quals-1'),
+  statusRef?.uri || '',
+);
+
+const readStatusList = async () => {
+  const response = await fetch(statusRef.uri);
+  const payload = verifyStatusListJws(await response.text(), issuerPublicKeyFrom(presentedDocument));
+  return decodeStatusListPayload(payload);
+};
+
+const beforeRevoke = await readStatusList();
+check(
+  'claimed credential reads as valid in the status list',
+  readStatusBit(beforeRevoke, statusRef.idx) !== STATUS_INVALID,
+);
+
+const adminLogin = (await call('POST', '/admin/auth/login', {
+  email: process.env.ADMIN_EMAIL || 'admin@quals.local',
+  password: process.env.ADMIN_PASSWORD || 'quals-admin-2026',
+})).data;
+const revoked = await call(
+  'DELETE',
+  `/credentials/${claim.credentialId}`,
+  { reason: 'status list test' },
+  { authorization: `Bearer ${adminLogin.token}` },
+);
+check('credential can be revoked', revoked.status === 200 && revoked.data.success === true, `HTTP ${revoked.status}`);
+
+const afterRevoke = await readStatusList();
+check(
+  'revoked credential reads as invalid in the status list',
+  readStatusBit(afterRevoke, statusRef.idx) === STATUS_INVALID,
+);
+check(
+  'revoking one credential leaves its neighbours valid',
+  readStatusBit(afterRevoke, statusRef.idx + 1) !== STATUS_INVALID,
+);
+
 // 5c. The credential now shows as held in the wallet.
 const afterClaim = (await call('GET', '/academy/credentials', null, auth)).data;
 const claimed = (afterClaim.credentials || []).find((c) => c.sessionId === first.sessionId);
