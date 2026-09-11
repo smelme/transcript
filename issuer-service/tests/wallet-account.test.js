@@ -1,9 +1,26 @@
 import { test } from 'node:test';
 import assert from 'node:assert';
-import fs from 'fs';
-import { IssuerService } from '../src/index.js';
-import { WalletAccountService } from '../src/wallet-account-service.js';
-import { buildCwt, generateDeviceKeyPair } from '../../mdoc-core.js';
+import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
+
+// Point the shared database at a throwaway file *before* the service modules load.
+// Without this the suite signs in as erika@example.com against the developer's own
+// database and fails on the second run, when the account already exists.
+const testDbPath = path.join(os.tmpdir(), `wallet-account-unit-${process.pid}.db`);
+process.env.DATABASE_PATH = testDbPath;
+for (const suffix of ['', '-shm', '-wal']) {
+  fs.rmSync(`${testDbPath}${suffix}`, { force: true });
+}
+process.on('exit', () => {
+  for (const suffix of ['', '-shm', '-wal']) {
+    try { fs.rmSync(`${testDbPath}${suffix}`, { force: true }); } catch { /* leave it to the OS */ }
+  }
+});
+
+const { IssuerService } = await import('../src/index.js');
+const { WalletAccountService } = await import('../src/wallet-account-service.js');
+const { buildCwt, generateDeviceKeyPair } = await import('../../mdoc-core.js');
 
 // Access tokens are signed with the dedicated wallet-token-signer key (separate
 // from the mdoc document-signer key).

@@ -23,12 +23,116 @@ process.on('exit', () => {
 
 const { IssuerService } = await import('../src/index.js');
 const { getDb } = await import('../../db.js');
+const { generateAcademicRecord } = await import('../src/credential-generator.js');
+const { verifyIssuerSigned } = await import('../../mdoc-core.js');
 
 // Every test asserts against an empty store, but issued credentials are
 // persisted and a new IssuerService loads them on construction - so without this
 // each test would inherit the credentials the previous one issued.
 beforeEach(() => {
   getDb().prepare('DELETE FROM credentials').run();
+});
+
+test('Credential kinds - a transcript is its own credential', () => {
+  const { records } = generateAcademicRecord({
+    institution: 'Smart Academy',
+    studentId: 'SA-T1',
+    include: 'transcript',
+  });
+  assert.strictEqual(records.length, 1);
+  assert.strictEqual(records[0].kind, 'transcript');
+  assert.strictEqual(records[0].docType, 'org.iso.23220.education.transcript.1');
+  assert.ok(records[0].credentialData.education_transcript, 'expected transcript data');
+  assert.strictEqual(
+    records[0].credentialData.education_qualification,
+    undefined,
+    'a transcript credential must not carry qualification data',
+  );
+  assert.ok(records[0].credentialData.full_name, 'identity travels with the transcript');
+});
+
+test('Credential kinds - both means two credentials, one per kind', () => {
+  const { records } = generateAcademicRecord({
+    institution: 'Smart Academy',
+    studentId: 'SA-T2',
+    include: 'both',
+  });
+  assert.deepStrictEqual(records.map((record) => record.kind), ['qualification', 'transcript']);
+  assert.deepStrictEqual(records.map((record) => record.docType), [
+    'org.iso.23220.photoid.1',
+    'org.iso.23220.education.transcript.1',
+  ]);
+  assert.deepStrictEqual(records.map((record) => record.display.kind), ['qualification', 'transcript']);
+});
+
+test('Credential kinds - qualification is the default, even for an unknown choice', () => {
+  for (const include of [undefined, '', 'nonsense']) {
+    const { records } = generateAcademicRecord({
+      institution: 'Smart Academy',
+      studentId: 'SA-T3',
+      include,
+    });
+    assert.strictEqual(records.length, 1, `include=${include}`);
+    assert.strictEqual(records[0].docType, 'org.iso.23220.photoid.1');
+    assert.ok(records[0].credentialData.education_qualification);
+    assert.strictEqual(records[0].credentialData.education_transcript, undefined);
+  }
+});
+
+test('Credential kinds - a transcript mdoc carries no qualification namespace', () => {
+  const issuer = new IssuerService();
+  const { records } = generateAcademicRecord({
+    institution: 'Smart Academy',
+    studentId: 'SA-T4',
+    include: 'transcript',
+  });
+  const mdoc = issuer.buildCredentialMdoc(records[0].credentialData);
+  assert.ok(mdoc, 'expected a signed mdoc');
+
+  const verified = verifyIssuerSigned(mdoc.base64url);
+  assert.strictEqual(verified.docType, 'org.iso.23220.education.transcript.1');
+  assert.deepStrictEqual(Object.keys(verified.namespaces).sort(), [
+    'org.iso.23220.education.transcript.1',
+    'org.iso.23220.photoid.1',
+  ]);
+});
+
+test('Credential kinds - a qualification mdoc carries no transcript namespace', () => {
+  const issuer = new IssuerService();
+  const { records } = generateAcademicRecord({
+    institution: 'Smart Academy',
+    studentId: 'SA-T5',
+    include: 'qualification',
+  });
+  const mdoc = issuer.buildCredentialMdoc(records[0].credentialData);
+  assert.ok(mdoc, 'expected a signed mdoc');
+
+  const verified = verifyIssuerSigned(mdoc.base64url);
+  assert.strictEqual(verified.docType, 'org.iso.23220.photoid.1');
+  assert.deepStrictEqual(Object.keys(verified.namespaces).sort(), [
+    'org.iso.23220.education.qualification.1',
+    'org.iso.23220.photoid.1',
+  ]);
+});
+
+test('Credential kinds - issuing a transcript records its own docType', () => {
+  const issuer = new IssuerService();
+  const { records } = generateAcademicRecord({
+    institution: 'Smart Academy',
+    studentId: 'SA-T6',
+    include: 'transcript',
+  });
+  const result = issuer.issue(records[0].credentialData);
+  assert.strictEqual(result.success, true, result.error);
+  assert.strictEqual(result.docType, 'org.iso.23220.education.transcript.1');
+
+  const stored = issuer.getCredential(result.credentialId);
+  assert.strictEqual(stored.credential.docType, 'org.iso.23220.education.transcript.1');
+  assert.notStrictEqual(
+    stored.credential.statusIndex,
+    undefined,
+    'a transcript credential needs its own status index',
+  );
 });
 
 test('Issuer Service - Create Instance', () => {

@@ -87,11 +87,12 @@ const cwt = buildCwt({
 const claim = await post('/wallet/issuance', { offerUrl, accessToken: token.accessToken, cwt });
 console.log('claim ok, credentialId=', claim.credentialId);
 
-// 5. Create the share (select all three categories).
+// 5. Create the share. The qualification credential holds the identity and
+//    qualification namespaces; a transcript is a credential of its own.
 const share = await post('/shares', {
   accessToken: token.accessToken,
   credentialId: claim.credentialId,
-  categories: ['personal', 'qualification', 'transcript'],
+  categories: ['personal', 'qualification'],
   recipientName: 'Recipient Person',
   recipientEmail: RECIPIENT,
   message: 'Here are my documents for the application.',

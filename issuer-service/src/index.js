@@ -23,7 +23,7 @@ import { WalletAccountService } from './wallet-account-service.js';
 import { ShareService } from './share-service.js';
 import { AdminAuthService } from './admin-auth.js';
 import { ClientOrgService } from './client-orgs.js';
-import { generateAcademicRecord } from './credential-generator.js';
+import { generateAcademicRecord, CREDENTIAL_KINDS, DEFAULT_DOCTYPE, requestedDocTypes } from './credential-generator.js';
 import * as emailService from './email-service.js';
 import { getDb } from '../../db.js';
 import {
@@ -127,7 +127,7 @@ class IssuerService {
       type: 'object',
       required: ['docType', 'full_name', 'date_of_birth', 'document_number', 'issuing_authority', 'issue_date', 'expiry_date'],
       properties: {
-        docType: { type: 'string', const: 'org.iso.23220.photoid.1' },
+        docType: { type: 'string', enum: Object.keys(CREDENTIAL_KINDS) },
         full_name: { type: 'string' },
         date_of_birth: { type: 'string', format: 'date' },
         document_number: { type: 'string' },
@@ -277,10 +277,23 @@ class IssuerService {
     }
   }
 
-  // Build and sign an ISO 18013-5 IssuerSigned mdoc for a Photo ID credential.
-  // `deviceJwk` (optional) is the holder's EC P-256 public JWK; when provided it
-  // is embedded in the MSO deviceKeyInfo as the device's mdoc authentication key.
-  buildPhotoIDMdoc(credentialData, deviceJwk = null, statusIndex = null) {
+  /**
+   * Build and sign an ISO 18013-5 IssuerSigned mdoc for one credential kind.
+   *
+   * The docType decides which namespaces are assembled, so a transcript credential never
+   * carries qualification claims (or the reverse) even when the academic record handed in
+   * holds both. `deviceJwk` (optional) is the holder's EC P-256 public JWK; when provided
+   * it is embedded in the MSO deviceKeyInfo as the device's mdoc authentication key.
+   *
+   * Returns null when the kind is unknown or carries no claims, which the caller must
+   * treat as a failure rather than issuing a credential that cannot be presented.
+   */
+  buildCredentialMdoc(credentialData, deviceJwk = null, statusIndex = null) {
+    const docType = credentialData.docType || DEFAULT_DOCTYPE;
+    const spec = CREDENTIAL_KINDS[docType];
+    if (!spec) return null;
+
+    const wanted = new Set(spec.namespaces);
     const namespaces = {};
     const fullName = (credentialData.full_name || '').trim();
     const parts = fullName.split(/\s+/);
@@ -301,7 +314,9 @@ class IssuerService {
         photoId.push(['portrait', new Cbor().bstr(Buffer.from(credentialData.portrait, 'base64')).encode()]);
       } catch (e) { /* ignore invalid portrait */ }
     }
-    if (photoId.length) namespaces['org.iso.23220.photoid.1'] = photoId;
+    if (photoId.length && wanted.has('org.iso.23220.photoid.1')) {
+      namespaces['org.iso.23220.photoid.1'] = photoId;
+    }
 
     const eq = credentialData.education_qualification || {};
     const qual = [];
@@ -310,7 +325,9 @@ class IssuerService {
     if (eq.field_of_study) qual.push(['field_of_study', new Cbor().tstr(eq.field_of_study).encode()]);
     if (eq.graduation_date) qual.push(['graduation_date', fullDate(eq.graduation_date)]);
     if (typeof eq.gpa === 'number') qual.push(['gpa', new Cbor().f64(eq.gpa).encode()]);
-    if (qual.length) namespaces['org.iso.23220.education.qualification.1'] = qual;
+    if (qual.length && wanted.has('org.iso.23220.education.qualification.1')) {
+      namespaces['org.iso.23220.education.qualification.1'] = qual;
+    }
 
     const tr = credentialData.education_transcript || {};
     const transcript = [];
@@ -323,12 +340,14 @@ class IssuerService {
     }
     if (typeof tr.total_credits === 'number') transcript.push(['total_credits', new Cbor().uint(tr.total_credits).encode()]);
     if (tr.status) transcript.push(['status', new Cbor().tstr(tr.status).encode()]);
-    if (transcript.length) namespaces['org.iso.23220.education.transcript.1'] = transcript;
+    if (transcript.length && wanted.has('org.iso.23220.education.transcript.1')) {
+      namespaces['org.iso.23220.education.transcript.1'] = transcript;
+    }
 
     if (!Object.keys(namespaces).length) return null;
 
     return generateIssuerSigned({
-      docType: 'org.iso.23220.photoid.1',
+      docType,
       namespaces,
       signerKeyPem: this.mdocSigner.signerKeyPem,
       certDer: this.mdocSigner.certDer,
@@ -378,12 +397,13 @@ class IssuerService {
     let credential = null;
     let mdocBase64url = null;
     
-    if (credentialData.docType === 'org.iso.23220.photoid.1') {
-      // Photo ID credential validation
+    if (CREDENTIAL_KINDS[credentialData.docType]) {
+      // A credential kind this issuer publishes (qualification or transcript),
+      // validated against the ISO 23220 shape and issued as a signed mdoc.
       if (!this.validatePhotoIDRequest(credentialData)) {
         return {
           success: false,
-          error: `Photo ID validation failed: ${JSON.stringify(this.validatePhotoIDRequest.errors)}`
+          error: `Credential validation failed: ${JSON.stringify(this.validatePhotoIDRequest.errors)}`
         };
       }
 
@@ -429,22 +449,34 @@ class IssuerService {
         createdAt: now.toISOString()
       };
 
-      // Generate the ISO 18013-5 IssuerSigned mdoc for Photo ID credentials.
-      // The mdoc payload is held in-memory only (session store) — never persisted.
-      if (this.mdocSigner) {
-        try {
-          const statusIndex = this._allocateStatusIndex();
-          credential.statusIndex = statusIndex;
-          const mdoc = this.buildPhotoIDMdoc(credentialData, deviceKeyJwk, statusIndex);
-          if (mdoc) {
-            mdocBase64url = mdoc.base64url;
-            credential.mdocDocType = 'org.iso.23220.photoid.1';
-            credential.hasMdoc = true;
-            this.storeMdocSession(credentialId, mdoc.base64url);
-          }
-        } catch (e) {
-          console.error('[issuer] mdoc generation failed:', e.message);
+      // Generate the ISO 18013-5 IssuerSigned mdoc for this credential kind. The mdoc
+      // payload is held in-memory only (session store) — never persisted.
+      //
+      // A credential without an mdoc cannot be presented or status-checked, so a failure
+      // here fails the request rather than returning a credential that is dead on arrival.
+      if (!this.mdocSigner) {
+        return {
+          success: false,
+          error: 'The mdoc signing key is not configured, so credentials cannot be issued',
+        };
+      }
+      try {
+        const statusIndex = this._allocateStatusIndex();
+        credential.statusIndex = statusIndex;
+        const mdoc = this.buildCredentialMdoc(credentialData, deviceKeyJwk, statusIndex);
+        if (!mdoc) {
+          return {
+            success: false,
+            error: `No claims to issue for ${credentialData.docType}: a ${CREDENTIAL_KINDS[credentialData.docType].label} needs its own academic data`,
+          };
         }
+        mdocBase64url = mdoc.base64url;
+        credential.mdocDocType = credentialData.docType;
+        credential.hasMdoc = true;
+        this.storeMdocSession(credentialId, mdoc.base64url);
+      } catch (e) {
+        console.error('[issuer] mdoc generation failed:', e.message);
+        return { success: false, error: `Credential could not be signed: ${e.message}` };
       }
       
       // Track by name for Photo ID
@@ -512,7 +544,7 @@ class IssuerService {
     return {
       success: true,
       credentialId,
-      docType: credentialData.docType || 'org.iso.18013.5.1.mDL',
+      docType: credentialData.docType || DEFAULT_DOCTYPE,
       status: 'active',
       deviceKey: credential.deviceKey || null,
       deviceBound: credential.deviceBound || false,
@@ -717,14 +749,15 @@ class IssuerService {
     }
   }
 
-  // Issue a device-bound Photo ID mdoc for an issuance session.
+  // Issue a device-bound mdoc for an issuance session, of whatever kind it holds.
   issueForSession(session, deviceJwk) {
     if (session.status === 'issued') {
       return { success: false, error: 'Issuance session already claimed' };
     }
+    const docType = session.credentialData?.docType || DEFAULT_DOCTYPE;
     const statusIndex = this._allocateStatusIndex();
-    const mdoc = this.buildPhotoIDMdoc(session.credentialData, deviceJwk, statusIndex);
-    if (!mdoc) return { success: false, error: 'mdoc generation failed' };
+    const mdoc = this.buildCredentialMdoc(session.credentialData, deviceJwk, statusIndex);
+    if (!mdoc) return { success: false, error: `No claims to issue for ${docType}` };
 
     const credentialId = uuidv4();
     const credential = {
@@ -732,7 +765,7 @@ class IssuerService {
       issuerId: this.issuerId,
       issuerDid: this.issuerDid,
       issuerName: this.issuerName,
-      docType: 'org.iso.23220.photoid.1',
+      docType,
       studentId: session.studentId,
       institution: session.institution,
       ...session.credentialData,
@@ -1066,7 +1099,7 @@ function buildCredentialOfferUrl(session) {
   const offer = {
     credential_issuer: process.env.ISSUER_BASE_URL || 'https://issuer.smartcollege.example',
     issuer_id: session.institution,
-    credentials: ['org.iso.23220.photoid.1'],
+    credentials: [docTypeOf(session)],
     grants: {
       'urn:ietf:params:oauth:grant-type:pre-authorized_code': {
         'pre-authorized_code': session.sessionId,
@@ -1601,6 +1634,20 @@ const ACADEMY_SITE_URL =
 
 const isEmail = (value) => /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(String(value || '').trim());
 
+/** The docType a stored issuance session will issue. */
+function docTypeOf(session) {
+  return session?.credentialData?.docType || DEFAULT_DOCTYPE;
+}
+
+/** The kind label for a session, derived from its docType rather than guessed. */
+function kindOf(session) {
+  return CREDENTIAL_KINDS[docTypeOf(session)]?.kind || 'credential';
+}
+
+function kindLabel(session) {
+  return CREDENTIAL_KINDS[docTypeOf(session)]?.label || docTypeOf(session);
+}
+
 function bearerToken(req) {
   const header = req.headers.authorization || '';
   return header.startsWith('Bearer ') ? header.slice(7) : null;
@@ -1624,40 +1671,66 @@ app.post('/academy/requests', async (req, res) => {
       institution: ACADEMY_NAME,
     });
 
-    const { credentialData, display } = generateAcademicRecord({
+    // The applicant chooses what to hold: a qualification, a transcript, or both. Each
+    // kind becomes its own credential, with its own status index and its own revocation.
+    const { records } = generateAcademicRecord({
       institution: ACADEMY_NAME,
       studentId,
       fullName: req.body?.fullName,
+      include: req.body?.include,
     });
 
-    const session = issuer.createIssuanceSession({
-      studentId,
-      institution: ACADEMY_NAME,
-      credentialData,
-      display,
-      email,
-      sub,
-      termsRequired: true,
-    });
+    const issued = records.map((record) => ({
+      record,
+      session: issuer.createIssuanceSession({
+        studentId,
+        institution: ACADEMY_NAME,
+        credentialData: record.credentialData,
+        display: record.display,
+        email,
+        sub,
+        termsRequired: true,
+      }),
+    }));
 
     const claimUrl = `${ACADEMY_SITE_URL}/claim?email=${encodeURIComponent(email)}`;
     const sent = await emailService.sendCredentialsReadyEmail({
       email,
       institution: ACADEMY_NAME,
       claimUrl,
-      credentials: [
-        { title: display.title, subtitle: `${display.degreeLevel} · Graduated ${display.graduationDate}` },
-      ],
+      credentials: records.map((record) => ({
+        title: record.display.title,
+        subtitle:
+          record.kind === 'transcript'
+            ? `${record.display.totalCredits} credits · ${record.display.courseCount} courses`
+            : `${record.display.degreeLevel} · Graduated ${record.display.graduationDate}`,
+      })),
     });
 
+    const primary = issued[0];
     res.status(201).json({
       success: true,
       email,
       studentId,
       claimUrl,
       emailSent: sent.success,
-      sessionId: session.sessionId,
-      credential: { title: display.title, graduationDate: display.graduationDate },
+      // The first credential, for callers written before the choice existed, plus the
+      // complete list of what was created.
+      sessionId: primary.session.sessionId,
+      credential: {
+        title: primary.record.display.title,
+        graduationDate: primary.record.display.graduationDate,
+      },
+      credentials: issued.map(({ record, session }) => ({
+        sessionId: session.sessionId,
+        kind: record.kind,
+        label: record.label,
+        docType: record.docType,
+        title: record.display.title,
+        graduationDate: record.display.graduationDate ?? null,
+        totalCredits: record.display.totalCredits ?? null,
+        courseCount: record.display.courseCount ?? null,
+      })),
       // Dev convenience when SMTP/Brevo is not configured.
       message: sent.success
         ? 'We have emailed you a link to add your credentials to your wallet.'
@@ -1689,6 +1762,9 @@ app.get('/academy/credentials', async (req, res) => {
         sessionId: session.sessionId,
         status: session.status,
         inWallet: session.status === 'issued',
+        kind: kindOf(session),
+        label: kindLabel(session),
+        docType: docTypeOf(session),
         title: session.display?.title || 'Academic credential',
         institution: session.display?.institution || session.institution,
         degreeLevel: session.display?.degreeLevel || null,
@@ -1743,7 +1819,9 @@ app.post('/academy/credentials/:sessionId/offer', async (req, res) => {
     res.json({
       success: true,
       sessionId: session.sessionId,
-      docType: 'org.iso.23220.photoid.1',
+      docType: docTypeOf(session),
+      kind: kindOf(session),
+      label: kindLabel(session),
       offerUrl,
       // Present only when a wallet App Link domain is configured.
       appLinkUrl: buildAppLinkOfferUrl(offerUrl),

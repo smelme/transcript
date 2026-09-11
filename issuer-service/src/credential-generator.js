@@ -124,12 +124,59 @@ function isoDate(year, month, day) {
 }
 
 /**
- * Build the academic record for a student.
+ * The credential kinds this issuer issues, keyed by the docType carried in the mdoc.
  *
- * @param {{ institution: string, studentId: string, fullName?: string }} input
- * @returns {{ credentialData: object, display: object }}
+ * Both kinds carry the holder's identity so a relying party can bind the claims to a
+ * person; each kind adds only the namespace that belongs to it, so a transcript
+ * credential never carries qualification claims and vice versa.
  */
-export function generateAcademicRecord({ institution, studentId, fullName }) {
+export const CREDENTIAL_KINDS = {
+  'org.iso.23220.photoid.1': {
+    kind: 'qualification',
+    label: 'Qualification',
+    namespaces: ['org.iso.23220.photoid.1', 'org.iso.23220.education.qualification.1'],
+  },
+  'org.iso.23220.education.transcript.1': {
+    kind: 'transcript',
+    label: 'Academic transcript',
+    namespaces: ['org.iso.23220.photoid.1', 'org.iso.23220.education.transcript.1'],
+  },
+};
+
+export const DEFAULT_DOCTYPE = 'org.iso.23220.photoid.1';
+
+/**
+ * The docTypes a request asks for: `qualification` (the default and historic
+ * behaviour), `transcript`, or `both`. Anything unrecognised is treated as
+ * `qualification` rather than rejected here, so a typo cannot silently issue two
+ * credentials.
+ */
+export function requestedDocTypes(include) {
+  const value = String(include ?? '').trim().toLowerCase();
+  if (value === 'transcript') return ['org.iso.23220.education.transcript.1'];
+  if (value === 'both') return [DEFAULT_DOCTYPE, 'org.iso.23220.education.transcript.1'];
+  return [DEFAULT_DOCTYPE];
+}
+
+/** The identity elements both credential kinds carry. */
+const IDENTITY_FIELDS = [
+  'full_name',
+  'date_of_birth',
+  'document_number',
+  'issuing_authority',
+  'issue_date',
+  'expiry_date',
+  'issuing_country',
+];
+
+/**
+ * Build the academic record for a student, projected onto the requested kinds.
+ *
+ * @param {{ institution: string, studentId: string, fullName?: string, include?: string }} input
+ * @returns {{ records: Array<{ kind: string, label: string, docType: string,
+ *   credentialData: object, display: object }> }}
+ */
+export function generateAcademicRecord({ institution, studentId, fullName, include = 'qualification' }) {
   const rng = makeRng(seedFrom(institution, studentId));
 
   const given = fullName?.trim().split(/\s+/)[0] || pick(rng, FIRST_NAMES);
@@ -168,8 +215,7 @@ export function generateAcademicRecord({ institution, studentId, fullName }) {
   const documentNumber = `SA-${String(seedFrom(studentId) % 1000000).padStart(6, '0')}`;
   const qualificationTitle = `${programme.level} of ${programme.field}`;
 
-  const credentialData = {
-    docType: 'org.iso.23220.photoid.1',
+  const record = {
     full_name: `${given} ${family}`,
     date_of_birth: isoDate(birthYear, birthMonth, birthDay),
     document_number: documentNumber,
@@ -192,21 +238,54 @@ export function generateAcademicRecord({ institution, studentId, fullName }) {
     },
   };
 
-  return {
-    credentialData,
-    display: {
-      title: qualificationTitle,
-      institution,
-      degreeLevel: programme.level,
-      fieldOfStudy: programme.field,
-      graduationDate,
-      studentId,
-      country: country.label,
-      totalCredits,
-      courseCount: courses.length,
-      gpa,
-    },
+  const display = {
+    title: qualificationTitle,
+    institution,
+    degreeLevel: programme.level,
+    fieldOfStudy: programme.field,
+    graduationDate,
+    studentId,
+    country: country.label,
+    totalCredits,
+    courseCount: courses.length,
+    gpa,
   };
+
+  // Each credential carries only its own academic namespace: the holder chooses the
+  // kind, and a relying party must never receive qualification claims it did not ask
+  // for (or the reverse).
+  const records = requestedDocTypes(include).map((docType) => {
+    const spec = CREDENTIAL_KINDS[docType];
+    const credentialData = { docType };
+    for (const field of IDENTITY_FIELDS) credentialData[field] = record[field];
+
+    if (spec.kind === 'transcript') {
+      credentialData.education_transcript = record.education_transcript;
+      return {
+        kind: spec.kind,
+        label: spec.label,
+        docType,
+        credentialData,
+        display: {
+          ...display,
+          kind: spec.kind,
+          label: spec.label,
+          title: `Academic transcript — ${programme.level} of ${programme.field}`,
+        },
+      };
+    }
+
+    credentialData.education_qualification = record.education_qualification;
+    return {
+      kind: spec.kind,
+      label: spec.label,
+      docType,
+      credentialData,
+      display: { ...display, kind: spec.kind, label: spec.label, title: qualificationTitle },
+    };
+  });
+
+  return { records };
 }
 
-export default { generateAcademicRecord };
+export default { generateAcademicRecord, CREDENTIAL_KINDS, DEFAULT_DOCTYPE, requestedDocTypes };

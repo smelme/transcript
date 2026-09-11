@@ -4,6 +4,7 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import { renderSharePdf } from './pdf.js';
 import { devOtpAllowed } from './email-service.js';
+import { CREDENTIAL_KINDS, DEFAULT_DOCTYPE } from './credential-generator.js';
 
 /**
  * Selective-disclosure "share" flow for recipients that cannot integrate with
@@ -56,6 +57,14 @@ const SHARE_CATEGORIES = {
     },
   },
 };
+
+/**
+ * Namespaces assumed when a credential predates the kind registry: every category,
+ * which is how a single credential used to carry all three namespaces.
+ */
+const defaultNamespaces = Object.values(SHARE_CATEGORIES).flatMap((category) =>
+  Object.keys(category.nameSpaces),
+);
 
 const DEFAULT_TTL_DAYS = parseInt(process.env.SHARE_TTL_DAYS || '30', 10);
 const OTP_TTL_MS = 10 * 60 * 1000;
@@ -141,7 +150,7 @@ export class ShareService {
   }
 
   // ── Helpers ──────────────────────────────────────────────────────────────
-  async verifierCreateSession(nameSpaces, credentialId = null) {
+  async verifierCreateSession(nameSpaces, credentialId = null, docType = DEFAULT_DOCTYPE) {
     const response = await fetch(`${this.verifierApiUrl}/presentation/sessions`, {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
@@ -149,7 +158,7 @@ export class ShareService {
         relyingPartyId: 'smart-college-share',
         origin: this.origin,
         nameSpaces,
-        docType: 'org.iso.23220.photoid.1',
+        docType,
         credentialId,
       }),
     });
@@ -213,16 +222,36 @@ export class ShareService {
     const selected = [...new Set(categories)].filter((c) => SHARE_CATEGORIES[c]);
     if (selected.length === 0) throw new Error('Select at least one category to share');
 
-    const nameSpaces = {};
+    // Only categories this credential actually holds: asking a transcript credential
+    // for qualification claims (or the reverse) would disclose nothing and confuse the
+    // holder, so it is refused up front.
+    const supported = new Set(
+      CREDENTIAL_KINDS[credential.credential.docType]?.namespaces || defaultNamespaces,
+    );
+    for (const category of selected) {
+      const namespaces = Object.keys(SHARE_CATEGORIES[category].nameSpaces);
+      if (!namespaces.some((ns) => supported.has(ns))) {
+        throw new Error(
+          `This credential does not contain ${SHARE_CATEGORIES[category].label.toLowerCase()}`,
+        );
+      }
+    }
+
+    const nameSpaces = {}
     for (const cat of selected) {
       for (const [ns, fields] of Object.entries(SHARE_CATEGORIES[cat].nameSpaces)) {
         nameSpaces[ns] = Array.from(new Set([...(nameSpaces[ns] || []), ...fields]));
       }
     }
 
-    // Mint a one-time verifier request for exactly these namespaces. The
-    // credentialId lets the verifier enforce the credential's lifecycle state.
-    const verifierSession = await this.verifierCreateSession(nameSpaces, credentialId);
+    // Mint a one-time verifier request for exactly these namespaces and this credential's
+    // own docType. The credentialId lets the verifier attribute the presentation to the
+    // share being created.
+    const verifierSession = await this.verifierCreateSession(
+      nameSpaces,
+      credentialId,
+      credential.credential.docType,
+    );
     const data = verifierSession.request.digital.requests[0].data;
 
     const shareId = uuidv4();

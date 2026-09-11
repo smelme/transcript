@@ -163,5 +163,86 @@ check('another account cannot start issuance for this credential', foreign.statu
 const decoded = await QRCode.toDataURL('https://example.com');
 check('qr encoder available', decoded.startsWith('data:image/png'));
 
+// 6. The applicant chooses what they hold: a qualification, a transcript, or both.
+const transcriptEmail = `transcript-${Date.now()}@example.com`;
+const transcriptRequest = (await call('POST', '/academy/requests', {
+  email: transcriptEmail,
+  include: 'transcript',
+})).data;
+check(
+  'a transcript request creates exactly one credential',
+  (transcriptRequest.credentials || []).length === 1,
+  JSON.stringify(transcriptRequest.credentials?.map((c) => c.docType)),
+);
+check(
+  'the transcript credential names its own docType',
+  transcriptRequest.credentials?.[0]?.docType === 'org.iso.23220.education.transcript.1',
+  transcriptRequest.credentials?.[0]?.docType,
+);
+check(
+  'the transcript credential is labelled as a transcript',
+  transcriptRequest.credentials?.[0]?.kind === 'transcript',
+  transcriptRequest.credentials?.[0]?.kind,
+);
+check(
+  'the first credential is still reported for callers written before the choice',
+  transcriptRequest.sessionId === transcriptRequest.credentials?.[0]?.sessionId,
+);
+
+const transcriptOtp = (await call('POST', '/auth/otp', { email: transcriptEmail })).data;
+const transcriptToken = (await call('POST', '/auth/token', { email: transcriptEmail, otp: transcriptOtp.otp })).data;
+const transcriptAuth = { authorization: `Bearer ${transcriptToken.accessToken}` };
+const transcriptList = (await call('GET', '/academy/credentials', null, transcriptAuth)).data;
+check('the wallet sees one credential to add', (transcriptList.credentials || []).length === 1);
+check(
+  'the wallet is told it is a transcript',
+  transcriptList.credentials?.[0]?.kind === 'transcript' &&
+    transcriptList.credentials?.[0]?.label === 'Academic transcript',
+  `${transcriptList.credentials?.[0]?.kind} / ${transcriptList.credentials?.[0]?.label}`,
+);
+
+const transcriptOffer = (await call(
+  'POST',
+  `/academy/credentials/${transcriptRequest.sessionId}/offer`,
+  {},
+  transcriptAuth,
+)).data;
+check(
+  'the offer names the transcript docType',
+  transcriptOffer.docType === 'org.iso.23220.education.transcript.1',
+  transcriptOffer.docType,
+);
+const transcriptOfferPayload = JSON.parse(
+  Buffer.from(String(transcriptOffer.offerUrl || '').split('credential_offer=')[1] || '', 'base64url').toString('utf8'),
+);
+check(
+  'the offered credential is the transcript',
+  transcriptOfferPayload.credentials?.[0] === 'org.iso.23220.education.transcript.1',
+  JSON.stringify(transcriptOfferPayload.credentials),
+);
+
+const bothRequest = (await call('POST', '/academy/requests', {
+  email: `both-${Date.now()}@example.com`,
+  include: 'both',
+})).data;
+check('asking for both creates two credentials', (bothRequest.credentials || []).length === 2);
+check(
+  'both credentials are distinct kinds',
+  JSON.stringify((bothRequest.credentials || []).map((c) => c.kind)) ===
+    JSON.stringify(['qualification', 'transcript']),
+  JSON.stringify((bothRequest.credentials || []).map((c) => c.kind)),
+);
+
+const unknownChoice = (await call('POST', '/academy/requests', {
+  email: `unknown-${Date.now()}@example.com`,
+  include: 'nonsense',
+})).data;
+check(
+  'an unknown choice falls back to a qualification',
+  (unknownChoice.credentials || []).length === 1 &&
+    unknownChoice.credentials[0].docType === 'org.iso.23220.photoid.1',
+  JSON.stringify((unknownChoice.credentials || []).map((c) => c.docType)),
+);
+
 console.log(failures === 0 ? '\nACADEMY_FLOW_PASSED' : `\n${failures} CHECK(S) FAILED`);
 process.exit(failures === 0 ? 0 : 1);
