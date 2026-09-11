@@ -34,7 +34,21 @@ object CredentialRegistry {
     /** Re-publishes the given credentials (already scoped to the current owner) to the system registry. Safe to call repeatedly. */
     fun register(context: Context, store: SecureStore, credentialIds: List<String> = store.credentialIdsForOwner(store.ownerEmail())) {
         try {
-            val database = buildCredentialDatabase(store, credentialIds)
+            val credentials = buildCredentialEntries(store, credentialIds)
+            // Publish the count: a registration that silently drops credentials is
+            // invisible otherwise, and it replaces whatever the chooser shows.
+            if (credentials.size != credentialIds.size) {
+                Log.w(TAG, "publishing ${credentials.size} of ${credentialIds.size} credentials; the rest were unreadable or unparseable")
+            } else {
+                Log.i(TAG, "publishing all ${credentials.size} credentials")
+            }
+
+            val database = CborCodec.encode(
+                mapOf<String, Any?>(
+                    "protocols" to listOf(ACADEMIC_DOC_TYPE),
+                    "credentials" to credentials,
+                )
+            )
             val matcher = loadMatcher(context)
             val client = IdentityCredentialManager.getClient(context)
 
@@ -48,7 +62,7 @@ object CredentialRegistry {
                         protocolTypes = emptyList(),
                     )
                 )
-                    .addOnSuccessListener { Log.i(TAG, "registerCredentials OK type=$type") }
+                    .addOnSuccessListener { Log.i(TAG, "registerCredentials OK type=$type n=${credentials.size}") }
                     .addOnFailureListener { Log.w(TAG, "registerCredentials failed type=$type: $it") }
             }
         } catch (e: Throwable) {
@@ -60,8 +74,8 @@ object CredentialRegistry {
         return context.assets.open("identitycredentialmatcher.wasm").use { it.readBytes() }
     }
 
-    private fun buildCredentialDatabase(store: SecureStore, credentialIds: List<String>): ByteArray {
-        val credentials = credentialIds.mapNotNull { id ->
+    private fun buildCredentialEntries(store: SecureStore, credentialIds: List<String>): List<Map<String, Any?>> =
+        credentialIds.mapNotNull { id ->
             val mdoc = store.mdoc(id)
             if (mdoc == null) {
                 // The mdoc body is wrapped with an auth-bound key, so it is briefly
@@ -76,13 +90,6 @@ object CredentialRegistry {
                 .onFailure { Log.w(TAG, "skipping $id: could not build registry entry: ${it.message}") }
                 .getOrNull()
         }
-
-        val database = mapOf<String, Any?>(
-            "protocols" to listOf(ACADEMIC_DOC_TYPE),
-            "credentials" to credentials,
-        )
-        return CborCodec.encode(database)
-    }
 
     private fun buildCredentialEntry(
         credentialId: String,
