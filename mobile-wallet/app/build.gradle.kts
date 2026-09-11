@@ -20,6 +20,14 @@ android {
         val issuerBaseUrl = (project.findProperty("issuerBaseUrl") as? String)
             ?: "https://issuer.smartcollege.example"
         buildConfigField("String", "ISSUER_BASE_URL", "\"$issuerBaseUrl\"")
+
+        // Android App Link host for same-device issuance. Leave unset (inert
+        // placeholder) until a domain serving /.well-known/assetlinks.json is
+        // pointed at this app; then build with:
+        //   -PwalletAppLinkHost=quals.example
+        val walletAppLinkHost = (project.findProperty("walletAppLinkHost") as? String)
+            ?: "applink.invalid"
+        manifestPlaceholders["walletAppLinkHost"] = walletAppLinkHost
     }
 
     buildFeatures {

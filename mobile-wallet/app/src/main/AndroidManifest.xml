@@ -29,6 +29,22 @@
                 <category android:name="android.intent.category.BROWSABLE" />
                 <data android:scheme="openid-credential-offer" />
             </intent-filter>
+
+            <!-- Android App Link (preferred once a domain is available): no
+                 scheme chooser, and the browser handles the URL if the wallet
+                 is not installed. Requires /.well-known/assetlinks.json on the
+                 host to list this app's signing certificate, and the host is
+                 supplied with -PwalletAppLinkHost=... (inert placeholder by
+                 default, so this filter simply never matches). -->
+            <intent-filter android:autoVerify="true">
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data
+                    android:scheme="https"
+                    android:host="${walletAppLinkHost}"
+                    android:pathPrefix="/offer" />
+            </intent-filter>
         </activity>
 
         <!-- Exported, non-launcher activity that fulfills org-iso-mdoc requests

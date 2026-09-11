@@ -176,6 +176,7 @@ export interface AcademyOfferResult {
   sessionId?: string;
   docType?: string;
   offerUrl?: string;
+  appLinkUrl?: string | null;
   qrDataUrl?: string;
   alreadyInWallet?: boolean;
   error?: string;

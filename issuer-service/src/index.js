@@ -1009,6 +1009,18 @@ function buildCredentialOfferUrl(session) {
   return `openid-credential-offer://?credential_offer=${encoded}`;
 }
 
+// When WALLET_APP_LINK_BASE is configured (e.g. https://quals.example/offer),
+// the same credential offer is also exposed as an Android App Link so a phone
+// can open the wallet directly without a scheme chooser.
+const WALLET_APP_LINK_BASE = process.env.WALLET_APP_LINK_BASE || null;
+
+function buildAppLinkOfferUrl(offerUrl) {
+  if (!WALLET_APP_LINK_BASE) return null;
+  const encoded = String(offerUrl || '').split('credential_offer=')[1];
+  if (!encoded) return null;
+  return `${WALLET_APP_LINK_BASE}?credential_offer=${encoded}`;
+}
+
 // Extract the issuance session id from an OpenID4VCI credential-offer URL.
 function parseSessionIdFromOffer(offerUrl) {
   let encoded = String(offerUrl || '').trim();
@@ -1478,6 +1490,8 @@ app.post('/academy/credentials/:sessionId/offer', async (req, res) => {
       sessionId: session.sessionId,
       docType: 'org.iso.23220.photoid.1',
       offerUrl,
+      // Present only when a wallet App Link domain is configured.
+      appLinkUrl: buildAppLinkOfferUrl(offerUrl),
       qrDataUrl,
     });
   } catch (e) {

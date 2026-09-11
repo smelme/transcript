@@ -76,11 +76,17 @@ class MainActivity : FragmentActivity() {
         if (offer != null) incomingOffer.value = offer
     }
 
-    /** The OpenID4VCI credential-offer URI from a VIEW intent, if any. */
+    /**
+     * The OpenID4VCI credential-offer URI from a VIEW intent, if any.
+     *
+     * Accepts both the `openid-credential-offer://` scheme and an `https://`
+     * App Link, since the offer payload is the `credential_offer` query
+     * parameter in either case.
+     */
     private fun extractOfferUrl(intent: Intent?): String? {
         if (intent?.action != Intent.ACTION_VIEW) return null
         val data = intent.dataString ?: return null
-        return if (data.startsWith("openid-credential-offer:")) data else null
+        return if (data.contains("credential_offer=")) data else null
     }
 }
 

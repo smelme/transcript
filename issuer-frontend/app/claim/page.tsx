@@ -22,7 +22,7 @@ function ClaimFlow() {
   const [token, setToken] = useState<string | null>(null);
   const [credentials, setCredentials] = useState<AcademyCredential[] | null>(null);
   const [selected, setSelected] = useState<string | null>(null);
-  const [offer, setOffer] = useState<{ qrDataUrl?: string; offerUrl?: string } | null>(null);
+  const [offer, setOffer] = useState<{ qrDataUrl?: string; offerUrl?: string; appLinkUrl?: string | null } | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isMobile, setIsMobile] = useState(false);
@@ -90,7 +90,7 @@ function ClaimFlow() {
         setError('That credential is already in your wallet.');
         return;
       }
-      setOffer({ qrDataUrl: r.qrDataUrl, offerUrl: r.offerUrl });
+      setOffer({ qrDataUrl: r.qrDataUrl, offerUrl: r.offerUrl, appLinkUrl: r.appLinkUrl });
     } catch (err) {
       setError((err as Error).message);
     } finally {
@@ -280,7 +280,11 @@ function ClaimFlow() {
 
             {isMobile && !showQr ? (
               <div className="panel" style={{ maxWidth: 520 }}>
-                <a href={offer.offerUrl} className="btn btn-dark" style={{ width: '100%', justifyContent: 'center' }}>
+                <a
+                  href={offer.appLinkUrl || offer.offerUrl}
+                  className="btn btn-dark"
+                  style={{ width: '100%', justifyContent: 'center' }}
+                >
                   Open in Quals wallet
                 </a>
                 <p className="muted" style={{ fontSize: 13, margin: '16px 0 0', lineHeight: 1.6 }}>
@@ -327,7 +331,7 @@ function ClaimFlow() {
                   </ol>
                   <div style={{ marginTop: 18, display: 'flex', gap: 10, flexWrap: 'wrap' }}>
                     {isMobile && (
-                      <a href={offer.offerUrl} className="btn btn-dark">
+                      <a href={offer.appLinkUrl || offer.offerUrl} className="btn btn-dark">
                         Open in Quals wallet
                       </a>
                     )}

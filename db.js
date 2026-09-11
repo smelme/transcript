@@ -108,6 +108,8 @@ export function getDb() {
   db = new Database(DB_PATH);
   db.pragma('journal_mode = WAL');
   db.pragma('foreign_keys = ON');
+  // Several service processes share this file; wait rather than failing fast.
+  db.pragma('busy_timeout = 5000');
   migrate(db);
   return db;
 }

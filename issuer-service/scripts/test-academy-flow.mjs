@@ -58,6 +58,15 @@ const offerPayload = JSON.parse(Buffer.from(offer.offerUrl.split('credential_off
 check('offer names the photoid doctype', Array.isArray(offerPayload.credentials) && offerPayload.credentials[0] === 'org.iso.23220.photoid.1');
 check('offer carries a pre-authorized code', !!offerPayload.grants?.['urn:ietf:params:oauth:grant-type:pre-authorized_code']);
 
+// App Link form of the same offer, present only when WALLET_APP_LINK_BASE is set.
+if (offer.appLinkUrl) {
+  const appLinkPayload = decodeURIComponent(String(offer.appLinkUrl).split('credential_offer=')[1]);
+  check('App Link offer points at the configured domain', String(offer.appLinkUrl).startsWith('https://'));
+  check('App Link carries the same offer', appLinkPayload === String(offer.offerUrl).split('credential_offer=')[1]);
+} else {
+  check('App Link offer is absent when no domain is configured', offer.appLinkUrl == null);
+}
+
 // 5b. The wallet claims the offered credential (proof-of-possession CWT).
 const { buildCwt, generateDeviceKeyPair } = await import('../../mdoc-core.js');
 const device = generateDeviceKeyPair();
