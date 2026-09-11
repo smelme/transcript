@@ -134,4 +134,53 @@ export async function sendOtpEmail({ email, otp, purpose, institution, siteUrl }
   return sendEmail({ to: email, subject, html });
 }
 
-export default { isEmailConfigured, sendEmail, sendOtpEmail };
+/**
+ * "Your credentials are ready" email for the academy self-service flow. It
+ * links the recipient straight to the issuance page, where they sign in with
+ * this email address and add the credential to their wallet.
+ *
+ * @returns {{ success: boolean, messageId?: string|null, reason?: string, error?: string }}
+ */
+export async function sendCredentialsReadyEmail({ email, institution, claimUrl, credentials = [] }) {
+  const institute = institution || 'Your institution';
+  const list = credentials.length
+    ? `<ul style="margin:10px 0 0;padding-left:20px">${credentials
+        .map((c) => `<li><strong>${c.title || 'Credential'}</strong>${c.subtitle ? ` — ${c.subtitle}` : ''}</li>`)
+        .join('')}</ul>`
+    : '';
+  const subject = `Your ${institute} credentials are ready to add to your wallet`;
+  const html = `
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <style>
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; }
+    .header { background: #14161c; color: #fff; padding: 24px 28px; border-radius: 12px 12px 0 0; }
+    .header h1 { margin: 0; font-size: 20px; }
+    .body { background: #fff; border: 1px solid #e5e5e5; border-top: none; padding: 24px 28px; border-radius: 0 0 12px 12px; }
+    .btn { display:inline-block;background:#14161c;color:#fff;text-decoration:none;padding:12px 22px;border-radius:8px;font-weight:600; }
+    .muted { color: #666; font-size: 13px; }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <h1>Your credentials are ready</h1>
+  </div>
+  <div class="body">
+    <p>Hello,</p>
+    <p><strong>${institute}</strong> has prepared your digital credentials. You can now add them to your Quals wallet.</p>
+    ${list}
+    <p style="margin: 22px 0;">
+      <a class="btn" href="${claimUrl}">Add to wallet</a>
+    </p>
+    <p class="muted">Sign in with <strong>${email}</strong> — the same address this email was sent to.</p>
+    <p class="muted">Or copy this link into your browser:<br>${claimUrl}</p>
+    <p class="muted">If you did not request this, you can safely ignore this email.</p>
+  </div>
+</body>
+</html>`;
+  return sendEmail({ to: email, subject, html });
+}
+
+export default { isEmailConfigured, sendEmail, sendOtpEmail, sendCredentialsReadyEmail };

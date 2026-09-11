@@ -140,3 +140,79 @@ export interface OfferQrResult {
 export function getOfferQr(sessionId: string): Promise<OfferQrResult> {
   return request(`/issuance-sessions/${sessionId}/offer-qr`);
 }
+
+/* ── Smart Academy self-service flow ────────────────────────────────────── */
+
+export interface AcademyRequestResult {
+  success: boolean;
+  email?: string;
+  studentId?: string;
+  claimUrl?: string;
+  emailSent?: boolean;
+  sessionId?: string;
+  credential?: { title?: string; graduationDate?: string };
+  message?: string;
+  error?: string;
+}
+
+export interface AcademyCredential {
+  sessionId: string;
+  status: string;
+  inWallet: boolean;
+  title: string;
+  institution: string;
+  degreeLevel?: string | null;
+  fieldOfStudy?: string | null;
+  graduationDate?: string | null;
+  studentId: string;
+  country?: string | null;
+  totalCredits?: number | null;
+  courseCount?: number | null;
+  holderName?: string | null;
+}
+
+export interface AcademyOfferResult {
+  success: boolean;
+  sessionId?: string;
+  docType?: string;
+  offerUrl?: string;
+  qrDataUrl?: string;
+  alreadyInWallet?: boolean;
+  error?: string;
+}
+
+/** Ask the academy to prepare credentials and email a secure link. */
+export function requestCredentials(payload: {
+  email: string;
+  fullName?: string;
+}): Promise<AcademyRequestResult> {
+  return request('/academy/requests', { method: 'POST', body: JSON.stringify(payload) });
+}
+
+export function requestSignInOtp(email: string): Promise<{ success: boolean; otp?: string; otpSent?: boolean; error?: string }> {
+  return request('/auth/otp', { method: 'POST', body: JSON.stringify({ email }) });
+}
+
+export function exchangeToken(
+  email: string,
+  otp: string,
+): Promise<{ success: boolean; accessToken?: string; refreshToken?: string; email?: string; error?: string }> {
+  return request('/auth/token', { method: 'POST', body: JSON.stringify({ email, otp }) });
+}
+
+export function listAcademyCredentials(
+  token: string,
+): Promise<{ success: boolean; email?: string; credentials?: AcademyCredential[]; error?: string }> {
+  return request('/academy/credentials', { headers: { Authorization: `Bearer ${token}` } });
+}
+
+export function createAcademyOffer(
+  sessionId: string,
+  token: string,
+): Promise<AcademyOfferResult> {
+  return request(`/academy/credentials/${sessionId}/offer`, {
+    method: 'POST',
+    body: JSON.stringify({}),
+    headers: { Authorization: `Bearer ${token}` },
+  });
+}

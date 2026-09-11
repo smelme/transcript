@@ -425,6 +425,22 @@ export class ShareService {
     return { success: true, pdf, filename: `shared-${share.shareId}.pdf` };
   }
 
+  /** Revoke (delete) a share. Used by the management portal. */
+  revoke({ shareId, reason = null }) {
+    const share = this.shares.get(shareId);
+    if (!share) throw new Error('Share not found');
+    this.shares.delete(shareId);
+    this.persist();
+    this.issuer.auditLog.push({
+      timestamp: new Date().toISOString(),
+      action: 'share_revoked',
+      shareId,
+      credentialId: share.credentialId,
+      details: { reason, recipientEmail: share.recipientEmail },
+    });
+    return { success: true, shareId, status: 'revoked' };
+  }
+
   list() {
     this.pruneExpired();
     return Array.from(this.shares.values()).map((s) => ({
@@ -433,8 +449,10 @@ export class ShareService {
       senderEmail: s.senderEmail,
       recipientEmail: s.recipientEmail,
       recipientName: s.recipientName,
+      message: s.message,
       status: s.status,
       categories: s.categories,
+      disclosedFields: s.claims ? Object.keys(s.claims).length : 0,
       createdAt: s.createdAt,
       expiresAt: s.expiresAt,
       viewedAt: s.viewedAt,

@@ -169,6 +169,46 @@ export class WalletAccountService {
     };
   }
 
+  /**
+   * Ensure a wallet account + institute link exist, without sending any email.
+   * Used by the academy self-service flow, which sends its own email.
+   */
+  ensureAccountLink({ email, studentId, institution }) {
+    const { account, created } = this._findOrCreateAccount(email);
+    const inst = String(institution || this.issuerId);
+    const sid = String(studentId || '').trim();
+    if (!sid) throw new Error('studentId is required');
+    const linkExists = this._linksFor(account.sub).some(
+      (l) => l.institution === inst && l.studentId === sid
+    );
+    if (!linkExists) this._addLink(account.sub, inst, sid);
+    return {
+      sub: account.sub,
+      email: account.email,
+      accountCreated: created,
+      linkAdded: !linkExists,
+    };
+  }
+
+  /** All wallet accounts with their links (for the management portal). */
+  listAccounts() {
+    const rows = this.db
+      .prepare('SELECT * FROM wallet_accounts ORDER BY created_at DESC')
+      .all();
+    return rows.map((account) => ({
+      sub: account.sub,
+      email: account.email,
+      emailVerified: !!account.email_verified,
+      active: !!account.active,
+      deletedAt: account.deleted_at,
+      createdAt: account.created_at,
+      links: this._linksFor(account.sub),
+      activeRefreshTokens: this.db
+        .prepare('SELECT COUNT(*) AS c FROM refresh_tokens WHERE sub = ? AND revoked_at IS NULL')
+        .get(account.sub).c,
+    }));
+  }
+
   _issueOtp(email) {
     const code = this._genOtp();
     this.otps.set(email, { code, expiresAt: Date.now() + this.otpTtlMs });

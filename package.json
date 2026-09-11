@@ -8,6 +8,7 @@
     "key-management",
     "issuer-service",
     "issuer-frontend",
+    "quals-portal",
     "verifier-service",
     "verifier-frontend",
     "mobile-wallet"

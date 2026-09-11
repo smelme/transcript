@@ -65,6 +65,27 @@ function migrate(database) {
     );
 
     CREATE INDEX IF NOT EXISTS idx_refresh_tokens_sub ON refresh_tokens (sub);
+
+    -- Pending/claimed issuance sessions. Persisted so an emailed claim link
+    -- keeps working after a restart.
+    CREATE TABLE IF NOT EXISTS issuance_sessions (
+      session_id         TEXT PRIMARY KEY,
+      sub                TEXT,
+      email              TEXT,
+      student_id         TEXT NOT NULL,
+      institution        TEXT NOT NULL,
+      credential_data    TEXT NOT NULL,
+      display            TEXT,
+      status             TEXT NOT NULL DEFAULT 'pending',
+      terms_required     INTEGER NOT NULL DEFAULT 1,
+      terms_accepted_at  TEXT,
+      nonce              TEXT NOT NULL,
+      credential_id      TEXT,
+      created_at         TEXT NOT NULL
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_issuance_sessions_owner ON issuance_sessions (institution, student_id);
+    CREATE INDEX IF NOT EXISTS idx_issuance_sessions_email ON issuance_sessions (email);
   `);
 }
 

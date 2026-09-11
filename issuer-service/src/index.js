@@ -1,6 +1,7 @@
 import express from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
+import crypto from 'crypto';
 import dotenv from 'dotenv';
 import { v4 as uuidv4 } from 'uuid';
 import Ajv from 'ajv';
@@ -20,6 +21,7 @@ import {
 } from '../../mdoc-core.js';
 import { WalletAccountService } from './wallet-account-service.js';
 import { ShareService } from './share-service.js';
+import { generateAcademicRecord } from './credential-generator.js';
 import * as emailService from './email-service.js';
 import { getDb } from '../../db.js';
 
@@ -511,7 +513,16 @@ class IssuerService {
   // token whose `sub` is linked to that studentId — that it belongs to the
   // same person. Only then is the credential issued.
 
-  createIssuanceSession({ studentId, institution, credentialData, feePence = 0, termsRequired = true }) {
+  createIssuanceSession({
+    studentId,
+    institution,
+    credentialData,
+    feePence = 0,
+    termsRequired = true,
+    email = null,
+    sub = null,
+    display = null,
+  }) {
     if (!studentId || !credentialData) {
       throw new Error('studentId and credentialData are required');
     }
@@ -519,9 +530,12 @@ class IssuerService {
     const sessionId = uuidv4();
     const session = {
       sessionId,
+      sub: sub || null,
+      email: email ? String(email).trim().toLowerCase() : null,
       studentId: String(studentId),
       institution: String(institution || this.issuerId),
       credentialData,
+      display: display || null,
       status: 'pending',
       termsRequired: !!termsRequired,
       termsVersion: '1.0',
@@ -532,7 +546,81 @@ class IssuerService {
       createdAt: new Date().toISOString(),
     };
     this.issuanceSessions.set(sessionId, session);
+    this._persistIssuanceSession(session);
     return session;
+  }
+
+  _hydrateIssuanceSession(row) {
+    return {
+      sessionId: row.session_id,
+      sub: row.sub,
+      email: row.email,
+      studentId: row.student_id,
+      institution: row.institution,
+      credentialData: JSON.parse(row.credential_data),
+      display: row.display ? JSON.parse(row.display) : null,
+      status: row.status,
+      termsRequired: !!row.terms_required,
+      termsVersion: '1.0',
+      termsAcceptedAt: row.terms_accepted_at,
+      feePence: 0,
+      paymentStatus: 'not_required',
+      nonce: row.nonce,
+      credentialId: row.credential_id,
+      createdAt: row.created_at,
+    };
+  }
+
+  _persistIssuanceSession(session) {
+    try {
+      this.db.prepare(`
+        INSERT INTO issuance_sessions
+          (session_id, sub, email, student_id, institution, credential_data, display, status,
+           terms_required, terms_accepted_at, nonce, credential_id, created_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ON CONFLICT(session_id) DO UPDATE SET
+          status = excluded.status,
+          terms_accepted_at = excluded.terms_accepted_at,
+          credential_id = excluded.credential_id
+      `).run(
+        session.sessionId,
+        session.sub || null,
+        session.email || null,
+        session.studentId,
+        session.institution,
+        JSON.stringify(session.credentialData),
+        session.display ? JSON.stringify(session.display) : null,
+        session.status || 'pending',
+        session.termsRequired ? 1 : 0,
+        session.termsAcceptedAt || null,
+        session.nonce,
+        session.credentialId || null,
+        session.createdAt || new Date().toISOString(),
+      );
+    } catch (e) {
+      console.error('[issuer] failed to persist issuance session:', e.message);
+    }
+  }
+
+  /** Issuance sessions visible to a wallet (by subject, email, or institute link). */
+  listIssuanceSessions({ sub = null, email = null, links = [] } = {}) {
+    let rows;
+    try {
+      rows = this.db.prepare('SELECT * FROM issuance_sessions ORDER BY created_at DESC').all();
+    } catch (e) {
+      console.error('[issuer] issuance session list failed:', e.message);
+      return [];
+    }
+    const normalizedEmail = email ? String(email).trim().toLowerCase() : null;
+    return rows
+      .map((row) => this._hydrateIssuanceSession(row))
+      .filter((session) => {
+        if (sub && session.sub === sub) return true;
+        if (normalizedEmail && session.email === normalizedEmail) return true;
+        return links.some(
+          (l) => l.institution === session.institution && l.studentId === session.studentId,
+        );
+      });
   }
 
   acceptTerms(sessionId, version = null) {
@@ -540,6 +628,7 @@ class IssuerService {
     if (!session) return { success: false, status: 404, error: 'Issuance session not found' };
     session.termsAcceptedAt = new Date().toISOString();
     if (version) session.termsVersion = String(version);
+    this._persistIssuanceSession(session);
     return { success: true, sessionId, termsAcceptedAt: session.termsAcceptedAt };
   }
 
@@ -566,7 +655,21 @@ class IssuerService {
   }
 
   getIssuanceSession(sessionId) {
-    return this.issuanceSessions.get(sessionId);
+    const cached = this.issuanceSessions.get(sessionId);
+    if (cached) return cached;
+    // Fall back to the database so pending sessions survive a restart.
+    try {
+      const row = this.db
+        .prepare('SELECT * FROM issuance_sessions WHERE session_id = ?')
+        .get(sessionId);
+      if (!row) return undefined;
+      const session = this._hydrateIssuanceSession(row);
+      this.issuanceSessions.set(sessionId, session);
+      return session;
+    } catch (e) {
+      console.error('[issuer] issuance session lookup failed:', e.message);
+      return undefined;
+    }
   }
 
   // Issue a device-bound Photo ID mdoc for an issuance session.
@@ -602,6 +705,7 @@ class IssuerService {
 
     session.status = 'issued';
     session.credentialId = credentialId;
+    this._persistIssuanceSession(session);
 
     return { success: true, credentialId, mdocBase64url: mdoc.base64url, deviceBound: !!deviceJwk };
   }
@@ -1088,6 +1192,186 @@ app.post('/admin/accounts/:sub/delete', (req, res) => {
   if (!requireAdmin(req, res)) return;
   try {
     res.json(walletAccounts.deleteAccount(req.params.sub));
+  } catch (e) {
+    res.status(400).json({ success: false, error: e.message });
+  }
+});
+
+// ── Management portal: accounts + shares ─────────────────────────────────
+app.get('/admin/accounts', (req, res) => {
+  if (!requireAdmin(req, res)) return;
+  try {
+    res.json({ success: true, accounts: walletAccounts.listAccounts() });
+  } catch (e) {
+    res.status(400).json({ success: false, error: e.message });
+  }
+});
+
+app.delete('/shares/:id', (req, res) => {
+  if (!requireAdmin(req, res)) return;
+  try {
+    res.json(shareService.revoke({ shareId: req.params.id, reason: req.body?.reason || null }));
+  } catch (e) {
+    res.status(400).json({ success: false, error: e.message });
+  }
+});
+
+// ── Smart Academy self-service flow ──────────────────────────────────────
+// The academy already holds the academic record, so there is no form: the
+// applicant gives an email, we generate the record, and email them a link to
+// the issuance page where they sign in and add the credential to their wallet.
+const ACADEMY_NAME = process.env.ACADEMY_NAME || 'Smart Academy';
+const ACADEMY_SITE_URL =
+  process.env.ACADEMY_SITE_URL || process.env.ISSUER_FRONTEND_URL || 'http://localhost:3002';
+
+const isEmail = (value) => /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(String(value || '').trim());
+
+function bearerToken(req) {
+  const header = req.headers.authorization || '';
+  return header.startsWith('Bearer ') ? header.slice(7) : null;
+}
+
+app.post('/academy/requests', async (req, res) => {
+  try {
+    const email = String(req.body?.email || '').trim().toLowerCase();
+    if (!isEmail(email)) {
+      return res.status(400).json({ success: false, error: 'Please provide a valid email address' });
+    }
+
+    // Deterministic student id so repeat requests always map to one person.
+    const studentId =
+      String(req.body?.studentId || '').trim() ||
+      `SA-${crypto.createHash('sha1').update(email).digest('hex').slice(0, 8).toUpperCase()}`;
+
+    const { sub } = walletAccounts.ensureAccountLink({
+      email,
+      studentId,
+      institution: ACADEMY_NAME,
+    });
+
+    const { credentialData, display } = generateAcademicRecord({
+      institution: ACADEMY_NAME,
+      studentId,
+      fullName: req.body?.fullName,
+    });
+
+    const session = issuer.createIssuanceSession({
+      studentId,
+      institution: ACADEMY_NAME,
+      credentialData,
+      display,
+      email,
+      sub,
+      termsRequired: true,
+    });
+
+    const claimUrl = `${ACADEMY_SITE_URL}/claim?email=${encodeURIComponent(email)}`;
+    const sent = await emailService.sendCredentialsReadyEmail({
+      email,
+      institution: ACADEMY_NAME,
+      claimUrl,
+      credentials: [
+        { title: display.title, subtitle: `${display.degreeLevel} · Graduated ${display.graduationDate}` },
+      ],
+    });
+
+    res.status(201).json({
+      success: true,
+      email,
+      studentId,
+      claimUrl,
+      emailSent: sent.success,
+      sessionId: session.sessionId,
+      credential: { title: display.title, graduationDate: display.graduationDate },
+      // Dev convenience when SMTP/Brevo is not configured.
+      message: sent.success
+        ? 'We have emailed you a link to add your credentials to your wallet.'
+        : 'Email delivery is not configured — use the link below to continue.',
+    });
+  } catch (e) {
+    res.status(400).json({ success: false, error: e.message });
+  }
+});
+
+// List the credentials the signed-in wallet address can add.
+app.get('/academy/credentials', async (req, res) => {
+  try {
+    const token = bearerToken(req);
+    if (!token) return res.status(401).json({ success: false, error: 'Sign in required' });
+
+    const payload = await walletAccounts.verifyAccessToken(token);
+    const links = walletAccounts.getLinks(payload.sub);
+    const sessions = issuer.listIssuanceSessions({
+      sub: payload.sub,
+      email: payload.email,
+      links,
+    });
+
+    res.json({
+      success: true,
+      email: payload.email,
+      credentials: sessions.map((session) => ({
+        sessionId: session.sessionId,
+        status: session.status,
+        inWallet: session.status === 'issued',
+        title: session.display?.title || 'Academic credential',
+        institution: session.display?.institution || session.institution,
+        degreeLevel: session.display?.degreeLevel || null,
+        fieldOfStudy: session.display?.fieldOfStudy || null,
+        graduationDate: session.display?.graduationDate || null,
+        studentId: session.studentId,
+        country: session.display?.country || null,
+        totalCredits: session.display?.totalCredits || null,
+        courseCount: session.display?.courseCount || null,
+        holderName: session.credentialData?.full_name || null,
+      })),
+    });
+  } catch (e) {
+    res.status(401).json({ success: false, error: 'Your session has expired — please sign in again' });
+  }
+});
+
+// Accept terms and return the credential offer + QR code for one credential.
+app.post('/academy/credentials/:sessionId/offer', async (req, res) => {
+  try {
+    const token = bearerToken(req);
+    if (!token) return res.status(401).json({ success: false, error: 'Sign in required' });
+
+    const payload = await walletAccounts.verifyAccessToken(token);
+    const session = issuer.getIssuanceSession(req.params.sessionId);
+    if (!session) return res.status(404).json({ success: false, error: 'Credential not found' });
+
+    const links = walletAccounts.getLinks(payload.sub);
+    const owns =
+      session.sub === payload.sub ||
+      links.some(
+        (l) => l.institution === session.institution && l.studentId === session.studentId,
+      );
+    if (!owns) return res.status(403).json({ success: false, error: 'This credential belongs to another account' });
+
+    if (session.status === 'issued') {
+      return res.json({ success: true, alreadyInWallet: true, sessionId: session.sessionId });
+    }
+
+    if (session.termsRequired && !session.termsAcceptedAt) {
+      issuer.acceptTerms(session.sessionId);
+    }
+
+    const offerUrl = buildCredentialOfferUrl(session);
+    const qrDataUrl = await QRCode.toDataURL(offerUrl, {
+      errorCorrectionLevel: 'M',
+      type: 'image/png',
+      width: 320,
+      margin: 1,
+    });
+
+    res.json({
+      success: true,
+      sessionId: session.sessionId,
+      docType: 'org.iso.23220.photoid.1',
+      offerUrl,
+      qrDataUrl,
+    });
   } catch (e) {
     res.status(400).json({ success: false, error: e.message });
   }

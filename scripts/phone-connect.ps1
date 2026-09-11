@@ -9,7 +9,7 @@
 # Usage:  pwsh -File scripts/phone-connect.ps1
 
 param(
-    [int[]]$Ports = @(3000, 3001, 3002, 3003)
+    [int[]]$Ports = @(3000, 3001, 3002, 3003, 3004)
 )
 
 $adb = Join-Path $env:LOCALAPPDATA 'Android\Sdk\platform-tools\adb.exe'

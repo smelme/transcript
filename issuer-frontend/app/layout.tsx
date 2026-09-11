@@ -5,8 +5,9 @@ import ThemeToggle from './theme-toggle';
 import './globals.css';
 
 export const metadata: Metadata = {
-  title: 'Smart Academy — Credential Issuer',
-  description: 'Issue ISO 18013-5 mDOC academic credentials',
+  title: 'Smart Academy — Digital qualifications and transcripts',
+  description:
+    'Access your academic qualifications and transcripts as verifiable digital credentials you can save, share and prove anywhere.',
   icons: { icon: '/logo.svg' },
 };
 
@@ -21,19 +22,30 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           <Link href="/" className="brand">
             <span className="brand-mark" aria-hidden="true">
               {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src="/logo.svg" alt="" width={28} height={28} />
+              <img src="/logo.svg" alt="" width={30} height={30} />
             </span>
-            Smart Academy
+            <span>
+              Smart Academy
+              <span className="brand-sub">Registry</span>
+            </span>
           </Link>
           <nav className="nav-links">
-            <Link href="/invite">Invite &amp; Issue</Link>
-            <Link href="/issue">Issue Credential</Link>
-            <Link href="/credentials">Credentials</Link>
-            <Link href="/history">Audit History</Link>
+            <Link href="/credentials">Digital credentials</Link>
+            <Link href="/get-credentials" className="nav-cta">
+              Get your credentials
+            </Link>
           </nav>
           <ThemeToggle />
         </header>
-        <main className="container">{children}</main>
+        <main>{children}</main>
+        <footer className="site-footer">
+          <div className="container footer-inner">
+            <span>Smart Academy — example issuing authority for the Quals network.</span>
+            <span>
+              Powered by <strong style={{ color: '#fff' }}>Quals</strong> verifiable credentials
+            </span>
+          </div>
+        </footer>
       </body>
     </html>
   );
