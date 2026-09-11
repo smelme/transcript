@@ -91,7 +91,8 @@ object CredentialRegistry {
                 .getOrNull()
         }
 
-    private fun buildCredentialEntry(
+    /** Internal (not private) so it can be exercised from unit tests without a device. */
+    internal fun buildCredentialEntry(
         credentialId: String,
         mdocBase64Url: String,
         summary: CredentialSummary?,
