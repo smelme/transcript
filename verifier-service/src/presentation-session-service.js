@@ -3,6 +3,7 @@ import { v4 as uuidv4 } from 'uuid';
 import * as cbor2 from 'cbor2';
 import { generateNonce, generateJWK, processCredentials } from 'id-verifier';
 import { getDb } from '../../db.js';
+import { ReaderAuthService } from './reader-auth.js';
 
 /**
  * Ephemeral state for one W3C Digital Credentials API (org-iso-mdoc)
@@ -75,20 +76,21 @@ const jwkToCoseKey = (jwk) => {
 // academic namespaces, including the required DeviceRequestInfo use-case.
 // `requestedNameSpaces` is `{ namespace: [field, ...] }`; defaults to the
 // academic set (used by the interactive verifier flow).
-function createMdocDeviceRequest(requestedNameSpaces, docType) {
+function buildItemsRequestBytes(requestedNameSpaces, docType) {
   const source = requestedNameSpaces || ACADEMIC_NAME_SPACES;
   const nameSpaces = {};
   for (const [namespace, fields] of Object.entries(source)) {
     nameSpaces[namespace] = {};
     for (const field of fields) nameSpaces[namespace][field] = true;
   }
+  return cbor2.encode({ docType: docType || ACADEMIC_DOC_TYPE, nameSpaces });
+}
 
-  const itemsRequest = { docType: docType || ACADEMIC_DOC_TYPE, nameSpaces };
+function createMdocDeviceRequest(itemsRequestBytes, readerAuthAll = []) {
   const docRequests = [{
-    itemsRequest: new cbor2.Tag(24, cbor2.encode(itemsRequest)),
+    itemsRequest: new cbor2.Tag(24, itemsRequestBytes),
   }];
   const documentSets = [[0]];
-  const readerAuthAll = []; // reader auth is added once a reader certificate is configured
 
   const deviceRequestInfo = new cbor2.Tag(24, cbor2.encode({
     useCases: [{ mandatory: true, documentSets }],
@@ -111,6 +113,18 @@ function createEncryptionInfo(nonceHex, jwk) {
   return bufferToBase64Url(encryptionInfo);
 }
 
+// Mirrors id-verifier's MDOCProtocolHelper._generateSessionTranscript for the
+// W3C Digital Credentials API (dcapi) transport. The wallet derives the exact
+// same value from the encryptionInfo it receives; that shared value is what
+// binds a reader's signature to this one-time session.
+function buildSessionTranscript(origin, nonceHex, jwk) {
+  const encryptionInfo = createEncryptionInfo(nonceHex, jwk);
+  const dcapiInfo = cbor2.encode([encryptionInfo, origin]);
+  const hash = crypto.createHash('sha256').update(dcapiInfo).digest();
+  const handover = ['dcapi', new Uint8Array(hash)];
+  return new Uint8Array(cbor2.encode([null, null, handover]));
+}
+
 // Extract the DER bytes of the IssuerAuth leaf certificate from a decoded
 // mdoc document, for the optional pinned-issuer check.
 function extractLeafCertificateDer(document) {
@@ -129,10 +143,17 @@ function extractLeafCertificateDer(document) {
 }
 
 export class PresentationSessionService {
-  constructor({ ttlMs = 5 * 60 * 1000, now = () => Date.now() } = {}) {
+  constructor({ ttlMs = 5 * 60 * 1000, now = () => Date.now(), dataDir } = {}) {
     this.ttlMs = ttlMs;
     this.now = now;
     this.sessions = new Map();
+    // Authenticates this verifier's requests to the wallet.
+    this.readerAuth = new ReaderAuthService({ dataDir });
+  }
+
+  /** The reader key a wallet can pin, so it can show who is asking. */
+  async readerKeyInfo() {
+    return this.readerAuth.describe();
   }
 
   async create({ relyingPartyId, origin, nameSpaces, docType, credentialId }) {
@@ -146,13 +167,23 @@ export class PresentationSessionService {
     const jwk = await generateJWK(); // EC P-256 private JWK (includes x/y for the reader key)
     const sessionId = uuidv4();
     const expiresAtMs = this.now() + this.ttlMs;
+
+    // The reader authenticates the exact request it is making: the signature
+    // covers this one-time session transcript and the ItemsRequest bytes.
+    const sessionTranscript = buildSessionTranscript(parsedOrigin.origin, nonce, jwk);
+    const itemsRequestBytes = buildItemsRequestBytes(nameSpaces, docType);
+    const readerAuthAll = await this.readerAuth.createReaderAuth({
+      sessionTranscriptBytes: sessionTranscript,
+      itemsRequestBytes,
+    });
+
     const request = {
       mediation: 'required',
       digital: {
         requests: [{
           protocol: 'org-iso-mdoc',
           data: {
-            deviceRequest: createMdocDeviceRequest(nameSpaces, docType),
+            deviceRequest: createMdocDeviceRequest(itemsRequestBytes, readerAuthAll),
             encryptionInfo: createEncryptionInfo(nonce, jwk),
           },
         }],
@@ -165,8 +196,14 @@ export class PresentationSessionService {
       jwk,
       expiresAtMs,
       credentialId: credentialId || null,
+      readerKid: await this.readerAuth.kid(),
     });
-    return { sessionId, expiresAt: new Date(expiresAtMs).toISOString(), request };
+    return {
+      sessionId,
+      expiresAt: new Date(expiresAtMs).toISOString(),
+      reader: await this.readerAuth.describe(),
+      request,
+    };
   }
 
   consume(sessionId, { relyingPartyId, origin }) {

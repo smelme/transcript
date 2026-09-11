@@ -97,6 +97,7 @@ jobs:
 
       - name: End-to-end scenarios
         run: |
+          node verifier-service/scripts/test-reader-auth.mjs
           node issuer-service/scripts/test-academy-flow.mjs
           node issuer-service/scripts/test-db-auth.mjs
           node issuer-service/scripts/test-admin-auth.mjs

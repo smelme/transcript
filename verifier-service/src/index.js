@@ -481,6 +481,16 @@ app.get('/health', (req, res) => {
   res.json({ status: 'ok', verifierId: verifier.verifierId });
 });
 
+// The reader key this verifier signs its requests with. A wallet can pin it
+// (out of band) so it can tell the holder who is asking for their data.
+app.get('/presentation/reader-key', async (req, res) => {
+  try {
+    res.json({ success: true, reader: await presentationSessions.readerKeyInfo() });
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
 // Create a one-time W3C Digital Credentials API request for an academic mdoc.
 app.post('/presentation/sessions', async (req, res) => {
   try {
