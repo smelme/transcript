@@ -70,4 +70,6 @@ dependencies {
 
     implementation(libs.androidx.credentials)
     implementation(libs.play.services.identity.credentials)
+
+    testImplementation(libs.junit)
 }

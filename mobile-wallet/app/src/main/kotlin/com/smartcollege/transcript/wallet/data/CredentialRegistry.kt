@@ -62,9 +62,19 @@ object CredentialRegistry {
 
     private fun buildCredentialDatabase(store: SecureStore, credentialIds: List<String>): ByteArray {
         val credentials = credentialIds.mapNotNull { id ->
-            val mdoc = store.mdoc(id) ?: return@mapNotNull null
-            val summary = store.credentialSummary(id)
-            buildCredentialEntry(id, mdoc, summary)
+            val mdoc = store.mdoc(id)
+            if (mdoc == null) {
+                // The mdoc body is wrapped with an auth-bound key, so it is briefly
+                // unreadable while the device is locked.
+                Log.w(TAG, "skipping $id: mdoc not readable (locked or missing)")
+                return@mapNotNull null
+            }
+            // One unusable credential must not abort the whole registration: a
+            // failure here used to leave the system registry stale, so the chooser
+            // kept showing an outdated set of credentials.
+            runCatching { buildCredentialEntry(id, mdoc, store.credentialSummary(id)) }
+                .onFailure { Log.w(TAG, "skipping $id: could not build registry entry: ${it.message}") }
+                .getOrNull()
         }
 
         val database = mapOf<String, Any?>(

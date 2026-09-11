@@ -2,6 +2,7 @@ package com.smartcollege.transcript.wallet.data
 
 import java.io.ByteArrayOutputStream
 import java.nio.ByteBuffer
+import kotlin.math.pow
 
 /** A raw CBOR fragment spliced verbatim into the encoder output. */
 class CborRaw(val bytes: ByteArray)
@@ -109,6 +110,12 @@ object CborCodec {
             val initial = nextByte()
             val major = initial ushr 5
             val additional = initial and 0x1f
+            // Major type 7 (floats and simple values) carries its payload in the
+            // additional-information bits, so it must not go through readLength:
+            // doing so consumed the float bytes here and then again in readSimple,
+            // desynchronising the decoder and throwing "Unexpected end of CBOR"
+            // for any element whose value is a float (e.g. a numeric gpa).
+            if (major == 7) return readSimple(additional)
             val length = readLength(additional)
             return when (major) {
                 0 -> length
@@ -121,8 +128,7 @@ object CborCodec {
                     repeat(length.toInt()) { map[read()] = read() }
                 }
                 6 -> CborTagged(length, read())
-                7 -> readSimple(additional)
-                else -> error("Unsupported CBOR major type $major")
+                else -> throw IllegalArgumentException("Unsupported CBOR major type $major")
             }
         }
 
@@ -131,10 +137,23 @@ object CborCodec {
             21 -> true
             22, 23 -> null
             24 -> nextByte()
-            25 -> error("float16 values are not supported")
+            25 -> float16(readUnsigned(2).toInt())
             26 -> Float.fromBits(readUnsigned(4).toInt())
             27 -> Double.fromBits(readUnsigned(8))
-            else -> error("Unsupported simple value $additional")
+            else -> throw IllegalArgumentException("Unsupported simple value $additional")
+        }
+
+        /** IEEE 754 half-precision (major type 7, additional information 25). */
+        private fun float16(bits: Int): Float {
+            val sign = bits and 0x8000
+            val exponent = (bits ushr 10) and 0x1f
+            val mantissa = bits and 0x03ff
+            val magnitude = when (exponent) {
+                0 -> mantissa * 2.0.pow(-24)
+                31 -> if (mantissa == 0) Double.POSITIVE_INFINITY else Double.NaN
+                else -> (mantissa + 1024) * 2.0.pow(exponent - 25)
+            }
+            return (if (sign != 0) -magnitude else magnitude).toFloat()
         }
 
         private fun readLength(additional: Int): Long = when (additional) {
@@ -143,7 +162,7 @@ object CborCodec {
             25 -> readUnsigned(2)
             26 -> readUnsigned(4)
             27 -> readUnsigned(8)
-            else -> error("Indefinite-length CBOR is not supported")
+            else -> throw IllegalArgumentException("Indefinite-length CBOR is not supported")
         }
 
         private fun readUnsigned(size: Int): Long {

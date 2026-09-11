@@ -59,7 +59,9 @@ local.properties
 *.db
 *.db-shm
 *.db-wal
-data/
+# Anchored: a bare `data/` also matched source packages such as
+# mobile-wallet/app/src/main/kotlin/.../wallet/data, silently ignoring new files.
+/data/
 
 # Testing
 .jest/
@@ -73,4 +75,5 @@ secrets/
 .keys/
 
 # Runtime share persistence
-issuer-service/data/
+/issuer-service/data/
+/verifier-service/data/
