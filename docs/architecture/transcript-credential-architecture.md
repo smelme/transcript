@@ -109,6 +109,44 @@ Naming should follow content rather than audience: the administrative-record nam
 named for what it holds, not for the country whose practice it came from, because practice changes
 and content does not.
 
+### The element sets, as decoded from a signed mdoc
+
+Shared core — `org.iso.23220.education.transcript.1`:
+
+`student_id`, `student_id_scheme`, `institution_name`, `institution_id`,
+`institution_id_scheme`, `programme_title`, `programme_type`, `programme_code`,
+`programme_code_scheme`, `programme_level`, `programme_level_framework`, `enrolment_start`,
+`enrolment_end`, `credit_scheme`, `total_credits`, `grading_scale_id`,
+`grading_scale_minimum`, `grading_scale_maximum`, `grading_scale_pass_mark`,
+`grading_scale_label`, `outcome`, `outcome_scheme`, `overall_mark`, `overall_mark_scale_id`,
+`courses`.
+
+Administrative record — `org.iso.23220.education.academic-record.1`:
+
+`credit_hours_scheme`, `credit_hours_attempted`, `credit_hours_earned`,
+`credit_hours_for_average`, `average_institutional`, `average_cumulative`,
+`average_range_minimum`, `average_range_maximum`, `quality_points`, `transferred_credits`,
+`transfer_source_institution`, `document_type`, `document_id`, `document_status`,
+`document_completeness`, `document_issued_at`, `release_authorised`, `release_method`,
+`issued_to`, `request_reference`.
+
+### What the mdoc encoding forces
+
+1. **A scheme is a sibling element, not a sub-field.** An mdoc element is a single
+   identifier/value pair, so `credit_scheme` sits beside `total_credits`, and a mark points at a
+   scale by id (`overall_mark_scale_id` → `grading_scale_id`). Nesting a `{scheme, value}` map
+   inside an element would make it opaque to selective disclosure and to mdoc debuggers.
+2. **The course list is all or nothing.** `courses` stays one element (one JSON string), so
+   anything a reader may want *without* the marks — the programme, the total, the outcome, the
+   average — must be its own element. That is why the aggregates are in the core.
+3. **Dates are date-only, CBOR tag 1004**, and decode as such in every inspector.
+4. **Codes are strings, not numbers.** `programme_level` is `"7"`, not `7`, so nothing adds up
+   levels by accident; likewise `programme_code` and `outcome`.
+5. **Omit rather than emit empty.** No transfer credit means no `transfer_source_institution`
+   element, not an empty string.
+6. **Revocation is not in these namespaces.** The status reference lives in the signed MSO, so it
+   travels with the credential whatever an applicant discloses.
+
 ## API contract direction
 
 - `POST /academy/requests` gains `include`: `qualification` (default), `transcript`, or
