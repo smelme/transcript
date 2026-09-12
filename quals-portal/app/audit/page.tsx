@@ -69,6 +69,7 @@ export default function AuditPage() {
                   <tr>
                     <th>When</th>
                     <th>Action</th>
+                    <th>Kind</th>
                     <th>Subject</th>
                     <th>Details</th>
                   </tr>
@@ -80,6 +81,7 @@ export default function AuditPage() {
                       <td>
                         <span className="badge neutral">{entry.action.replace(/_/g, ' ')}</span>
                       </td>
+                      <td>{entry.kindLabel || entry.kind || '—'}</td>
                       <td className="mono">
                         {entry.credentialId
                           ? `cred ${shortId(entry.credentialId, 10)}`

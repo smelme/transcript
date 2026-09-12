@@ -2,7 +2,13 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { PageHeader, StatusBadge, formatDate, shortId } from '../components/ui';
-import { listCredentials, revokeCredential, type Credential } from '../lib/api';
+import {
+  CREDENTIAL_KINDS,
+  credentialKindLabel,
+  listCredentials,
+  revokeCredential,
+  type Credential,
+} from '../lib/api';
 
 export default function CredentialsPage() {
   const [credentials, setCredentials] = useState<Credential[]>([]);
@@ -10,6 +16,7 @@ export default function CredentialsPage() {
   const [error, setError] = useState<string | null>(null);
   const [query, setQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
+  const [kindFilter, setKindFilter] = useState('all');
   const [target, setTarget] = useState<Credential | null>(null);
   const [reason, setReason] = useState('Withdrawn by the registry');
   const [busy, setBusy] = useState(false);
@@ -34,12 +41,23 @@ export default function CredentialsPage() {
     const q = query.trim().toLowerCase();
     return credentials.filter((c) => {
       if (statusFilter !== 'all' && (c.status || '') !== statusFilter) return false;
+      // A credential holding no academic namespace has no kind to filter on, so it is
+      // only ever shown under 'all' rather than being attributed to either kind.
+      if (kindFilter !== 'all' && (c.kind || 'credential') !== kindFilter) return false;
       if (!q) return true;
-      return [c.credentialId, c.full_name, c.studentId, c.institution, c.credentialType]
+      return [
+        c.credentialId,
+        c.full_name,
+        c.studentId,
+        c.institution,
+        c.credentialType,
+        credentialKindLabel(c),
+        c.kind,
+      ]
         .filter(Boolean)
         .some((v) => String(v).toLowerCase().includes(q));
     });
-  }, [credentials, query, statusFilter]);
+  }, [credentials, query, statusFilter, kindFilter]);
 
   async function confirmRevoke() {
     if (!target) return;
@@ -77,6 +95,18 @@ export default function CredentialsPage() {
             <option value="active">Active</option>
             <option value="revoked">Revoked</option>
           </select>
+          <select
+            value={kindFilter}
+            onChange={(e) => setKindFilter(e.target.value)}
+            aria-label="Filter by credential kind"
+          >
+            <option value="all">All kinds</option>
+            {CREDENTIAL_KINDS.map((kind) => (
+              <option key={kind.value} value={kind.value}>
+                {kind.label}
+              </option>
+            ))}
+          </select>
           <button type="button" className="btn btn-secondary" onClick={refresh} disabled={loading}>
             {loading ? 'Refreshing…' : 'Refresh'}
           </button>
@@ -98,7 +128,7 @@ export default function CredentialsPage() {
                     <th>Holder</th>
                     <th>Institution</th>
                     <th>Student ID</th>
-                    <th>Type</th>
+                    <th>Kind</th>
                     <th>Status</th>
                     <th>Issued</th>
                     <th>Credential ID</th>
@@ -113,7 +143,11 @@ export default function CredentialsPage() {
                         <td>{c.full_name || '—'}</td>
                         <td>{c.institution || '—'}</td>
                         <td className="mono">{c.studentId || '—'}</td>
-                        <td>{c.credentialType || c.docType || '—'}</td>
+                        <td title={c.docType || undefined}>
+                          <span className={`badge ${c.kind === 'credential' ? 'neutral' : 'ok'}`}>
+                            {credentialKindLabel(c)}
+                          </span>
+                        </td>
                         <td>
                           <StatusBadge status={c.status} />
                         </td>

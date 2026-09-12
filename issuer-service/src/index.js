@@ -547,6 +547,10 @@ class IssuerService {
       credentialId,
       credentialType: credential.credentialType,
       studentId: credential.studentId,
+      // The kind travels with the event, so the log is readable without a lookup and
+      // without inferring it from a docType every kind shares.
+      kind: credential.kind || 'credential',
+      kindLabel: labelOfCredentialData(credential),
       details: { issued: true, docType: credential.docType || credential.credentialType }
     });
 
@@ -844,6 +848,20 @@ class IssuerService {
     this.statistics.totalIssued++;
     this.statistics.byType['PhotoID'] = (this.statistics.byType['PhotoID'] || 0) + 1;
 
+    // The academy path issues through a session rather than through the API, so it needs
+    // its own audit entry: without it, the credentials a student claims were invisible to
+    // the organisation that issued them.
+    this.auditLog.push({
+      timestamp: credential.createdAt,
+      action: 'credential_issued',
+      credentialId,
+      credentialType: 'PhotoID',
+      studentId: credential.studentId,
+      kind: credential.kind,
+      kindLabel: labelOfCredentialData(credential),
+      details: { issued: true, docType, sessionId: session.sessionId },
+    });
+
     session.status = 'issued';
     session.credentialId = credentialId;
     this._persistIssuanceSession(session);
@@ -965,7 +983,17 @@ class IssuerService {
 
     return {
       success: true,
-      credentials: results.slice(start, end),
+      credentials: results.slice(start, end).map((credential) => ({
+        ...credential,
+        // The kind is derived from the academic namespace the credential holds, never
+        // inferred from its contents: both kinds share the photo-ID docType, so the
+        // namespace is the only thing that tells them apart. A credential that holds
+        // neither namespace stays 'credential', and the caller falls back to the raw
+        // docType rather than being given a label that would be a guess.
+        kind: kindOfCredentialData(credential),
+        kindLabel: labelOfCredentialData(credential),
+        academicNamespaces: academicNamespacesOf(credential),
+      })),
       total: results.length,
       page,
       pageSize
@@ -993,6 +1021,8 @@ class IssuerService {
       action: 'credential_revoked',
       credentialId,
       studentId: credential.studentId,
+      kind: credential.kind || 'credential',
+      kindLabel: labelOfCredentialData(credential),
       details: { reason }
     });
 
@@ -1036,7 +1066,19 @@ class IssuerService {
    * issued, so they can never include anybody else's.
    */
   getStatistics(institution = null) {
+    // Counts by kind, taken from the credentials themselves. Both kinds share the
+    // photo-ID docType, so a count by docType would silently merge them.
+    const countByKind = (credentials) => {
+      const byKind = {};
+      for (const credential of credentials) {
+        const kind = kindOfCredentialData(credential);
+        byKind[kind] = (byKind[kind] || 0) + 1;
+      }
+      return byKind;
+    };
+
     if (!institution) {
+      const all = Array.from(this.credentials.values());
       return {
         issuerId: this.issuerId,
         issuerName: this.issuerName,
@@ -1046,7 +1088,9 @@ class IssuerService {
         totalIssued: this.credentials.size,
         totalRevoked: this.revokedCredentials.size,
         credentialsInSystem: this.credentials.size,
-        activeCredentials: this.credentials.size - this.revokedCredentials.size
+        activeCredentials: this.credentials.size - this.revokedCredentials.size,
+        byKind: countByKind(all),
+        byKindActive: countByKind(all.filter((c) => c.status !== 'revoked')),
       };
     }
 
@@ -1062,6 +1106,8 @@ class IssuerService {
       totalRevoked: revoked,
       credentialsInSystem: mine.length,
       activeCredentials: mine.length - revoked,
+      byKind: countByKind(mine),
+      byKindActive: countByKind(mine.filter((credential) => credential.status !== 'revoked')),
     };
   }
 

@@ -837,3 +837,119 @@ test('Academy request - linking a session attaches the account and keeps the cre
   assert.ok(reloaded.credentialData.education_transcript, 'the claims are untouched');
   dropSessionsFor(studentId);
 });
+
+// ── What the management portal is told about a credential ──
+//
+// The portal must state each credential's kind without guessing. Both kinds share the
+// photo-ID docType, so the kind is derived from the academic namespace the credential
+// holds and travels with the list, the audit trail and the organisation's counts.
+
+const issueKind = (issuer, studentId, kind, institution = 'Smart Academy') => {
+  const { records } = generateAcademicRecord({ institution, studentId, include: kind });
+  const session = issuer.createIssuanceSession({
+    studentId,
+    institution,
+    credentialData: records[0].credentialData,
+    display: records[0].display,
+  });
+  const result = issuer.issueForSession(session, null);
+  assert.strictEqual(result.success, true, result.error || '');
+  return result.credentialId;
+};
+
+test('Portal - each listed credential states the kind its namespace implies', () => {
+  const issuer = new IssuerService();
+  const qualificationId = issueKind(issuer, 'SA-PORTAL-1', 'qualification');
+  const transcriptId = issueKind(issuer, 'SA-PORTAL-2', 'transcript');
+
+  const { credentials } = issuer.listCredentials({ institution: 'Smart Academy' });
+  const qualification = credentials.find((c) => c.credentialId === qualificationId);
+  const transcript = credentials.find((c) => c.credentialId === transcriptId);
+
+  assert.strictEqual(qualification.kind, 'qualification');
+  assert.strictEqual(qualification.kindLabel, 'Qualification');
+  assert.deepStrictEqual(qualification.academicNamespaces, [
+    'org.iso.23220.education.qualification.1',
+  ]);
+  assert.strictEqual(transcript.kind, 'transcript');
+  assert.strictEqual(transcript.kindLabel, 'Academic transcript');
+  assert.deepStrictEqual(transcript.academicNamespaces, [
+    'org.iso.23220.education.transcript.1',
+  ]);
+  assert.strictEqual(
+    qualification.docType,
+    transcript.docType,
+    'the docType cannot tell them apart, which is why the kind is derived from the namespace',
+  );
+  dropSessionsFor('SA-PORTAL-1');
+  dropSessionsFor('SA-PORTAL-2');
+});
+
+test('Portal - a credential holding no academic namespace is not given a kind', () => {
+  const issuer = new IssuerService();
+  // A legacy row, loaded from the store in a shape this issuer no longer issues.
+  issuer.credentials.set('legacy-1', {
+    credentialId: 'legacy-1',
+    docType: 'org.example.legacy.1',
+    credentialType: 'Legacy',
+    institution: 'Smart Academy',
+    status: 'active',
+  });
+
+  const { credentials } = issuer.listCredentials({ institution: 'Smart Academy' });
+  const legacy = credentials.find((c) => c.credentialId === 'legacy-1');
+  assert.strictEqual(legacy.kind, 'credential', 'no namespace, so no kind to claim');
+  assert.deepStrictEqual(legacy.academicNamespaces, []);
+  assert.strictEqual(
+    legacy.docType,
+    'org.example.legacy.1',
+    'the portal shows this raw docType rather than a label it would be guessing at',
+  );
+});
+
+test('Portal - the organisation overview is split by kind', () => {
+  const issuer = new IssuerService();
+  const qualificationId = issueKind(issuer, 'SA-STATS-1', 'qualification');
+  const transcriptId = issueKind(issuer, 'SA-STATS-2', 'transcript');
+  issueKind(issuer, 'SA-STATS-3', 'transcript', 'Another Academy');
+
+  const mine = issuer.getStatistics('Smart Academy');
+  assert.deepStrictEqual(mine.byKind, { qualification: 1, transcript: 1 });
+  assert.deepStrictEqual(mine.byKindActive, { qualification: 1, transcript: 1 });
+  assert.strictEqual(mine.totalIssued, 2, 'another organisation is not counted here');
+
+  issuer.revokeCredential(transcriptId, 'withdrawn by the registry');
+
+  const afterRevoke = issuer.getStatistics('Smart Academy');
+  assert.deepStrictEqual(afterRevoke.byKind, { qualification: 1, transcript: 1 });
+  assert.deepStrictEqual(
+    afterRevoke.byKindActive,
+    { qualification: 1 },
+    'a revoked transcript is no longer active, so it drops out of the active split',
+  );
+  assert.strictEqual(afterRevoke.totalRevoked, 1);
+  assert.ok(issuer.getCredential(qualificationId).success);
+  dropSessionsFor('SA-STATS-1');
+  dropSessionsFor('SA-STATS-2');
+  dropSessionsFor('SA-STATS-3');
+});
+
+test('Portal - the audit trail records the kind with the event', () => {
+  const issuer = new IssuerService();
+  const transcriptId = issueKind(issuer, 'SA-AUDIT-1', 'transcript');
+  issuer.revokeCredential(transcriptId, 'withdrawn by the registry');
+
+  const { auditLog } = issuer.getAuditLog({ institution: 'Smart Academy' });
+  const issued = auditLog.find((entry) => entry.action === 'credential_issued');
+  const revokedEntry = auditLog.find((entry) => entry.action === 'credential_revoked');
+
+  assert.strictEqual(issued.kind, 'transcript');
+  assert.strictEqual(issued.kindLabel, 'Academic transcript');
+  assert.strictEqual(revokedEntry.kind, 'transcript');
+  assert.strictEqual(
+    revokedEntry.kindLabel,
+    'Academic transcript',
+    'a revocation is readable without looking the credential up',
+  );
+  dropSessionsFor('SA-AUDIT-1');
+});

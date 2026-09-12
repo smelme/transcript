@@ -1,12 +1,14 @@
 # P1-01: The academy app does not build
 
 **Priority:** P1 — the app runs in development but cannot be built for release
-**Status:** Open, reproduced on unmodified code
-**Components:** `issuer-frontend` (Next.js 16.3.3, Turbopack)
+**Status:** Open, reproduced on unmodified code in two apps
+**Components:** `issuer-frontend` and `quals-portal` (Next.js 16.3.3, Turbopack)
 
 ## Problem
 
-`npx next build` in `issuer-frontend` fails while prerendering Next's internal error boundary:
+`npx next build` fails while prerendering Next's internal error boundary, in `issuer-frontend` and
+identically in `quals-portal`. Both report `Compiled successfully` first, so application code is
+fine and the failure is in the export step:
 
 ```
 Error occurred prerendering page "/_global-error"

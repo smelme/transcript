@@ -26,6 +26,9 @@ export interface Statistics {
   totalVerified?: number;
   credentialsInSystem?: number;
   activeCredentials?: number;
+  /** Counts per credential kind. Both kinds share a docType, so this is the only split. */
+  byKind?: Record<string, number>;
+  byKindActive?: Record<string, number>;
 }
 
 export async function getStatistics(): Promise<Statistics> {
@@ -39,6 +42,10 @@ export interface Credential {
   credentialId: string;
   credentialType?: string;
   docType?: string;
+  /** Derived by the issuer from the academic namespace the credential holds. */
+  kind?: string;
+  kindLabel?: string;
+  academicNamespaces?: string[];
   status?: string;
   studentId?: string;
   institution?: string;
@@ -47,6 +54,32 @@ export interface Credential {
   issue_date?: string;
   expiry_date?: string;
   [key: string]: unknown;
+}
+
+/** The kinds that can be filtered on. A legacy credential holds neither. */
+export const CREDENTIAL_KINDS = [
+  { value: 'qualification', label: 'Qualification' },
+  { value: 'transcript', label: 'Transcript' },
+] as const;
+
+/**
+ * How the portal labels a credential's kind. The kind is derived by the issuer from the
+ * academic namespace the credential holds - never guessed from its contents - and a
+ * credential holding none falls back to its raw docType rather than to a wrong label.
+ */
+export function credentialKindLabel(credential: Credential): string {
+  if (credential.kind && credential.kind !== 'credential') {
+    return credential.kindLabel || credential.kind;
+  }
+  return credential.docType || credential.credentialType || '—';
+}
+
+/** A counting label for a kind key, for the overview's split totals. */
+export function kindCountLabel(kind: string): string {
+  if (kind === 'qualification') return 'Qualifications';
+  if (kind === 'transcript') return 'Transcripts';
+  if (kind === 'academic') return 'Both kinds held';
+  return kind === 'credential' ? 'No academic namespace' : kind;
 }
 
 export async function listCredentials(params: { studentId?: string; status?: string } = {}): Promise<Credential[]> {
@@ -177,6 +210,9 @@ export interface AuditEntry {
   credentialId?: string;
   studentId?: string;
   shareId?: string;
+  /** The credential kind the event was about, recorded with the event. */
+  kind?: string;
+  kindLabel?: string;
   details?: Record<string, unknown>;
 }
 

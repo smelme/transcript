@@ -4,8 +4,10 @@ import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { PageHeader, StatusBadge, formatDate } from './components/ui';
 import {
+  credentialKindLabel,
   getAuditLog,
   getStatistics,
+  kindCountLabel,
   listAccounts,
   listCredentials,
   listShares,
@@ -60,6 +62,9 @@ export default function OverviewPage() {
   const activeShares = shares.filter((s) => s.status === 'shared').length;
   const revoked = credentials.filter((c) => c.status === 'revoked').length;
   const activeAccounts = accounts.filter((a) => a.active && !a.deletedAt).length;
+  // Counts by kind, from the issuer's own figures: both kinds share a docType, so a
+  // single total would hide which credential a student actually received.
+  const kindCounts = Object.entries(stats?.byKindActive || {});
 
   return (
     <main>
@@ -87,6 +92,14 @@ export default function OverviewPage() {
             <div className="stat-grid">
               <Stat label="Credentials issued" value={stats?.totalIssued ?? credentials.length} hint="All time" />
               <Stat label="Active credentials" value={stats?.activeCredentials ?? credentials.length - revoked} hint="Currently valid" />
+              {kindCounts.map(([kind, count]) => (
+                <Stat
+                  key={kind}
+                  label={kindCountLabel(kind)}
+                  value={count}
+                  hint={kind === 'credential' ? 'No academic namespace' : 'Active'}
+                />
+              ))}
               <Stat label="Revoked" value={stats?.totalRevoked ?? revoked} hint="No longer valid" />
               {platform && (
                 <>
@@ -159,6 +172,7 @@ export default function OverviewPage() {
                         <th>Holder</th>
                         <th>Institution</th>
                         <th>Student ID</th>
+                        <th>Kind</th>
                         <th>Status</th>
                         <th>Issued</th>
                       </tr>
@@ -169,6 +183,7 @@ export default function OverviewPage() {
                           <td>{c.full_name || '—'}</td>
                           <td>{c.institution || '—'}</td>
                           <td className="mono">{c.studentId || '—'}</td>
+                          <td title={c.docType || undefined}>{credentialKindLabel(c)}</td>
                           <td>
                             <StatusBadge status={c.status} />
                           </td>
