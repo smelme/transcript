@@ -92,8 +92,8 @@ the third of which needs structural separation.
    outcome, and the aggregates.
 2. **One additional namespace carries the administrative-record extras** that a US-style reader
    asks for: attempted versus earned credits, averages with their range and quality points,
-   summary types, credit basis and override school, official or partial status, release
-   authorisation, destination and tracking reference.
+   summary types, credit basis and override school, the record's own document identity,
+   official or partial status, release authorisation, destination and tracking reference.
 3. **A third namespace, only if it is ever needed, carries EU recognition extras**: ECTS grade,
    EQF level, language of instruction, diploma supplement reference.
 4. **A total is always per scheme.** This one rule is what prevents the dangerous failure mode:
@@ -108,6 +108,37 @@ elements off the surface every presentation exposes.
 Naming should follow content rather than audience: the administrative-record namespace will be
 named for what it holds, not for the country whose practice it came from, because practice changes
 and content does not.
+
+### Who asks for which: the division of labour
+
+The two academic namespaces answer different questions, and that - not the country a practice
+comes from - is what divides them.
+
+| Namespace | The question it answers | Who asks for it |
+|---|---|---|
+| `org.iso.23220.education.transcript.1` | *What did this person study, at which institution and programme, over which period, and with what marks, on what scale?* | A recognition officer (ELMO/EuroLMAI), an admissions team, an employer checking a claim |
+| `org.iso.23220.education.academic-record.1` | *Is this record authentic, official and complete, who authorised its release, and what does it say in the units the reader works in - credits, averages, quality points?* | A registrar running a credit-hour process |
+| `org.iso.23220.photoid.1` | *Who is the holder?* | Both, for identity binding and selective personal components |
+
+Three consequences follow, and together they explain why an element may appear in both academic
+namespaces without being a duplicate:
+
+1. **The academic record is self-contained.** A namespace is the unit of a request, so a registrar
+   that asks for `academic-record.1` alone must receive a record that identifies itself
+   (`document_type`, `document_id`, `document_issued_at`) and states its own standing
+   (`document_status`, `document_completeness`) and release framing. The alternative - asking for
+   `photoid.1` as well - would disclose the photograph and personal components the process has no
+   use for.
+2. **It may be a different document.** `document_number` in the photo-ID namespace identifies the
+   identity document; the academic-record elements identify *the record being released*. These are
+   separate artefacts that may legitimately differ, so the same element name is not restating a
+   value. Chosen behaviour: the academic-record namespace carries the registrar's own record
+   identity, so a reader learns which registrar document this credential corresponds to.
+3. **The unit difference is arithmetic, not geographical.** `credit_hours_*` exists so a
+   credit-hour reader can use the record without converting ECTS, and `average_*` / `quality_points`
+   exist because they are computed *from* the marks rather than asserted by the institution.
+   Neither is summoned by a country; both are summoned by a process. The transcript namespace stays
+   process-neutral either way.
 
 ### The element sets, as decoded from a signed mdoc
 

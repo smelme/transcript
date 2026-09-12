@@ -59,9 +59,12 @@ Decided before implementing, because it changes where every new element goes:
   outcome, aggregates) stays in `org.iso.23220.education.transcript.1`, scheme-qualified, so one
   credential serves a European recognition officer and a US registrar alike.
 - The **administrative-record extras** (attempted vs earned, averages with range and quality
-  points, credit basis, official/partial status, release authorisation, destination) go in their
-  own namespace, which must not restate the credential's existing document identity
-  (`document_number`, `issue_date`, `issuing_authority` live in the photo-ID namespace).
+  points, credit basis, documented status and completeness, release authorisation, destination)
+  go in their own namespace, and that namespace **does** carry document identity on purpose: a
+  namespace is the unit of a request, so a relying party asking for it alone must receive a
+  self-contained record - which document this is, when it was issued, who issued it, whether it is
+  official and complete, and who authorised its release. See "Who asks for which" in
+  `docs/architecture/transcript-credential-architecture.md`.
 - **Jurisdiction-legal or privacy-sensitive claims** (consent framing, national identifiers,
   ethnicity, residency) do not go in the core namespace, and the ones we should not hold at all
   are simply not modelled.
