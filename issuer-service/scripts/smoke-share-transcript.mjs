@@ -169,11 +169,33 @@ check('the completion status arrives', claims.status === 'completed', String(cla
 check('the student id arrives', claims.student_id === STUDENT, String(claims.student_id));
 check('the personal components arrive with it', claims.given_name === 'Tessa' && !!claims.family_name);
 check(
+  'the recipient is told which credential was shared',
+  view.kind === 'transcript' && view.kindLabel === 'Academic transcript',
+  `${view.kind} / ${view.kindLabel}`,
+);
+check(
   'no qualification claims are disclosed',
   claims.institution_name === undefined
     && claims.degree_level === undefined
     && claims.gpa === undefined,
   JSON.stringify(claims.institution_name ?? null),
+);
+
+// The PDF is labelled by kind too: the text is written uncompressed, so the label is
+// readable in the bytes the recipient downloads.
+const pdfResponse = await fetch(
+  `${ISSUER}/shares/${share.shareId}/pdf?token=${encodeURIComponent(verified.recipientToken)}`,
+);
+const pdfBytes = Buffer.from(await pdfResponse.arrayBuffer()).toString('latin1');
+check(
+  'the share PDF downloads',
+  pdfResponse.ok && (pdfResponse.headers.get('content-type') || '').includes('pdf'),
+  `${pdfResponse.status} ${pdfResponse.headers.get('content-type')}`,
+);
+check(
+  'the share PDF is labelled by kind',
+  pdfBytes.includes('Academic transcript'),
+  `title present: ${pdfBytes.includes('Academic transcript')}`,
 );
 
 console.log(failures === 0 ? '\nTRANSCRIPT_SHARE_PASSED' : `\n${failures} CHECK(S) FAILED`);

@@ -4,7 +4,7 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import { renderSharePdf } from './pdf.js';
 import { devOtpAllowed } from './email-service.js';
-import { PHOTOID_DOCTYPE } from './credential-generator.js';
+import { PHOTOID_DOCTYPE, kindOfCredentialData, labelOfCredentialData } from './credential-generator.js';
 
 /**
  * Selective-disclosure "share" flow for recipients that cannot integrate with
@@ -254,6 +254,11 @@ export class ShareService {
     const share = {
       shareId,
       credentialId,
+      // What the recipient is actually being sent, recorded when the share is created so
+      // the view, the PDF and the notifications can name it. Both kinds share a docType,
+      // so this is the only honest label: the academic namespace decides the kind.
+      kind: kindOfCredentialData(credential.credential),
+      kindLabel: labelOfCredentialData(credential.credential),
       senderEmail: payload.email || null,
       senderSub: payload.sub,
       recipientName: String(recipientName).trim(),
@@ -425,6 +430,10 @@ export class ShareService {
       senderEmail: share.senderEmail,
       recipientName: share.recipientName,
       message: share.message,
+      // The recipient is told which credential they are looking at, not just which
+      // sections of it were disclosed.
+      kind: share.kind || null,
+      kindLabel: share.kindLabel || null,
       categories: share.categories.map((c) => SHARE_CATEGORIES[c]?.label || c),
       claims: share.claims || {},
       sharedAt: share.createdAt,
@@ -441,7 +450,9 @@ export class ShareService {
       return [k, value];
     });
     const pdf = renderSharePdf({
-      title: 'Shared credential information',
+      // Named by kind where the share recorded one; a share created before this was
+      // recorded keeps the neutral title rather than being given a guess.
+      title: share.kindLabel || 'Shared credential information',
       subtitle: `Shared by ${share.senderEmail || 'a verified holder'} with ${share.recipientName}`,
       rows: rows.length ? rows : [['Message', 'No fields disclosed']],
       footer: `Share ID ${share.shareId} · Generated ${new Date().toISOString()}`,
@@ -509,13 +520,14 @@ export default ShareService;
 
 // ── Email templates ────────────────────────────────────────────────────────
 function renderRecipientHtml(share, link) {
+  const shared = share.kindLabel ? ` ${escapeHtml(share.kindLabel.toLowerCase())}` : ' documents';
   return `
 <!DOCTYPE html><html><body style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;color:#333">
   <div style="background:#14161c;color:#fff;padding:24px;border-radius:12px 12px 0 0">
-    <h1 style="margin:0;font-size:20px">${share.recipientName}, you've been sent documents</h1>
+    <h1 style="margin:0;font-size:20px">${escapeHtml(share.recipientName)}, you've been sent${shared}</h1>
   </div>
   <div style="border:1px solid #e5e5e5;border-top:none;padding:24px;border-radius:0 0 12px 12px">
-    <p><strong>${share.senderEmail || 'Someone'}</strong> has shared documents with you.</p>
+    <p><strong>${escapeHtml(share.senderEmail || 'Someone')}</strong> has shared${shared} with you.</p>
     ${share.message ? `<blockquote style="border-left:4px solid #0a58ca;margin:16px 0;padding-left:14px;color:#555">${escapeHtml(share.message)}</blockquote>` : ''}
     <p>Please use the link below to view the documents that were shared with you:</p>
     <p style="margin:22px 0"><a href="${link}" style="display:inline-block;background:#14161c;color:#fff;text-decoration:none;padding:12px 22px;border-radius:8px">View shared documents</a></p>

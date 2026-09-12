@@ -8,6 +8,9 @@ type ShareView = {
   senderEmail?: string;
   recipientName?: string;
   message?: string;
+  /** Which credential was shared. Both kinds share a docType, so this is the label. */
+  kind?: string | null;
+  kindLabel?: string | null;
   categories?: string[];
   claims?: Record<string, unknown>;
   sharedAt?: string;
@@ -221,6 +224,11 @@ export default function SharePage() {
           <p className="muted">
             Shared by <b>{view.senderEmail || 'a verified holder'}</b> with {view.recipientName}.
           </p>
+          {view.kindLabel && (
+            <p style={{ marginTop: 8 }}>
+              <span className="badge kind">{view.kindLabel}</span>
+            </p>
+          )}
           {view.message && (
             <blockquote className="result-box" style={{ borderLeft: '4px solid var(--brand)' }}>
               {view.message}

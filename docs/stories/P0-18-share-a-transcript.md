@@ -1,10 +1,9 @@
 # P0-18: Share a transcript by email
 
 **Priority:** P0 — the holder must be able to disclose a transcript outside an RP website
-**Status:** In progress — increment 1 is done and covered by
-`issuer-service/scripts/smoke-share-transcript.mjs`. Remaining: increment 2 (recipient view and PDF
-labelled by kind - no kind label exists in `verifier-frontend` today) and increment 3 (wallet share
-entry point, delivered with P0-20).
+**Status:** In progress — increments 1 and 2 are done and covered by
+`issuer-service/scripts/smoke-share-transcript.mjs` and `smoke-share.mjs`. Remaining: increment 3,
+the wallet share entry point, delivered with P0-20
 **Components:** Issuer share flow, wallet share entry point, share recipient page
 
 ## User story
@@ -51,8 +50,20 @@ recipient having an account anywhere.
 1. **Done:** share session uses the credential's own namespaces and docType, and
    `smoke-share-transcript.mjs` shares a transcript to a registrar and checks that the grades
    arrive while no qualification claims are disclosed.
-2. Recipient view and PDF labelled by kind.
+2. **Done:** the share records the credential's kind when it is created (the academic namespace
+   decides it, since both kinds share the docType), and the recipient view, the PDF and the
+   recipient email are labelled with it. A share created before this was recorded keeps the neutral
+   title rather than being given a guess.
 3. Wallet share entry point per kind (P0-20).
+
+## Verification
+
+- `issuer-service/scripts/smoke-share-transcript.mjs` — the recipient is told they have been sent an
+  academic transcript (`kind: transcript`, `kindLabel: Academic transcript`), and the downloaded PDF
+  carries that label in its bytes; the grades still arrive with no qualification claims disclosed.
+- `issuer-service/scripts/smoke-share.mjs` — the qualification path is unchanged (claims, view and
+  PDF all still pass).
+- 66 issuer unit tests and 58 verifier tests pass; `issuer-frontend` type-checks clean.
 
 ## Definition of done
 
