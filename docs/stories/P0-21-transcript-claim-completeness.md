@@ -21,11 +21,24 @@ can make an admission decision without contacting the issuing institution.
   result is reported as a label rather than a bare number.
 - **Credit scheme**: credits and total credits state their scheme (ECTS, or whatever the
   institution uses) and level.
+- **Attempted versus earned credit**: each result separates what was attempted from what was
+  earned, and the credits that count towards the average are identifiable.
+- **Overall average with its range**: the average is stated with the range it sits on and, where
+  the institution computes them, the quality points behind it.
+- **Provenance of each credit**: whether it was earned here, transferred, studied abroad, or
+  awarded by examination or another body (the US model's `CreditBasis` and `courseOverrideSchool`;
+  ELMO's `schoolOverrideCodes`).
 - **Academic period**: each result carries its academic term (title plus start and end), and
   the transcript carries the enrolment period.
 - **Result vocabulary**: a controlled outcome per result (`passed`, `failed`, `withdrawn`,
   `exempted`, `in progress`) alongside the human label, replacing the free `status` string.
 - **Level**: per-result and per-programme level, framework named.
+- **Document status**: the transcript states that it is the official document (our signed
+  credential always is), whether it is complete or partial, and its own document identifier.
+- **Release authorisation**: the credential records that the holder authorised the disclosure
+  and by what method, so a recipient can see the consent rather than infer it.
+- **Issued to**: the relying party the credential was presented to and a reference for the
+  exchange, as US practice carries inside the document.
 - **Aggregates**: programme, overall result, credit total and scheme travel as their own
   elements so an applicant can disclose a summary without their whole course list (see gap 14).
 
@@ -41,9 +54,10 @@ can make an admission decision without contacting the issuing institution.
 ## Acceptance criteria
 
 1. A presented transcript alone answers: which programme, at which institution, over which
-   period, with which marks on which scales, how many credits of which scheme, and with what
-   overall outcome.
+   period, with which marks on which scales, how many credits of which scheme (attempted and
+   earned), which of them came from elsewhere, and with what overall outcome.
 2. Every numeric mark is accompanied by its scheme, and no scale is assumed by the reader.
+3. The overall average states its range, so a reader can tell an A from a 9 out of 10.
 3. The aggregate elements can be disclosed without disclosing `courses`.
 4. Existing credentials are unaffected: no new element is required for a credential to verify,
    and the old free-text `status` remains readable where it was issued.
@@ -63,10 +77,15 @@ can make an admission decision without contacting the issuing institution.
 
 - **Decision needed:** which grading and credit model Smart Academy actually uses (ECTS with a
   10-point Dutch scale and 5.5 pass mark, or something else), whether the programme level is
-  EQF, and whether the institution has a SCHAC/Erasmus code. The generator must not invent
-  these; a wrong scale is worse than none.
+  EQF, the programme classification code (ISCED-F, or CIP for a US-facing transcript), and
+  whether the institution has a SCHAC/Erasmus code. The generator must not invent these; a wrong
+  scale is worse than none.
 - Tier 2 depends on the academy's academic record carrying the data (workload hours, course
   groupings, language of instruction), which it may not.
+- The US-derived items assume the registrar decides to carry them in the credential rather than
+  relying on the presentation context (who it was presented to, when, and that the holder
+  consented). Carrying them costs disclosure surface; leaving them out keeps the credential
+  narrower. This is a deliberate choice to record, not a default.
 
 ## Delivery increments
 

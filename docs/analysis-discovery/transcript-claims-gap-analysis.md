@@ -10,7 +10,7 @@ what are we missing from a claims point of view?
 | **ELMO / EMREX** (fetched: `github.com/emrex-eu/elmo-schemas`) | The European exchange format for result information, based on CEN **EN 15981-2011 EuroLMAI**: "a data model describing assessments, primarily Diplomas, Diploma Supplements and **Transcripts of Records** for higher education". This is the closest analogue to what we issue. | Enveloped **XML-DSig** with an X.509 certificate embedded in the document |
 | **ELM v3 / European Digital Credentials** (fetched: `github.com/european-commission-empl/European-Learning-Model`) | Europass credential model: W3C Verifiable Credentials expressed as JSON-LD, "fully mapped to the ELMO/EMREX standard", covering qualifications, learning opportunities, accreditation and person identity | VC proof (JWS/Data Integrity) |
 | **CLR 2.0 / Open Badges 3.0** (not fetched; pages did not render) | US-centric learner record and badge specs: achievements with credits earned, grade/result, term, alignment, evidence, verification | VC proof |
-| **PESC / EdExchange** (not fetched) | US college transcript exchange XML: attempted vs earned credits, grade points, per-term GPA, academic standing, degree awarded, transferred and in-progress work | Institution-signed exchange, not document-signed |
+| **PESC / EdExchange (US and Canada)** (fetched: `github.com/pesc-org/json-ld-transcript`, `github.com/pesc-org/json-ld-code`, `github.com/pesc-org/canpesc-common-digital-layout`) | The North American college transcript standard: XML and now JSON/JSON-LD, built on CEDS data elements (e.g. `P000057` credit units, `P000058` credit value, `P001298` academic grade scale code, `P000043` CIP code, `P001517` SCED code) with SKOS code lists (grade status, credit basis, credit levels, honours levels, document completeness) | **Not signed in the schema.** The only "signature" in the PESC schemas is the student's release consent: `ReleaseAuthorizedIndicator` with `ReleaseAuthorizedMethod` = `Signature` (signed and dated written consent) or `ElectronicSignature` (FERPA-compliant authenticated username and password). Integrity rests on the exchange network and on vendor-issued certified PDFs, not on the document |
 
 The ELMO example was read in full; the other rows are stated at a level I am confident about
 rather than quoted, and are marked as such.
@@ -95,11 +95,56 @@ the XML-DSig patterns above, which have no revocation mechanism at all.
     some institutions print; and no `citizenship`, which ELMO carries but which is
     privacy-sensitive and should stay optional.
 
+## What the US pattern adds
+
+The PESC model (read from the schemas and validation reports in `pesc-org`) is more administrative
+than ELMO: it is built around **credit hours, grade points and the provenance of credit**. It
+confirms the Tier 1 gaps above — it has academic sessions, credit units and value, an academic
+grade scale code per course, a programme classification code, result status codes and multi-language
+titles — and it adds these, in the order a US registrar would care:
+
+| US element | Why it matters | Our position |
+|---|---|---|
+| `creditHoursAttempted` **vs** `creditHoursEarned`, `creditHoursForGPA` | Every US transcript separates what was attempted from what was earned, and computes the average over GPA-basis hours only. A single `credits` number cannot express a withdrawn or failed course | Missing |
+| `gradePointAverage`, `totalQualityPoints`, `gpaRangeMinimum`/`gpaRangeMaximum` | The average is stated **with its range**, and quality points make it checkable. This is the grading-scale gap expressed numerically | Missing |
+| `AcademicSummary` typed by `AcademicSummaryType` — `SenderOnly`, `TransferOnly`, `TransferNotRepeated`, `CarryoverCredit`, `Weighted`, `NonWeighted`, `AcademicRenewal` | Institutions publish several averages at once: institutional, transfer, cumulative, weighted. One summary is not enough for an admissions decision | Missing |
+| `courseOverrideSchool`, `overrideSchoolCourseNumber`, `CreditBasis` (`Transfer`, `StudyAbroad`, `AdvancedPlacement`, `CreditByExam`, `InternationalBaccalaureate`, `Military`, `Coop`, `Internship`, `Reciprocal` …), `SchoolOverrideCodes` | "Where did this credit come from?" is the second question after the average. ELMO has the same concept (`schoolOverrideCodes`), so both patterns carry it | Missing |
+| `CourseAcademicGradeScaleCode` per course, `CourseCreditUnits`/`CourseCreditValue`/`CourseCreditBasis`/`CourseCreditLevel` | Scale and unit are stated per course, not just globally — a transcript can mix scales and credit bases | Missing |
+| `ProgramCIPCode` plus `CSIS`/`HEGIS`/`ESIS`/`USIS`/local codes | Programme classification is a coded, required field, and several schemes coexist | Missing (the ELMO equivalent is ISCED-F) |
+| `courseOverrideSchool`, `requirement`, `attribute` on courses | Tags a course to degree requirements and attributes (core, elective, general education) — ELMO's grouping by another name | Missing |
+| `documentOfficialCode`, `documentID`, `documentTypeCode`, `documentProcessCode`, `documentCompleteCode` | **Official versus unofficial**, and complete versus partial, are first-class. `DocumentCompleteCodes` notes that "Partial generally means that the remainder will be sent in hard copy" | Missing — though our signed credential is *always* official, and we never say so |
+| `delinquencies`, `residency` | Holds that qualify or block an official release; in-state/out-of-state for fees | Missing (a revoked credential is our nearest analogue) |
+| `academicHonors` with `honorsLevel` (`FirstHighest`, `SecondHighest`, `ThirdHighest`), `honorsTitle`, `AcademicAwardLevels` | Classification of award and honours | Missing (`gpa` only) |
+| `ReleaseAuthorizedIndicator` + `ReleaseAuthorizedMethod` | Records *that the student authorised this release*, and how | Missing — our holder consent is implicit in the presentation |
+| `DocumentRecipient`, `RequestTrackingID` | The transcript names who it was issued to and carries the exchange reference | Missing |
+| Test scores, licensure, additional achievements, degree requirements | Adjacent artefacts carried in the same document | Out of scope for us |
+
+### On signing, which is the part that surprised me
+
+In the US pattern the transcript *document* is not what is signed. The schema's only signature
+semantics are the student's **release authorisation** (FERPA-compliant), and integrity comes from the
+exchange network plus vendor-issued certified PDFs. ELMO, by contrast, embeds an XML-DSig with an
+X.509 certificate; and ours is signed twice — the mdoc `issuerAuth` and the status list — with
+selective disclosure and revocation the other two lack. On revocation and integrity we are ahead;
+what we lack is the *administrative* framing (attempted vs earned, the average with its range,
+provenance, official status, and the record of who authorised the release).
+
 ## Recommendation
 
 Tier 1 is what stands between us and a transcript a registrar can actually act on, and it is
 mostly data the academy already has — programme, grading scale, credit unit, term and result
 outcome. Tier 2 is what makes it recognisable without a human phoning the university.
+
+The US pattern reinforces two of these and adds three of its own, which belong in Tier 1 because
+both traditions treat them as basic:
+
+- **attempted versus earned credit**, and the average stated **with its range** and quality points;
+- **the provenance of each credit** (institutional, transfer, study abroad, AP/IB, credit by exam);
+- **official status and completeness** of the document — and, since our signed credential is always
+official, saying so rather than leaving it implicit;
+- **the record of the student's release authorisation** (their consent to this disclosure);
+- **who the transcript was issued to** and the exchange reference, which US practice carries inside
+the document.
 
 One deliberate reversal to consider: because `courses` is a single element, the aggregate view
 should be carried as its own elements (Tier 1) rather than expecting applicants to disclose
