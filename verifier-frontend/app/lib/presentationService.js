@@ -80,3 +80,95 @@ export async function submitAcademicCredential(sessionId, credential) {
 
   return data;
 }
+
+/* ── Trust University: a registrar asking for the transcript ───────────── */
+
+/**
+ * Both credential kinds are issued under this docType, so it does not identify one; the
+ * transcript namespace in the request does.
+ */
+export const TRANSCRIPT_DOC_TYPE = 'org.iso.23220.photoid.1';
+
+/**
+ * What a registrar needs: the holder's name, then the study itself. The award fields are
+ * deliberately not requested - a transcript credential does not carry them, and asking for
+ * them would suggest the registrar reads an award from a transcript.
+ */
+export const REGISTRAR_NAME_SPACES = {
+  'org.iso.23220.photoid.1': ['given_name', 'family_name'],
+  'org.iso.23220.education.transcript.1': [
+    'student_id',
+    'courses',
+    'total_credits',
+    'status',
+  ],
+};
+
+export const REGISTRAR_RELYING_PARTY = 'trust-university';
+
+export async function createRegistrarSession(relyingPartyId = REGISTRAR_RELYING_PARTY) {
+  return request('/presentation/sessions', {
+    method: 'POST',
+    body: JSON.stringify({
+      relyingPartyId,
+      origin: typeof window !== 'undefined' ? window.location.origin : '',
+      docType: TRANSCRIPT_DOC_TYPE,
+      nameSpaces: REGISTRAR_NAME_SPACES,
+    }),
+  });
+}
+
+/** Ask the holder's wallet for their transcript and return the verified claims. */
+export async function requestTranscript(relyingPartyId = REGISTRAR_RELYING_PARTY) {
+  if (!supportsIsoMdocPresentation()) {
+    throw new Error('This browser does not support digital credential requests.');
+  }
+
+  const session = await createRegistrarSession(relyingPartyId);
+  const credential = await navigator.credentials.get(session.request);
+
+  if (!credential) {
+    throw new Error('No transcript was shared.');
+  }
+
+  return submitTranscript(session.sessionId, credential, relyingPartyId);
+}
+
+export async function submitTranscript(
+  sessionId,
+  credential,
+  relyingPartyId = REGISTRAR_RELYING_PARTY,
+) {
+  const data = await request(
+    `/presentation/sessions/${encodeURIComponent(sessionId)}/response`,
+    {
+      method: 'POST',
+      body: JSON.stringify({
+        relyingPartyId,
+        origin: typeof window !== 'undefined' ? window.location.origin : '',
+        credential: { protocol: credential.protocol, data: credential.data },
+      }),
+    },
+  );
+
+  if (!data?.success) {
+    throw new Error(data?.error || 'Transcript verification failed.');
+  }
+
+  return data;
+}
+
+/**
+ * The course list travels as one JSON string claim. Returns an empty list rather than
+ * throwing, so a registrar sees the verified totals even if the list cannot be read.
+ */
+export function parseCourses(value) {
+  if (Array.isArray(value)) return value;
+  if (typeof value !== 'string' || value.trim() === '') return [];
+  try {
+    const parsed = JSON.parse(value);
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return [];
+  }
+}

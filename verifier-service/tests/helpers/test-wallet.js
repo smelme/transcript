@@ -101,18 +101,55 @@ function hpkeEncrypt(recipientJwk, info, plaintext) {
 // `status` is the credential's status-list reference (`{ idx, uri }`), which a
 // real issuance embeds in the MSO; pass it to exercise the revocation path.
 export function buildAcademicCredential({ signerKeyPem, certDer, status = null }) {
+  return buildCredential({
+    signerKeyPem,
+    certDer,
+    status,
+    namespaces: {
+      'org.iso.23220.photoid.1': [
+        ['given_name', new Cbor().tstr('Jane').encode()],
+        ['family_name', new Cbor().tstr('Doe').encode()],
+      ],
+      'org.iso.23220.education.qualification.1': [
+        ['institution_name', new Cbor().tstr('Transcript University').encode()],
+        ['degree_level', new Cbor().tstr('Bachelor').encode()],
+        ['graduation_date', fullDate('2025-06-01')],
+      ],
+    },
+  });
+}
+
+/**
+ * The same holder, but issued a transcript credential: the photo-ID document the shared
+ * docType implies, carrying the transcript namespace instead of the qualification one.
+ */
+export function buildTranscriptCredential({ signerKeyPem, certDer, status = null }) {
+  return buildCredential({
+    signerKeyPem,
+    certDer,
+    status,
+    namespaces: {
+      'org.iso.23220.photoid.1': [
+        ['given_name', new Cbor().tstr('Jane').encode()],
+        ['family_name', new Cbor().tstr('Doe').encode()],
+      ],
+      'org.iso.23220.education.transcript.1': [
+        ['student_id', new Cbor().tstr('SA-TRUST-1').encode()],
+        ['total_credits', new Cbor().uint(24).encode()],
+        ['status', new Cbor().tstr('completed').encode()],
+        [
+          'courses',
+          new Cbor()
+            .tstr('[{"courseCode":"CS101","credits":6},{"courseCode":"CS210","credits":6}]')
+            .encode(),
+        ],
+      ],
+    },
+  });
+}
+
+function buildCredential({ signerKeyPem, certDer, status = null, namespaces }) {
   const device = generateDeviceKeyPair();
-  const namespaces = {
-    'org.iso.23220.photoid.1': [
-      ['given_name', new Cbor().tstr('Jane').encode()],
-      ['family_name', new Cbor().tstr('Doe').encode()],
-    ],
-    'org.iso.23220.education.qualification.1': [
-      ['institution_name', new Cbor().tstr('Transcript University').encode()],
-      ['degree_level', new Cbor().tstr('Bachelor').encode()],
-      ['graduation_date', fullDate('2025-06-01')],
-    ],
-  };
   const generated = generateIssuerSigned({
     docType: 'org.iso.23220.photoid.1',
     namespaces,

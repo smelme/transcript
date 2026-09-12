@@ -256,6 +256,13 @@ export class PresentationSessionService {
         institution: claims.institution_name || null,
         degreeLevel: claims.degree_level || null,
         graduationDate: claims.graduation_date || null,
+        // A transcript carries the study itself rather than an award, so a registrar reads
+        // these. Reported as null when absent rather than invented: a transcript credential
+        // holds no qualification namespace, and a qualification holds no course list.
+        studentId: claims.student_id || null,
+        totalCredits: claims.total_credits ?? null,
+        completionStatus: claims.status || null,
+        courses: claims.courses || null,
       },
       // Full disclosed element values (flattened, keyed by element identifier)
       // so callers such as the issuer's "share" flow can persist every
