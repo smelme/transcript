@@ -259,6 +259,26 @@ button:disabled {
   color: var(--err);
 }
 
+/* What kind of credential this is: a text label, since both kinds share a docType. */
+.badge.kind {
+  background: var(--bg-soft);
+  color: var(--ink);
+  border: 1px solid var(--border);
+  white-space: nowrap;
+}
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
 .result-box {
   background: var(--bg-soft);
   border: 1px solid var(--border);

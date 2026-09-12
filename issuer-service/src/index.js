@@ -666,6 +666,8 @@ class IssuerService {
         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         ON CONFLICT(session_id) DO UPDATE SET
           status = excluded.status,
+          email = COALESCE(excluded.email, email),
+          sub = COALESCE(excluded.sub, sub),
           terms_accepted_at = excluded.terms_accepted_at,
           credential_id = excluded.credential_id
       `).run(
@@ -707,6 +709,55 @@ class IssuerService {
           (l) => l.institution === session.institution && l.studentId === session.studentId,
         );
       });
+  }
+
+  /**
+   * An issuance session this student already holds for one academic namespace.
+   *
+   * A repeat request must not mint a duplicate credential, and the academic namespace is
+   * what tells the kinds apart (both share a docType). A pending session is preferred, so
+   * a link the student already has keeps working, but an issued one is still returned: the
+   * academy's non-goal is self-service re-issue, so the caller reports it as already held.
+   */
+  findIssuanceSessionFor({ studentId, institution, academicNamespace }) {
+    if (!studentId || !academicNamespace) return undefined;
+    let rows;
+    try {
+      rows = this.db
+        .prepare(
+          `SELECT * FROM issuance_sessions
+            WHERE student_id = ? AND institution = ?
+            ORDER BY (status = 'pending') DESC, created_at DESC`,
+        )
+        .all(String(studentId), String(institution));
+    } catch (e) {
+      console.error('[issuer] issuance session lookup by namespace failed:', e.message);
+      return undefined;
+    }
+    for (const row of rows) {
+      const session = this._hydrateIssuanceSession(row);
+      if (academicNamespacesOf(session.credentialData || {}).includes(academicNamespace)) {
+        return session;
+      }
+    }
+    return undefined;
+  }
+
+  /** Attach an account to a session created before the holder signed in. */
+  linkIssuanceSession(sessionId, { email = null, sub = null } = {}) {
+    const session = this.getIssuanceSession(sessionId);
+    if (!session) return undefined;
+    let changed = false;
+    if (email && !session.email) {
+      session.email = String(email).trim().toLowerCase();
+      changed = true;
+    }
+    if (sub && !session.sub) {
+      session.sub = sub;
+      changed = true;
+    }
+    if (changed) this._persistIssuanceSession(session);
+    return session;
   }
 
   acceptTerms(sessionId, version = null) {
@@ -1693,34 +1744,55 @@ app.post('/academy/requests', async (req, res) => {
       include: req.body?.include,
     });
 
-    const issued = records.map((record) => ({
-      record,
-      session: issuer.createIssuanceSession({
+    // One session per requested kind. A request for something the student already holds
+    // reuses the existing session instead of minting a duplicate credential, and keeps the
+    // same session id so a link or QR code they already have stays valid.
+    const issued = records.map((record) => {
+      const existing = issuer.findIssuanceSessionFor({
         studentId,
         institution: ACADEMY_NAME,
-        credentialData: record.credentialData,
-        display: record.display,
-        email,
-        sub,
-        termsRequired: true,
-      }),
-    }));
-
-    const claimUrl = `${ACADEMY_SITE_URL}/claim?email=${encodeURIComponent(email)}`;
-    const sent = await emailService.sendCredentialsReadyEmail({
-      email,
-      institution: ACADEMY_NAME,
-      claimUrl,
-      credentials: records.map((record) => ({
-        title: record.display.title,
-        subtitle:
-          record.kind === 'transcript'
-            ? `${record.display.totalCredits} credits · ${record.display.courseCount} courses`
-            : `${record.display.degreeLevel} · Graduated ${record.display.graduationDate}`,
-      })),
+        academicNamespace: record.academicNamespace,
+      });
+      if (existing) {
+        issuer.linkIssuanceSession(existing.sessionId, { email, sub });
+        return { record, session: existing, reused: true };
+      }
+      return {
+        record,
+        reused: false,
+        session: issuer.createIssuanceSession({
+          studentId,
+          institution: ACADEMY_NAME,
+          credentialData: record.credentialData,
+          display: record.display,
+          email,
+          sub,
+          termsRequired: true,
+        }),
+      };
     });
 
+    const claimUrl = `${ACADEMY_SITE_URL}/claim?email=${encodeURIComponent(email)}`;
+    // Only mail a link when something is still claimable: repeating a request the student
+    // has already acted on must not send them a second "your credentials are ready".
+    const claimable = issued.some(({ session }) => session.status !== 'issued');
+    const sent = claimable
+      ? await emailService.sendCredentialsReadyEmail({
+          email,
+          institution: ACADEMY_NAME,
+          claimUrl,
+          credentials: records.map((record) => ({
+            title: record.display.title,
+            subtitle:
+              record.kind === 'transcript'
+                ? `${record.display.totalCredits} credits · ${record.display.courseCount} courses`
+                : `${record.display.degreeLevel} · Graduated ${record.display.graduationDate}`,
+          })),
+        })
+      : { success: false, skipped: 'already-issued' };
+
     const primary = issued[0];
+    const allInWallet = issued.every(({ session }) => session.status === 'issued');
     res.status(201).json({
       success: true,
       email,
@@ -1728,27 +1800,32 @@ app.post('/academy/requests', async (req, res) => {
       claimUrl,
       emailSent: sent.success,
       // The first credential, for callers written before the choice existed, plus the
-      // complete list of what was created.
+      // complete list of what was created or reused.
       sessionId: primary.session.sessionId,
       credential: {
         title: primary.record.display.title,
         graduationDate: primary.record.display.graduationDate,
       },
-      credentials: issued.map(({ record, session }) => ({
+      credentials: issued.map(({ record, session, reused }) => ({
         sessionId: session.sessionId,
         kind: record.kind,
         label: record.label,
         docType: record.docType,
         academicNamespace: record.academicNamespace,
+        // `reused` means this request matched credentials already prepared, so the same
+        // session (and the same offer) is returned rather than a duplicate being created.
+        reused,
+        inWallet: session.status === 'issued',
         title: record.display.title,
         graduationDate: record.display.graduationDate ?? null,
         totalCredits: record.display.totalCredits ?? null,
         courseCount: record.display.courseCount ?? null,
       })),
-      // Dev convenience when SMTP/Brevo is not configured.
-      message: sent.success
-        ? 'We have emailed you a link to add your credentials to your wallet.'
-        : 'Email delivery is not configured — use the link below to continue.',
+      message: allInWallet
+        ? 'These credentials are already in your wallet.'
+        : sent.success
+          ? 'We have emailed you a link to add your credentials to your wallet.'
+          : 'Email delivery is not configured — use the link below to continue.',
     });
   } catch (e) {
     res.status(400).json({ success: false, error: e.message });

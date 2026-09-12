@@ -45,6 +45,11 @@ function ClaimFlow() {
     setSelected(available[0]?.sessionId || null);
   }, []);
 
+  /** How a credential is named in messages: its kind, not its session id. */
+  function labelFor(sessionId: string | null) {
+    return (credentials || []).find((c) => c.sessionId === sessionId)?.label || 'credential';
+  }
+
   async function handleSendCode(e: React.FormEvent) {
     e.preventDefault();
     setBusy(true);
@@ -86,18 +91,23 @@ function ClaimFlow() {
       const r = await createAcademyOffer(selected, token);
       if (!r.success) throw new Error(r.error || 'Could not start the issuance');
       if (r.alreadyInWallet) {
+        // Idempotent by design: the wallet holds it already, so nothing is issued again.
         await loadCredentials(token);
-        setError('That credential is already in your wallet.');
+        setError(`Your ${labelFor(selected)} is already in your wallet.`);
         return;
       }
       setOffer({ qrDataUrl: r.qrDataUrl, offerUrl: r.offerUrl, appLinkUrl: r.appLinkUrl });
     } catch (err) {
       setError((err as Error).message);
+      // A failure for one credential must not stop the other: refresh the list so the
+      // student can see what is still available and try again.
+      await loadCredentials(token).catch(() => undefined);
     } finally {
       setBusy(false);
     }
   }
 
+  const selectedCredential = (credentials || []).find((c) => c.sessionId === selected) || null;
   const step = offer ? 3 : credentials ? 2 : codeSent ? 2 : 1;
 
   return (
@@ -211,7 +221,11 @@ function ClaimFlow() {
                 </p>
               </div>
             ) : (
-              <div style={{ display: 'grid', gap: 14, marginBottom: 26 }}>
+              <div
+                role="radiogroup"
+                aria-label="Choose a credential to add to your wallet"
+                style={{ display: 'grid', gap: 14, marginBottom: 26 }}
+              >
                 {credentials.map((c) => {
                   const isSelected = selected === c.sessionId;
                   return (
@@ -222,13 +236,17 @@ function ClaimFlow() {
                     >
                       <input
                         className="checkbox"
-                        type="checkbox"
+                        type="radio"
+                        name="credential"
+                        value={c.sessionId}
                         checked={isSelected}
                         disabled={c.inWallet}
                         onChange={() => !c.inWallet && setSelected(c.sessionId)}
                       />
                       <div style={{ flex: 1 }}>
-                        <h3>{c.title}</h3>
+                        <h3>
+                          {c.title} <span className="badge kind">{c.label}</span>
+                        </h3>
                         <div className="meta">
                           {c.institution}
                           {c.degreeLevel ? ` · ${c.degreeLevel}` : ''}
@@ -248,19 +266,23 @@ function ClaimFlow() {
             )}
 
             {error && (
-              <div className="notice err" style={{ marginBottom: 18 }}>
+              <div className="notice err" role="alert" style={{ marginBottom: 18 }}>
                 {error}
               </div>
             )}
 
-            <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
+            <div style={{ display: 'flex', gap: 12, alignItems: 'center', flexWrap: 'wrap' }}>
               <button
                 type="button"
                 className="btn btn-dark"
                 onClick={handleStartIssuance}
                 disabled={busy || !selected}
               >
-                {busy ? 'Preparing…' : 'Start issuance'}
+                {busy
+                  ? 'Preparing…'
+                  : selectedCredential
+                    ? `Add ${selectedCredential.label} to wallet`
+                    : 'Add to wallet'}
               </button>
               <span className="muted">You must accept the terms to continue.</span>
             </div>

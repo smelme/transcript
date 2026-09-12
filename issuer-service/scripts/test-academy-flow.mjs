@@ -250,5 +250,57 @@ check(
   JSON.stringify((unknownChoice.credentials || []).map((c) => `${c.kind}:${c.docType}`)),
 );
 
+// 8. Asking twice must not mint a second copy of a credential the student already holds.
+const repeatEmail = `repeat-${Date.now()}@example.com`;
+const firstRequest = (await call('POST', '/academy/requests', {
+  email: repeatEmail,
+  include: 'both',
+})).data;
+check('a first request creates both kinds', (firstRequest.credentials || []).length === 2);
+check(
+  'nothing is reused on a first request',
+  (firstRequest.credentials || []).every((c) => c.reused === false),
+  JSON.stringify((firstRequest.credentials || []).map((c) => c.reused)),
+);
+
+const repeatRequest = (await call('POST', '/academy/requests', {
+  email: repeatEmail,
+  include: 'both',
+})).data;
+check(
+  'asking again reuses the same two credentials',
+  JSON.stringify((repeatRequest.credentials || []).map((c) => c.sessionId)) ===
+    JSON.stringify((firstRequest.credentials || []).map((c) => c.sessionId)),
+  JSON.stringify((repeatRequest.credentials || []).map((c) => c.sessionId)),
+);
+check(
+  'and says each was already prepared',
+  (repeatRequest.credentials || []).every((c) => c.reused === true),
+  JSON.stringify((repeatRequest.credentials || []).map((c) => c.reused)),
+);
+
+const repeatOtp = (await call('POST', '/auth/otp', { email: repeatEmail })).data;
+const repeatToken = (await call('POST', '/auth/token', { email: repeatEmail, otp: repeatOtp.otp })).data;
+const repeatList = (await call('GET', '/academy/credentials', null, {
+  authorization: `Bearer ${repeatToken.accessToken}`,
+})).data;
+check(
+  'the wallet is offered two credentials, not four',
+  (repeatList.credentials || []).length === 2,
+  String((repeatList.credentials || []).length),
+);
+
+const narrower = (await call('POST', '/academy/requests', {
+  email: repeatEmail,
+  include: 'transcript',
+})).data;
+check(
+  'asking for a subset touches only that kind',
+  (narrower.credentials || []).length === 1 &&
+    narrower.credentials[0].kind === 'transcript' &&
+    narrower.credentials[0].reused === true,
+  JSON.stringify(narrower.credentials || []),
+);
+
 console.log(failures === 0 ? '\nACADEMY_FLOW_PASSED' : `\n${failures} CHECK(S) FAILED`);
 process.exit(failures === 0 ? 0 : 1);

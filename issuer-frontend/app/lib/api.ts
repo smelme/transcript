@@ -128,14 +128,43 @@ export interface AcademyRequestResult {
   emailSent?: boolean;
   sessionId?: string;
   credential?: { title?: string; graduationDate?: string };
+  /** Everything the issuer prepared for this request, one entry per credential. */
+  credentials?: AcademyPreparedCredential[];
   message?: string;
   error?: string;
+}
+
+/**
+ * What the applicant asks to hold. `both` is an explicit choice rather than a side effect
+ * of selecting two things, and anything unrecognised behaves as `qualification`.
+ */
+export type CredentialChoice = 'qualification' | 'transcript' | 'both';
+
+/** One credential the issuer has prepared and is waiting for the holder to claim. */
+export interface AcademyPreparedCredential {
+  sessionId: string;
+  kind: string;
+  label: string;
+  docType: string;
+  academicNamespace: string;
+  /** True when this request matched a credential already prepared: nothing new was created. */
+  reused: boolean;
+  inWallet: boolean;
+  title: string;
+  graduationDate?: string | null;
+  totalCredits?: number | null;
+  courseCount?: number | null;
 }
 
 export interface AcademyCredential {
   sessionId: string;
   status: string;
   inWallet: boolean;
+  /** The kind, derived from the academic namespace: both kinds share the photo-ID docType. */
+  kind: string;
+  label: string;
+  docType: string;
+  academicNamespaces: string[];
   title: string;
   institution: string;
   degreeLevel?: string | null;
@@ -163,6 +192,7 @@ export interface AcademyOfferResult {
 export function requestCredentials(payload: {
   email: string;
   fullName?: string;
+  include?: CredentialChoice;
 }): Promise<AcademyRequestResult> {
   return request('/academy/requests', { method: 'POST', body: JSON.stringify(payload) });
 }

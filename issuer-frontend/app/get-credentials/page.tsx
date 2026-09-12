@@ -2,11 +2,31 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
-import { requestCredentials, type AcademyRequestResult } from '../lib/api';
+import { requestCredentials, type AcademyRequestResult, type CredentialChoice } from '../lib/api';
+
+/** The three choices, each with the one-line description of what it holds. */
+const CHOICES: { value: CredentialChoice; label: string; description: string }[] = [
+  {
+    value: 'qualification',
+    label: 'Qualification certificate',
+    description: 'Your degree, the programme and your graduation date.',
+  },
+  {
+    value: 'transcript',
+    label: 'Academic transcript',
+    description: 'Every module you completed, with its credits and your overall result.',
+  },
+  {
+    value: 'both',
+    label: 'Both',
+    description: 'Two credentials, held separately so you can present one without the other.',
+  },
+];
 
 export default function GetCredentialsPage() {
   const [email, setEmail] = useState('');
   const [fullName, setFullName] = useState('');
+  const [include, setInclude] = useState<CredentialChoice>('qualification');
   const [busy, setBusy] = useState(false);
   const [result, setResult] = useState<AcademyRequestResult | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -17,7 +37,7 @@ export default function GetCredentialsPage() {
     setError(null);
     setResult(null);
     try {
-      const r = await requestCredentials({ email, fullName: fullName || undefined });
+      const r = await requestCredentials({ email, fullName: fullName || undefined, include });
       if (r.success) setResult(r);
       else setError(r.error || 'We could not prepare your credentials.');
     } catch (err) {
@@ -72,6 +92,35 @@ export default function GetCredentialsPage() {
                 </div>
               </div>
 
+              <fieldset style={{ border: 0, padding: 0, margin: '24px 0 0' }}>
+                <legend style={{ padding: 0, fontWeight: 600, fontSize: 15, marginBottom: 12 }}>
+                  What would you like to receive?
+                </legend>
+                <div style={{ display: 'grid', gap: 12 }}>
+                  {CHOICES.map((choice) => (
+                    <label
+                      key={choice.value}
+                      className={`credential-card${include === choice.value ? ' selected' : ''}`}
+                    >
+                      <input
+                        className="checkbox"
+                        type="radio"
+                        name="include"
+                        value={choice.value}
+                        checked={include === choice.value}
+                        onChange={() => setInclude(choice.value)}
+                      />
+                      <span style={{ flex: 1 }}>
+                        <strong style={{ display: 'block', fontSize: 15, marginBottom: 4 }}>
+                          {choice.label}
+                        </strong>
+                        <span className="meta">{choice.description}</span>
+                      </span>
+                    </label>
+                  ))}
+                </div>
+              </fieldset>
+
               {error && (
                 <div className="notice err" style={{ marginTop: 20 }}>
                   {error}
@@ -91,26 +140,39 @@ export default function GetCredentialsPage() {
         )}
 
         {result && (
-          <div className="panel">
+          <div className="panel" aria-live="polite">
             <div className="notice ok" style={{ marginBottom: 20 }}>
               {result.emailSent
                 ? `We have emailed a secure link to ${result.email}.`
                 : 'Your credentials are ready. Email delivery is not configured, so use the link below.'}
             </div>
 
-            {result.credential?.title && (
-              <dl className="definition-list" style={{ marginBottom: 22 }}>
-                <dt>Prepared for</dt>
-                <dd>{result.email}</dd>
-                <dt>Credential</dt>
-                <dd>{result.credential.title}</dd>
-                {result.credential.graduationDate && (
-                  <>
-                    <dt>Graduated</dt>
-                    <dd>{result.credential.graduationDate}</dd>
-                  </>
-                )}
-              </dl>
+            <dl className="definition-list" style={{ marginBottom: 18 }}>
+              <dt>Prepared for</dt>
+              <dd>{result.email}</dd>
+            </dl>
+
+            {result.credentials && result.credentials.length > 0 && (
+              <ul
+                style={{ listStyle: 'none', padding: 0, margin: '0 0 22px', display: 'grid', gap: 10 }}
+              >
+                {result.credentials.map((credential) => (
+                  <li
+                    key={credential.sessionId}
+                    style={{ display: 'flex', gap: 10, alignItems: 'baseline', flexWrap: 'wrap' }}
+                  >
+                    <span className="badge kind">{credential.label}</span>
+                    <span>{credential.title}</span>
+                    {credential.inWallet ? (
+                      <span className="badge ok">Already in your wallet</span>
+                    ) : (
+                      credential.reused && (
+                        <span className="muted">Already prepared — nothing new was issued</span>
+                      )
+                    )}
+                  </li>
+                ))}
+              </ul>
             )}
 
             {result.claimUrl && (

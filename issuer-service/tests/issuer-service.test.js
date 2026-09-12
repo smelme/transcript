@@ -701,3 +701,139 @@ test('Issuer Service - Non-Existent Filter Returns Empty', () => {
   const result = issuer.listCredentials({ studentId: 'NONEXISTENT' });
   assert.strictEqual(result.credentials.length, 0);
 });
+
+// ── Academy requests: one credential per kind, however often it is asked for ──
+//
+// The student chooses what to hold, and asking twice must not mint a second copy.
+// The academic namespace is what identifies a kind, since both kinds share the
+// photo-ID docType - so that, not the docType, is what the lookup matches on.
+
+const sessionsFor = (studentId) =>
+  getDb().prepare('SELECT * FROM issuance_sessions WHERE student_id = ?').all(studentId);
+
+const dropSessionsFor = (studentId) =>
+  getDb().prepare('DELETE FROM issuance_sessions WHERE student_id = ?').run(studentId);
+
+const academySession = (issuer, studentId, record) =>
+  issuer.createIssuanceSession({
+    studentId,
+    institution: 'Smart Academy',
+    credentialData: record.credentialData,
+    display: record.display,
+  });
+
+test('Academy request - a repeat request reuses the credential already prepared', () => {
+  const issuer = new IssuerService();
+  const studentId = 'SA-DEDUPE-1';
+  dropSessionsFor(studentId);
+  const { records } = generateAcademicRecord({
+    institution: 'Smart Academy',
+    studentId,
+    include: 'both',
+  });
+  const prepared = records.map((record) => academySession(issuer, studentId, record));
+  assert.strictEqual(sessionsFor(studentId).length, 2);
+
+  const found = records.map((record) =>
+    issuer.findIssuanceSessionFor({
+      studentId,
+      institution: 'Smart Academy',
+      academicNamespace: record.academicNamespace,
+    }),
+  );
+
+  assert.deepStrictEqual(
+    found.map((session) => session.sessionId),
+    prepared.map((session) => session.sessionId),
+    'the same sessions come back, in the order they were requested',
+  );
+  assert.strictEqual(sessionsFor(studentId).length, 2, 'and nothing duplicate was created');
+  dropSessionsFor(studentId);
+});
+
+test('Academy request - the namespace decides which credential is reused', () => {
+  const issuer = new IssuerService();
+  const studentId = 'SA-DEDUPE-2';
+  dropSessionsFor(studentId);
+  const { records } = generateAcademicRecord({
+    institution: 'Smart Academy',
+    studentId,
+    include: 'transcript',
+  });
+  const transcript = academySession(issuer, studentId, records[0]);
+
+  assert.strictEqual(
+    issuer.findIssuanceSessionFor({
+      studentId,
+      institution: 'Smart Academy',
+      academicNamespace: 'org.iso.23220.education.transcript.1',
+    }).sessionId,
+    transcript.sessionId,
+  );
+  assert.strictEqual(
+    issuer.findIssuanceSessionFor({
+      studentId,
+      institution: 'Smart Academy',
+      academicNamespace: 'org.iso.23220.education.qualification.1',
+    }),
+    undefined,
+    'a kind the student does not hold is not answered with the kind they do',
+  );
+  assert.strictEqual(
+    issuer.findIssuanceSessionFor({
+      studentId: 'SA-SOMEONE-ELSE',
+      institution: 'Smart Academy',
+      academicNamespace: 'org.iso.23220.education.transcript.1',
+    }),
+    undefined,
+    'another student is never answered with this one',
+  );
+  dropSessionsFor(studentId);
+});
+
+test('Academy request - a credential already in the wallet is reported, not re-issued', () => {
+  const issuer = new IssuerService();
+  const studentId = 'SA-DEDUPE-3';
+  dropSessionsFor(studentId);
+  const { records } = generateAcademicRecord({
+    institution: 'Smart Academy',
+    studentId,
+    include: 'qualification',
+  });
+  const session = academySession(issuer, studentId, records[0]);
+  session.status = 'issued';
+  issuer._persistIssuanceSession(session);
+
+  const found = issuer.findIssuanceSessionFor({
+    studentId,
+    institution: 'Smart Academy',
+    academicNamespace: 'org.iso.23220.education.qualification.1',
+  });
+  assert.strictEqual(found.sessionId, session.sessionId);
+  assert.strictEqual(found.status, 'issued');
+  assert.strictEqual(sessionsFor(studentId).length, 1, 'self-service re-issue is not offered');
+  dropSessionsFor(studentId);
+});
+
+test('Academy request - linking a session attaches the account and keeps the credential', () => {
+  const issuer = new IssuerService();
+  const studentId = 'SA-DEDUPE-4';
+  dropSessionsFor(studentId);
+  const { records } = generateAcademicRecord({
+    institution: 'Smart Academy',
+    studentId,
+    include: 'transcript',
+  });
+  const session = academySession(issuer, studentId, records[0]);
+  assert.strictEqual(session.email, null, 'created before the holder signed in');
+
+  issuer.linkIssuanceSession(session.sessionId, { email: ' Student@Example.edu ', sub: 'sub-9' });
+
+  // Read back through a fresh service, so this asserts what was persisted.
+  const reloaded = new IssuerService().getIssuanceSession(session.sessionId);
+  assert.strictEqual(reloaded.email, 'student@example.edu', 'normalised and persisted');
+  assert.strictEqual(reloaded.sub, 'sub-9');
+  assert.strictEqual(reloaded.sessionId, session.sessionId, 'the offer link still resolves');
+  assert.ok(reloaded.credentialData.education_transcript, 'the claims are untouched');
+  dropSessionsFor(studentId);
+});
