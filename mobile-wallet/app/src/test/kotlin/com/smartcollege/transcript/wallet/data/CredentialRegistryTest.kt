@@ -102,14 +102,60 @@ class CredentialRegistryTest {
         val entry = CredentialRegistry.buildCredentialEntry(
             credentialId = "6ab66df2-5fee-4481-9e76-7146beee511b",
             mdocBase64Url = academicMdoc(),
-            summary = CredentialSummary("Samuel Melese", "Smart Academy", "Master", "2025-06-30"),
+            summary = CredentialSummary(
+                fullName = "Samuel Melese",
+                institution = "Smart Academy",
+                degreeLevel = "Master",
+                graduationDate = "2025-06-30",
+                kind = AcademicNamespaces.KIND_QUALIFICATION,
+            ),
         )
 
-        assertEquals("Samuel Melese", entry["title"])
-        assertEquals("Smart Academy", entry["subtitle"])
+        // The kind leads, because both kinds are photo-ID documents and the chooser is where
+        // the holder decides which one to present.
+        assertEquals("Qualification certificate - Samuel Melese", entry["title"])
+        assertEquals("Smart Academy · Master · Graduated 2025-06-30", entry["subtitle"])
         assertEquals(
             "6ab66df2-5fee-4481-9e76-7146beee511b",
             (entry["mdoc"] as Map<*, *>)["documentId"],
+        )
+    }
+
+    @Test
+    fun `labels a transcript entry with the figures a transcript holds`() {
+        val entry = CredentialRegistry.buildCredentialEntry(
+            credentialId = "8af0f2b1-0000-4000-8000-000000000001",
+            mdocBase64Url = academicMdoc(),
+            summary = CredentialSummary(
+                fullName = "Tessa Novak",
+                institution = "Smart Academy",
+                kind = AcademicNamespaces.KIND_TRANSCRIPT,
+                courseCount = 3,
+                totalCredits = 24,
+            ),
+        )
+
+        assertEquals("Academic transcript - Tessa Novak", entry["title"])
+        assertEquals(
+            "a transcript credential holds no award date, so it is described by what it has",
+            "Smart Academy · 3 courses · 24 credits",
+            entry["subtitle"],
+        )
+    }
+
+    @Test
+    fun `an unlabelled credential is shown as an academic credential`() {
+        val entry = CredentialRegistry.buildCredentialEntry(
+            credentialId = "8af0f2b1-0000-4000-8000-000000000002",
+            mdocBase64Url = academicMdoc(),
+            summary = CredentialSummary(fullName = "Someone"),
+        )
+
+        assertEquals("Academic credential - Someone", entry["title"])
+        assertEquals(
+            "no institution and no kind is stated as such rather than guessed at",
+            "Academic credential",
+            entry["subtitle"],
         )
     }
 

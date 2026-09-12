@@ -53,6 +53,7 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.smartcollege.transcript.wallet.data.AcademicNamespaces
 import com.smartcollege.transcript.wallet.data.CredentialSummary
 import com.smartcollege.transcript.wallet.data.WalletRepository
 import kotlinx.coroutines.launch
@@ -305,7 +306,22 @@ private fun CredentialCard(
     modifier: Modifier = Modifier,
 ) {
     val institution = summary?.institution?.takeIf { it.isNotBlank() } ?: "Smart Academy"
-    val title = summary?.degreeLevel?.takeIf { it.isNotBlank() } ?: "Credential"
+    // The kind is the card's title: both kinds are photo-ID documents, so the label is the
+    // only thing that tells the holder which credential they are looking at.
+    val kind = summary?.kind ?: AcademicNamespaces.KIND_UNKNOWN
+    val title = AcademicNamespaces.labelOf(kind)
+    val isTranscript = kind == AcademicNamespaces.KIND_TRANSCRIPT
+    val detail = if (isTranscript) {
+        listOfNotNull(
+            summary?.courseCount?.takeIf { it > 0 }?.let { "$it courses" },
+            summary?.totalCredits?.takeIf { it > 0 }?.let { "$it credits" },
+        ).joinToString(" · ")
+    } else {
+        listOfNotNull(
+            summary?.degreeLevel?.takeIf { it.isNotBlank() },
+            summary?.fieldOfStudy?.takeIf { it.isNotBlank() },
+        ).joinToString(" · ")
+    }
     val issuedDate = formatDate(summary?.graduationDate)
     val cardColor = institutionColor(institution)
 
@@ -336,13 +352,16 @@ private fun CredentialCard(
                 color = Color.White,
                 fontWeight = FontWeight.Bold,
             )
-            Spacer(Modifier.height(6.dp))
-            Text(
-                credentialId,
-                style = MaterialTheme.typography.bodyMedium,
-                color = Color.White.copy(alpha = 0.75f),
-            )
+            if (detail.isNotBlank()) {
+                Spacer(Modifier.height(6.dp))
+                Text(
+                    detail,
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = Color.White.copy(alpha = 0.85f),
+                )
+            }
             if (issuedDate != null) {
+                Spacer(Modifier.height(2.dp))
                 Text(
                     "Issued $issuedDate",
                     style = MaterialTheme.typography.bodySmall,
@@ -407,7 +426,19 @@ fun CredentialDetailScreen(
 
     val personName = summary?.fullName?.takeIf { it.isNotBlank() } ?: "Credential holder"
     val institution = summary?.institution?.takeIf { it.isNotBlank() } ?: "Smart Academy"
-    val title = summary?.degreeLevel?.takeIf { it.isNotBlank() } ?: "Credential"
+    val kind = summary?.kind ?: AcademicNamespaces.KIND_UNKNOWN
+    val isTranscript = kind == AcademicNamespaces.KIND_TRANSCRIPT
+    val title = if (isTranscript) {
+        listOfNotNull(
+            summary?.courseCount?.takeIf { it > 0 }?.let { "$it courses" },
+            summary?.totalCredits?.takeIf { it > 0 }?.let { "$it credits" },
+        ).joinToString(" · ")
+    } else {
+        listOfNotNull(
+            summary?.degreeLevel?.takeIf { it.isNotBlank() },
+            summary?.fieldOfStudy?.takeIf { it.isNotBlank() },
+        ).joinToString(" · ")
+    }
     val issuedDate = formatDate(summary?.graduationDate)
     val cardColor = institutionColor(institution)
 
@@ -448,17 +479,26 @@ fun CredentialDetailScreen(
                     }
                     Spacer(Modifier.height(16.dp))
                     Text(
+                        AcademicNamespaces.labelOf(kind),
+                        style = MaterialTheme.typography.labelLarge,
+                        color = Color.White.copy(alpha = 0.85f),
+                        fontWeight = FontWeight.Bold,
+                    )
+                    Spacer(Modifier.height(6.dp))
+                    Text(
                         personName,
                         style = MaterialTheme.typography.headlineMedium,
                         color = Color.White,
                         fontWeight = FontWeight.Bold,
                     )
-                    Spacer(Modifier.height(6.dp))
-                    Text(
-                        title,
-                        style = MaterialTheme.typography.titleMedium,
-                        color = Color.White.copy(alpha = 0.9f),
-                    )
+                    if (title.isNotBlank()) {
+                        Spacer(Modifier.height(6.dp))
+                        Text(
+                            title,
+                            style = MaterialTheme.typography.titleMedium,
+                            color = Color.White.copy(alpha = 0.9f),
+                        )
+                    }
                     Spacer(Modifier.height(18.dp))
                     Text(
                         credentialId,
@@ -489,10 +529,20 @@ fun CredentialDetailScreen(
                 elevation = CardDefaults.cardElevation(defaultElevation = 1.dp),
             ) {
                 Column(Modifier.padding(vertical = 6.dp)) {
+                    DetailRow("Kind", AcademicNamespaces.labelOf(kind))
                     DetailRow("Name", summary?.fullName)
                     DetailRow("Institution", summary?.institution)
-                    DetailRow("Degree level", summary?.degreeLevel)
-                    DetailRow("Graduation date", summary?.graduationDate)
+                    if (isTranscript) {
+                        // A transcript credential carries no qualification namespace, so these
+                        // are the figures it actually holds rather than blank award fields.
+                        DetailRow("Courses", summary?.courseCount?.takeIf { it > 0 }?.toString())
+                        DetailRow("Total credits", summary?.totalCredits?.takeIf { it > 0 }?.toString())
+                        DetailRow("Status", summary?.completionStatus)
+                    } else {
+                        DetailRow("Degree level", summary?.degreeLevel)
+                        DetailRow("Field of study", summary?.fieldOfStudy)
+                        DetailRow("Graduation date", summary?.graduationDate)
+                    }
                     DetailRow("Credential ID", credentialId)
                 }
             }
@@ -594,8 +644,28 @@ fun ShareFlowScreen(
     onDone: () -> Unit,
     onBack: () -> Unit,
 ) {
+    // Only the categories this credential actually holds may be offered: the issuer refuses
+    // the rest, and offering them would have the holder pick something that cannot be sent.
+    val summary = remember(credentialId) { repository.credentialSummary(credentialId) }
+    val availableCategories = remember(summary?.kind) {
+        val held = AcademicNamespaces.namespacesOf(summary?.kind ?: AcademicNamespaces.KIND_UNKNOWN).toSet()
+        ShareCategories.filter { category ->
+            when (category.id) {
+                "qualification" -> AcademicNamespaces.QUALIFICATION in held
+                "transcript" -> AcademicNamespaces.TRANSCRIPT in held
+                "personal" -> true
+                else -> false
+            }
+        }
+    }
     var step by remember { mutableStateOf(0) } // 0 = disclosure, 1 = recipient, 2 = success
-    var selected by remember { mutableStateOf(setOf<String>()) }
+    // Start with the credential's own academic section, so the holder does not have to guess
+    // which of the offered sections is the one they are sharing.
+    var selected by remember(credentialId) {
+        mutableStateOf(
+            availableCategories.map { it.id }.filter { it != "personal" }.toSet(),
+        )
+    }
     var recipientName by remember { mutableStateOf("") }
     var recipientEmail by remember { mutableStateOf("") }
     var message by remember { mutableStateOf("") }
@@ -660,7 +730,7 @@ fun ShareFlowScreen(
                         color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.6f),
                     )
                     Spacer(Modifier.height(16.dp))
-                    for (category in ShareCategories) {
+                    for (category in availableCategories) {
                         Card(
                             modifier = Modifier
                                 .fillMaxWidth()

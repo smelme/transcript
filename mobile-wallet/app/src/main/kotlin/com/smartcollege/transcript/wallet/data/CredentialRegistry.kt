@@ -17,7 +17,7 @@ object CredentialRegistry {
 
     private const val TAG = "CredentialRegistry"
 
-    private const val ACADEMIC_DOC_TYPE = "org.iso.23220.photoid.1"
+    private const val ACADEMIC_DOC_TYPE = AcademicNamespaces.PHOTO_ID
     private const val TYPE_LEGACY = "com.credman.IdentityCredential"
     private const val TYPE_DIGITAL = "androidx.credentials.TYPE_DIGITAL_CREDENTIAL"
 
@@ -29,6 +29,10 @@ object CredentialRegistry {
         "institution_name" to "Institution",
         "degree_level" to "Degree level",
         "graduation_date" to "Graduation date",
+        "student_id" to "Student ID",
+        "total_credits" to "Total credits",
+        "status" to "Status",
+        "courses" to "Courses",
     )
 
     /** Re-publishes the given credentials (already scoped to the current owner) to the system registry. Safe to call repeatedly. */
@@ -86,10 +90,52 @@ object CredentialRegistry {
             // One unusable credential must not abort the whole registration: a
             // failure here used to leave the system registry stale, so the chooser
             // kept showing an outdated set of credentials.
-            runCatching { buildCredentialEntry(id, mdoc, store.credentialSummary(id)) }
+            runCatching { buildCredentialEntry(id, mdoc, summaryOf(store, id, mdoc)) }
                 .onFailure { Log.w(TAG, "skipping $id: could not build registry entry: ${it.message}") }
                 .getOrNull()
         }
+
+    /**
+     * The summary to publish for a credential. A summary written before the kinds existed
+     * has no kind, so it is re-read from the mdoc once and saved: without that, an older
+     * transcript would be published as an unlabelled academic credential for ever.
+     */
+    private fun summaryOf(store: SecureStore, credentialId: String, mdocBase64Url: String): CredentialSummary? {
+        val stored = store.credentialSummary(credentialId)
+        if (stored != null && stored.kind != AcademicNamespaces.KIND_UNKNOWN) return stored
+        val parsed = MdocParser.readCredentialSummary(mdocBase64Url)
+        if (parsed != null) store.saveCredentialSummary(credentialId, parsed)
+        return parsed ?: stored
+    }
+
+    /**
+     * What the chooser shows for one credential: the kind first, because both kinds are
+     * photo-ID documents and the holder must be able to tell which one they are presenting,
+     * then who it belongs to.
+     */
+    internal fun entryTitle(summary: CredentialSummary?): String {
+        val kindLabel = AcademicNamespaces.labelOf(summary?.kind ?: AcademicNamespaces.KIND_UNKNOWN)
+        val name = summary?.fullName?.takeIf { it.isNotBlank() }
+        return listOfNotNull(kindLabel, name).joinToString(" - ")
+    }
+
+    /**
+     * The line beneath it: where the credential came from, then what distinguishes its kind -
+     * a transcript shows how much was studied, a qualification what was awarded and when.
+     */
+    internal fun entrySubtitle(summary: CredentialSummary?): String {
+        if (summary == null) return "Academic credential"
+        val parts = mutableListOf<String>()
+        summary.institution.takeIf { it.isNotBlank() }?.let { parts += it }
+        if (summary.kind == AcademicNamespaces.KIND_TRANSCRIPT) {
+            if (summary.courseCount > 0) parts += "${summary.courseCount} courses"
+            if (summary.totalCredits > 0) parts += "${summary.totalCredits} credits"
+        } else {
+            summary.degreeLevel.takeIf { it.isNotBlank() }?.let { parts += it }
+            summary.graduationDate.takeIf { it.isNotBlank() }?.let { parts += "Graduated $it" }
+        }
+        return parts.joinToString(" · ").ifBlank { "Academic credential" }
+    }
 
     /** Internal (not private) so it can be exercised from unit tests without a device. */
     internal fun buildCredentialEntry(
@@ -118,8 +164,8 @@ object CredentialRegistry {
             if (nsMap.isNotEmpty()) namespacesCbor[ns as String] = nsMap
         }
 
-        val title = summary?.fullName?.takeIf { it.isNotBlank() } ?: "Academic credential"
-        val subtitle = summary?.institution?.takeIf { it.isNotBlank() } ?: "Academic credential"
+        val title = entryTitle(summary)
+        val subtitle = entrySubtitle(summary)
 
         return mapOf<String, Any?>(
             "title" to title,

@@ -74,7 +74,8 @@ class WalletRepository(private val client: IssuerClient, private val store: Secu
     }
 
     private fun CredentialSummary.hasDisplayFields(): Boolean =
-        fullName.isNotBlank() || institution.isNotBlank() || degreeLevel.isNotBlank() || graduationDate.isNotBlank()
+        kind != AcademicNamespaces.KIND_UNKNOWN ||
+            fullName.isNotBlank() || institution.isNotBlank() || degreeLevel.isNotBlank() || graduationDate.isNotBlank()
 
     /**
      * Step 1 of sharing: ask the issuer to prepare a one-time verifier request

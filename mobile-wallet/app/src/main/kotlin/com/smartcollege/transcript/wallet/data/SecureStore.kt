@@ -204,6 +204,11 @@ class SecureStore(context: Context) {
                 .put("institution", summary.institution)
                 .put("degreeLevel", summary.degreeLevel)
                 .put("graduationDate", summary.graduationDate)
+                .put("kind", summary.kind)
+                .put("fieldOfStudy", summary.fieldOfStudy)
+                .put("courseCount", summary.courseCount)
+                .put("totalCredits", summary.totalCredits)
+                .put("completionStatus", summary.completionStatus)
                 .toString()
         ).apply()
     }
@@ -217,6 +222,13 @@ class SecureStore(context: Context) {
                 institution = value.optString("institution"),
                 degreeLevel = value.optString("degreeLevel"),
                 graduationDate = value.optString("graduationDate"),
+                // A summary written before the kinds existed has no kind field, so it is
+                // read as unknown rather than assumed to be the qualification it was not.
+                kind = value.optString("kind").ifBlank { AcademicNamespaces.KIND_UNKNOWN },
+                fieldOfStudy = value.optString("fieldOfStudy"),
+                courseCount = value.optInt("courseCount"),
+                totalCredits = value.optInt("totalCredits"),
+                completionStatus = value.optString("completionStatus"),
             )
         }.getOrNull()
     }

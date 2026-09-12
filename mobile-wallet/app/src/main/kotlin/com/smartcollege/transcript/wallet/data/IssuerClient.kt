@@ -48,6 +48,16 @@ data class CredentialSummary(
     val institution: String = "",
     val degreeLevel: String = "",
     val graduationDate: String = "",
+    /**
+     * Which academic credential this is, derived from the namespace it holds. Both kinds
+     * are issued under the photo-ID docType, so this is the only honest discriminator.
+     */
+    val kind: String = AcademicNamespaces.KIND_UNKNOWN,
+    val fieldOfStudy: String = "",
+    /** From the transcript namespace, which a qualification credential does not carry. */
+    val courseCount: Int = 0,
+    val totalCredits: Int = 0,
+    val completionStatus: String = "",
 )
 
 @Serializable

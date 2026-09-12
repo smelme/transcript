@@ -39,6 +39,7 @@ import androidx.credentials.exceptions.GetCredentialUnknownException
 import androidx.credentials.provider.CallingAppInfo
 import androidx.credentials.provider.PendingIntentHandler
 import androidx.fragment.app.FragmentActivity
+import com.smartcollege.transcript.wallet.data.PresentationEligibility
 import com.smartcollege.transcript.wallet.data.SecureStore
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.delay
@@ -128,10 +129,17 @@ class PresentationActivity : FragmentActivity() {
         val request = runCatching {
             PendingIntentHandler.retrieveProviderGetCredentialRequest(intent)
         }.getOrNull()
+        // Which credential may answer is decided by what was asked for, not by which one
+        // happens to be stored first: both kinds are photo-ID documents, so the requested
+        // namespaces are the only thing that separates a transcript from a qualification.
+        val requiredNamespaces = runCatching { requiredNamespacesFrom(request) }.getOrDefault(emptySet())
         val credentialId = request
             ?.let { selectedCredentialId(it, credentialIds) }
-            ?: credentialIds.firstOrNull()
-        Log.d(TAG, "credentialIds=$credentialIds selected=$credentialId")
+            ?: eligibleCredentialId(store, credentialIds, requiredNamespaces)
+        Log.d(
+            TAG,
+            "credentialIds=$credentialIds requiredNamespaces=${requiredNamespaces.sorted()} selected=$credentialId",
+        )
 
         // NOTE: the mdoc itself is NOT read here. Its bytes are encrypted with a
         // user-auth-bound Keystore key, so they are only decryptable immediately
@@ -140,7 +148,14 @@ class PresentationActivity : FragmentActivity() {
             MaterialTheme {
                 Surface(modifier = Modifier.fillMaxSize()) {
                     if (credentialId == null) {
-                        MissingCredentialScreen(onClose = { finishWithFailure("No academic credential stored") })
+                        MissingCredentialScreen(
+                            onClose = {
+                                finishWithFailure(
+                                    if (credentialIds.isEmpty()) "No academic credential stored"
+                                    else "None of your stored credentials can answer this request",
+                                )
+                            },
+                        )
                     } else {
                         PresentmentFlow(
                             activity = this,
@@ -151,6 +166,48 @@ class PresentationActivity : FragmentActivity() {
                 }
             }
         }
+    }
+
+    /**
+     * The namespaces the relying party asked for, read from the CBOR device request.
+     *
+     * They are what decides which stored credential may answer: a request that names the
+     * transcript namespace is not satisfied by a qualification credential, even though both
+     * are issued under the photo-ID docType.
+     */
+    private fun requiredNamespacesFrom(
+        request: androidx.credentials.provider.ProviderGetCredentialRequest?,
+    ): Set<String> {
+        val option = request?.credentialOptions?.firstOrNull() as? GetDigitalCredentialOption
+            ?: return emptySet()
+        val root = Json.parseToJsonElement(option.requestJson).jsonObject
+        val orgIsoMdoc = root["requests"]?.jsonArray
+            ?.map { it.jsonObject }
+            ?.firstOrNull { it["protocol"]?.jsonPrimitive?.content == "org-iso-mdoc" }
+            ?: return emptySet()
+        val deviceRequest = orgIsoMdoc["data"]?.jsonObject
+            ?.get("deviceRequest")?.jsonPrimitive?.content
+            ?: return emptySet()
+        return MdocResponseBuilder.parseRequest(deviceRequest).requestedClaims.keys
+    }
+
+    /**
+     * The credential to present when the chooser named none: the first stored credential that
+     * can answer the request. Returns null when nothing can, so the caller fails with a clear
+     * message instead of presenting a credential that would disclose nothing.
+     */
+    private fun eligibleCredentialId(
+        store: SecureStore,
+        credentialIds: List<String>,
+        requiredNamespaces: Set<String>,
+    ): String? {
+        if (requiredNamespaces.isEmpty()) return credentialIds.firstOrNull()
+        val eligible = credentialIds.filter { id ->
+            val kind = store.credentialSummary(id)?.kind
+            kind != null && PresentationEligibility.satisfies(kind, requiredNamespaces)
+        }
+        Log.d(TAG, "credentials satisfying ${requiredNamespaces.sorted()}=$eligible")
+        return eligible.firstOrNull()
     }
 
     /**

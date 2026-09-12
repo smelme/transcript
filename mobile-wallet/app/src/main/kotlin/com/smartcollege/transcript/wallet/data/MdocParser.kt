@@ -2,31 +2,54 @@ package com.smartcollege.transcript.wallet.data
 
 import java.nio.ByteBuffer
 import java.util.Base64
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.jsonArray
 
 /**
  * Reads issuer-signed display claims from the stored mdoc. The data used by the
  * certificate card is never taken from a separate issuer response field.
  */
 object MdocParser {
-    private const val PHOTO_ID_NAMESPACE = "org.iso.23220.photoid.1"
-    private const val EDUCATION_NAMESPACE = "org.iso.23220.education.qualification.1"
 
     fun readCredentialSummary(mdocBase64url: String): CredentialSummary? = runCatching {
         val issuerSigned = CborDecoder(Base64.getUrlDecoder().decode(mdocBase64url)).read() as? Map<*, *>
             ?: return null
         val namespaces = issuerSigned["nameSpaces"] as? Map<*, *> ?: return null
-        val photoId = readNamespace(namespaces[PHOTO_ID_NAMESPACE])
-        val education = readNamespace(namespaces[EDUCATION_NAMESPACE])
+        // Which namespaces are present is what decides the kind: a transcript and a
+        // qualification are both photo-ID documents, so the docType cannot tell them apart.
+        val present = namespaces.keys.filterIsInstance<String>()
+        val photoId = readNamespace(namespaces[AcademicNamespaces.PHOTO_ID])
+        val qualification = readNamespace(namespaces[AcademicNamespaces.QUALIFICATION])
+        val transcript = readNamespace(namespaces[AcademicNamespaces.TRANSCRIPT])
 
         val givenName = photoId["given_name"] as? String
         val familyName = photoId["family_name"] as? String
         CredentialSummary(
             fullName = listOfNotNull(givenName, familyName).joinToString(" "),
-            institution = (education["institution_name"] ?: photoId["issuing_authority"]) as? String ?: "",
-            degreeLevel = education["degree_level"] as? String ?: "",
-            graduationDate = education["graduation_date"] as? String ?: "",
+            institution = (qualification["institution_name"] ?: photoId["issuing_authority"]) as? String ?: "",
+            degreeLevel = qualification["degree_level"] as? String ?: "",
+            graduationDate = qualification["graduation_date"] as? String ?: "",
+            kind = AcademicNamespaces.kindOf(present),
+            fieldOfStudy = qualification["field_of_study"] as? String ?: "",
+            courseCount = countCourses(transcript["courses"]),
+            totalCredits = wholeNumber(transcript["total_credits"]),
+            completionStatus = transcript["status"] as? String ?: "",
         )
     }.getOrNull()
+
+    /** The course list is one JSON string claim, so what a holder wants is how many it holds. */
+    private fun countCourses(value: Any?): Int {
+        val json = value as? String ?: return 0
+        return runCatching { Json.parseToJsonElement(json).jsonArray.size }.getOrDefault(0)
+    }
+
+    /** CBOR carries a number at whatever width it was written; credits are whole. */
+    private fun wholeNumber(value: Any?): Int = when (value) {
+        is Long -> value.toInt()
+        is Int -> value
+        is Double -> value.toInt()
+        else -> 0
+    }
 
     private fun readNamespace(value: Any?): Map<String, Any?> {
         val items = value as? List<*> ?: return emptyMap()
