@@ -1,7 +1,8 @@
 # P0-21: Transcript claim completeness
 
 **Priority:** P0 — the transcript is not interpretable without Tier 1
-**Status:** Blocked on a decision about the grading and credit model
+**Status:** Blocked on the institution's answers to `docs/analysis-discovery/transcript-model-facts.md`
+(sections A-E); Tier 2 additionally on F
 **Components:** Credential generator, mdoc builder, share categories, portal, wallet, Trust University RP
 **Analysis:** `docs/analysis-discovery/transcript-claims-gap-analysis.md` (ELMO/EuroLMAI pattern)
 
@@ -80,16 +81,16 @@ Decided before implementing, because it changes where every new element goes:
    earned), which of them came from elsewhere, and with what overall outcome.
 2. Every numeric mark is accompanied by its scheme, and no scale is assumed by the reader.
 3. The overall average states its range, so a reader can tell an A from a 9 out of 10.
-3. The aggregate elements can be disclosed without disclosing `courses`.
-4. Existing credentials are unaffected: no new element is required for a credential to verify,
+4. The aggregate elements can be disclosed without disclosing `courses`.
+5. Existing credentials are unaffected: no new element is required for a credential to verify,
    and the old free-text `status` remains readable where it was issued.
-5. The portal and the wallet show the programme and the outcome rather than internal codes.
-6. Trust University's registration page renders programme, period, credits and outcome from
+6. The portal and the wallet show the programme and the outcome rather than internal codes.
+7. Trust University's registration page renders programme, period, credits and outcome from
    the verified claims only.
-7. Revocation, status-list and selective-disclosure behaviour are unchanged.
-8. No value carries an ambiguous unit or scale: each states its scheme, and totals are per scheme.
-9. The shared core can be requested on its own, and the administrative-record namespace can be
-   requested on its own, without either depending on the other.
+8. Revocation, status-list and selective-disclosure behaviour are unchanged.
+9. No value carries an ambiguous unit or scale: each states its scheme, and totals are per scheme.
+10. The shared core can be requested on its own, and the administrative-record namespace can be
+    requested on its own, without either depending on the other.
 
 ## Explicit non-goals
 
@@ -100,17 +101,19 @@ Decided before implementing, because it changes where every new element goes:
 
 ## Dependencies and blockers
 
-- **Decision needed:** which grading and credit model Smart Academy actually uses (ECTS with a
-  10-point Dutch scale and 5.5 pass mark, or something else), whether the programme level is
-  EQF, the programme classification code (ISCED-F, or CIP for a US-facing transcript), and
-  whether the institution has a SCHAC/Erasmus code. The generator must not invent these; a wrong
-  scale is worse than none.
+- **Decision needed:** every fact in `docs/analysis-discovery/transcript-model-facts.md`. The
+  generator must not invent them; a wrong scale is worse than none, and the current generator
+  already mixes an invented 4.00-scale GPA with a 1-10 mark scale under one institution.
 - Tier 2 depends on the academy's academic record carrying the data (workload hours, course
   groupings, language of instruction), which it may not.
 - The US-derived items assume the registrar decides to carry them in the credential rather than
   relying on the presentation context (who it was presented to, when, and that the holder
   consented). Carrying them costs disclosure surface; leaving them out keeps the credential
-  narrower. This is a deliberate choice to record, not a default.
+  narrower. Recommendation (fact sheet section E): keep `document_status` and
+  `document_completeness`, which are properties of the credential, and let `issued_to`,
+  `release_method` and `request_reference` live with the presentation instead, since a reusable
+  credential is issued once and presented many times and any value written at issuance would be
+  stale by the second presentation.
 
 ## Delivery increments
 
