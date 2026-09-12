@@ -2,8 +2,9 @@
 
 **Priority:** P0 — the holder must be able to disclose a transcript outside an RP website
 **Status:** In progress — increments 1 and 2 are done and covered by
-`issuer-service/scripts/smoke-share-transcript.mjs` and `smoke-share.mjs`. Remaining: increment 3,
-the wallet share entry point, delivered with P0-20
+`issuer-service/scripts/smoke-share-transcript.mjs` and `smoke-share.mjs`. Increment 3, the wallet
+share entry point, is implemented with P0-20 (the share screen offers only the sections the
+credential holds, and its own academic section starts selected); what remains is a device run
 **Components:** Issuer share flow, wallet share entry point, share recipient page
 
 ## User story
