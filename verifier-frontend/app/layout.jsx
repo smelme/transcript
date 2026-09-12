@@ -17,6 +17,9 @@ export default function RootLayout({ children }) {
         <Script id="theme-init" strategy="beforeInteractive">
           {`(function(){try{var t=localStorage.getItem('theme');var d=t?t==='dark':window.matchMedia('(prefers-color-scheme: dark)').matches;document.documentElement.setAttribute('data-theme',d?'dark':'light');}catch(e){document.documentElement.setAttribute('data-theme','light');}})();`}
         </Script>
+        <a className="skip-link" href="#main">
+          Skip to content
+        </a>
         <div className="shell">
           <header className="navbar">
             <Link href="/" className="brand">
@@ -30,7 +33,7 @@ export default function RootLayout({ children }) {
             <Navigation />
             <ThemeToggle />
           </header>
-          <main className="container">{children}</main>
+          <main id="main" className="container">{children}</main>
           <footer className="footer">
             My Jobs credential verification &middot; powered by ISO 18013-5 mDOC
           </footer>

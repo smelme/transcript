@@ -11,6 +11,9 @@ export default function RootLayout({ children }) {
   return (
     <html lang="en">
       <body>
+        <a className="skip-link" href="#main">
+          Skip to content
+        </a>
         <header className="site-header">
           <div className="container header-inner">
             <Link href="/" className="brand">
@@ -20,14 +23,11 @@ export default function RootLayout({ children }) {
             <nav className="nav" aria-label="Primary">
               <Link href="/">Apply</Link>
               <Link href="/#how">How it works</Link>
-              <a href="https://github.com/openwallet-foundation/multipaz" rel="noreferrer">
-                About
-              </a>
             </nav>
           </div>
         </header>
 
-        <main className="container">{children}</main>
+        <main className="container" id="main">{children}</main>
 
         <footer className="site-footer">
           <div className="container">

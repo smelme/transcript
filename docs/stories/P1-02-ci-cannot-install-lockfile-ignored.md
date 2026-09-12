@@ -25,6 +25,22 @@ pnpm-lock.yaml
 and `git ls-files package-lock.json` returns nothing, so the file is not in the repository. A CI
 checkout therefore has no lockfile, and every install step fails before a single test runs.
 
+## Second problem — a workflow names a workspace that does not exist
+
+`cd.yml` builds `mobile-wallet-native`. That directory is not in the repository: it exists locally
+with nothing tracked inside it, apart from a stray `package-lock.json` (tracked as P1-04). So even
+after the lockfile question is settled, a fresh checkout cannot complete the matrix as written.
+
+Closing this story means checking every workspace name in `ci-cd.yml` and `cd.yml` against the
+repository, and settling what each one builds:
+
+```
+git ls-files mobile-wallet-native    # empty
+```
+
+Either the workflow is corrected to name the real wallet workspace, or the directory is given a
+tracked purpose.
+
 ## Evidence
 
 - `.gitignore` contains `package-lock.json`; `git ls-files package-lock.json` is empty.

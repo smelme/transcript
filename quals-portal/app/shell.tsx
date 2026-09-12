@@ -49,6 +49,9 @@ export default function Shell({ children }: { children: React.ReactNode }) {
   return (
     <SessionContext.Provider value={admin}>
       <div className="shell">
+        <a className="skip-link" href="#main">
+          Skip to content
+        </a>
         <aside className="sidebar">
           <div className="logo">
             <span className="logo-mark" aria-hidden="true">
@@ -82,7 +85,7 @@ export default function Shell({ children }: { children: React.ReactNode }) {
             </p>
           </div>
         </aside>
-        <div className="main">
+        <div className="main" id="main">
           {allowed ? (
             children
           ) : (

@@ -1,6 +1,11 @@
+import { withSecurityHeaders } from '../shared-web/security-headers.mjs';
+
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   reactStrictMode: true,
+  async headers() {
+    return withSecurityHeaders;
+  },
   async rewrites() {
     // The page never talks to the verifier service directly: /api/* is proxied server-side, so
     // the browser sees one origin and the verifier sees one origin.

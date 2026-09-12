@@ -642,3 +642,26 @@ select:focus {
     padding-right: 18px;
   }
 }
+
+/* Skip link and a consistent focus ring, rather than relying on each browser's default. */
+.skip-link {
+  position: absolute;
+  left: -9999px;
+  top: 0;
+  z-index: 100;
+  padding: 10px 16px;
+  background: #14161c;
+  color: #fff;
+  text-decoration: none;
+  border-radius: 0 0 8px 0;
+}
+
+.skip-link:focus {
+  left: 0;
+}
+
+:focus-visible {
+  outline: 3px solid #0a58ca;
+  outline-offset: 2px;
+}
+

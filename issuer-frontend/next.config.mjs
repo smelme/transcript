@@ -1,6 +1,11 @@
+import { withSecurityHeaders } from '../shared-web/security-headers.mjs';
+
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   reactStrictMode: true,
+  async headers() {
+    return withSecurityHeaders;
+  },
   async rewrites() {
     return [
       // Android App Links verification file (values come from the environment).

@@ -139,10 +139,11 @@ export default function SharesPage() {
               The link sent to <strong>{target.recipientEmail}</strong> will stop working
               immediately, even if it has not been opened yet.
             </p>
-            <label className="muted" style={{ display: 'block', marginBottom: 6 }}>
+            <label className="muted" htmlFor="reason" style={{ display: 'block', marginBottom: 6 }}>
               Reason (recorded in the audit log)
             </label>
             <input
+              id="reason"
               value={reason}
               onChange={(e) => setReason(e.target.value)}
               style={{ width: '100%', marginBottom: 20 }}

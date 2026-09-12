@@ -102,6 +102,7 @@ export default function IssuersList() {
                   type="range"
                   min="0"
                   max="100"
+                  aria-label={`Trust score for ${issuer.name || issuer.issuerId}`}
                   value={issuer.trustScore}
                   onChange={(e) =>
                     handleTrustScoreChange(issuer.issuerId, parseInt(e.target.value, 10))

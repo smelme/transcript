@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { PageHeader, StatusBadge, formatDate, shortId } from '../components/ui';
+import { isPlatformAdmin, useAdmin } from '../components/session';
 import {
   CREDENTIAL_KINDS,
   credentialKindLabel,
@@ -11,6 +12,8 @@ import {
 } from '../lib/api';
 
 export default function CredentialsPage() {
+  const admin = useAdmin();
+  const platform = isPlatformAdmin(admin);
   const [credentials, setCredentials] = useState<Credential[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -77,7 +80,11 @@ export default function CredentialsPage() {
     <main>
       <PageHeader
         title="Credentials"
-        subtitle="Every credential this issuer has created, and its current lifecycle state."
+        subtitle={
+          platform
+            ? 'Every credential issued across the network, and its current lifecycle state.'
+            : `Credentials issued by ${admin?.institution ?? 'your organisation'}, and their current lifecycle state.`
+        }
       />
 
       <div className="content stack">
@@ -86,6 +93,7 @@ export default function CredentialsPage() {
         <div className="toolbar">
           <input
             placeholder="Search holder, student ID or credential ID"
+            aria-label="Search credentials by holder, student ID or credential ID"
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             style={{ minWidth: 320 }}
@@ -122,7 +130,7 @@ export default function CredentialsPage() {
             <div className="empty">No credentials match your filters.</div>
           ) : (
             <div className="table-wrap">
-              <table>
+              <table aria-label="Issued credentials">
                 <thead>
                   <tr>
                     <th>Holder</th>
@@ -186,10 +194,11 @@ export default function CredentialsPage() {
               Verifiers will reject <strong>{target.full_name || target.credentialId}</strong> as
               soon as they check it. This cannot be undone — the holder will need a new credential.
             </p>
-            <label className="muted" style={{ display: 'block', marginBottom: 6 }}>
+            <label className="muted" htmlFor="reason" style={{ display: 'block', marginBottom: 6 }}>
               Reason (recorded in the audit log)
             </label>
             <input
+              id="reason"
               value={reason}
               onChange={(e) => setReason(e.target.value)}
               style={{ width: '100%', marginBottom: 20 }}

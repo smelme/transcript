@@ -248,8 +248,9 @@ function ClaimFlow() {
             {credentials.length === 0 ? (
               <div className="panel">
                 <p className="muted" style={{ margin: 0 }}>
-                  We could not find any credentials for {email}. Please check the address you used,
-                  or contact the academy registry.
+                  We could not find any credentials for {email}. Check the address you used, and
+                  note that credentials can only be claimed at the address the academy holds on
+                  your record.
                 </p>
               </div>
             ) : visibleCredentials.length === 0 ? (

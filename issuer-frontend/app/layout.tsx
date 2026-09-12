@@ -15,6 +15,9 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   return (
     <html lang="en" suppressHydrationWarning>
       <body>
+        <a className="skip-link" href="#main">
+          Skip to content
+        </a>
         <Script id="theme-init" strategy="beforeInteractive">
           {`(function(){try{var t=localStorage.getItem('theme');var d=t?t==='dark':window.matchMedia('(prefers-color-scheme: dark)').matches;document.documentElement.setAttribute('data-theme',d?'dark':'light');}catch(e){document.documentElement.setAttribute('data-theme','light');}})();`}
         </Script>
@@ -37,7 +40,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           </nav>
           <ThemeToggle />
         </header>
-        <main>{children}</main>
+        <main id="main">{children}</main>
         <footer className="site-footer">
           <div className="container footer-inner">
             <span>Smart Academy — example issuing authority for the Quals network.</span>

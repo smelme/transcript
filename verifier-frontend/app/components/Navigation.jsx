@@ -5,7 +5,7 @@ import { usePathname } from 'next/navigation';
 
 const links = [
   { href: '/dashboard', label: 'Dashboard' },
-  { href: '/verify-academic', label: 'Verify for MyJob' },
+  { href: '/verify-academic', label: 'Verify for My Jobs' },
   { href: '/issuers', label: 'Trusted Issuers' },
 ];
 
