@@ -1,7 +1,8 @@
 # P0-18: Share a transcript by email
 
 **Priority:** P0 — the holder must be able to disclose a transcript outside an RP website
-**Status:** Blocked on P0-15
+**Status:** In progress — the issuer share path is done and covered by
+`issuer-service/scripts/smoke-share-transcript.mjs`; the wallet share entry point remains (P0-20)
 **Components:** Issuer share flow, wallet share entry point, share recipient page
 
 ## User story
@@ -45,7 +46,9 @@ recipient having an account anywhere.
 
 ## Delivery increments
 
-1. Share session uses the credential's docType; issuer-side tests for a transcript share.
+1. **Done:** share session uses the credential's own namespaces and docType, and
+   `smoke-share-transcript.mjs` shares a transcript to a registrar and checks that the grades
+   arrive while no qualification claims are disclosed.
 2. Recipient view and PDF labelled by kind.
 3. Wallet share entry point per kind (P0-20).
 

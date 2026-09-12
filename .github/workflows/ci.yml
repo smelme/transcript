@@ -105,6 +105,7 @@ jobs:
           node issuer-service/scripts/test-security-hardening.mjs
           node issuer-service/scripts/test-revoked-share.mjs
           node issuer-service/scripts/smoke-share.mjs
+        node issuer-service/scripts/smoke-share-transcript.mjs
 
       - name: Service logs
         if: always()
