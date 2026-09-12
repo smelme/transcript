@@ -117,23 +117,32 @@ comes from - is what divides them.
 | Namespace | The question it answers | Who asks for it |
 |---|---|---|
 | `org.iso.23220.education.transcript.1` | *What did this person study, at which institution and programme, over which period, and with what marks, on what scale?* | A recognition officer (ELMO/EuroLMAI), an admissions team, an employer checking a claim |
-| `org.iso.23220.education.academic-record.1` | *Is this record authentic, official and complete, who authorised its release, and what does it say in the units the reader works in - credits, averages, quality points?* | A registrar running a credit-hour process |
+| `org.iso.23220.education.academic-record.1` | *Is this record authentic, official and complete, who authorised its release, and what does it say in the units the reader works in - credits, averages, quality points?* | A registrar running a credit-hour process, **alongside** the transcript |
 | `org.iso.23220.photoid.1` | *Who is the holder?* | Both, for identity binding and selective personal components |
 
-Three consequences follow, and together they explain why an element may appear in both academic
-namespaces without being a duplicate:
+Two shapes are possible, and the element list only makes sense in one of them:
 
-1. **The academic record is self-contained.** A namespace is the unit of a request, so a registrar
-   that asks for `academic-record.1` alone must receive a record that identifies itself
-   (`document_type`, `document_id`, `document_issued_at`) and states its own standing
-   (`document_status`, `document_completeness`) and release framing. The alternative - asking for
-   `photoid.1` as well - would disclose the photograph and personal components the process has no
-   use for.
-2. **It may be a different document.** `document_number` in the photo-ID namespace identifies the
-   identity document; the academic-record elements identify *the record being released*. These are
-   separate artefacts that may legitimately differ, so the same element name is not restating a
-   value. Chosen behaviour: the academic-record namespace carries the registrar's own record
-   identity, so a reader learns which registrar document this credential corresponds to.
+- **A. Two self-contained views.** `academic-record.1` would repeat the programme, the course list
+  and the marks in its own terms, so a registrar could request it alone. Each request would stand
+  alone, but the largest element (`courses`, all or nothing) would be duplicated, and two elements
+  would claim to be the source of truth for the same mark.
+- **B. One study view plus a supplement - chosen.** `transcript.1` stays the single source for what
+  was studied; `academic-record.1` adds only what a credit-hour process needs on top of it: the
+  same study in its units, the figures that process computes, and the standing and release of the
+  record. A registrar requests it together with `transcript.1` and `photoid.1`.
+
+The consequences of B:
+
+1. **It does not restate the study.** No programme, no course list, no marks - those stay in the
+   transcript namespace, so there is one source per fact and the payload does not double. What it
+   must carry is anything a reader of *it* needs to interpret its own numbers and to act on the
+   record.
+2. **Document identity is warranted only when it names a different artefact.** `document_number`
+   in the photo-ID namespace identifies the identity document. If the academic-record elements
+   name the *registrar's* record - its serial and its issuance - they carry information no other
+   namespace holds, which is what justifies them. If they merely repeat the credential's own
+   number, they are a duplicate and should be dropped or renamed. This is the one decision still
+   open (see P0-21).
 3. **The unit difference is arithmetic, not geographical.** `credit_hours_*` exists so a
    credit-hour reader can use the record without converting ECTS, and `average_*` / `quality_points`
    exist because they are computed *from* the marks rather than asserted by the institution.

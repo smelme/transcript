@@ -60,10 +60,12 @@ Decided before implementing, because it changes where every new element goes:
   credential serves a European recognition officer and a US registrar alike.
 - The **administrative-record extras** (attempted vs earned, averages with range and quality
   points, credit basis, documented status and completeness, release authorisation, destination)
-  go in their own namespace, and that namespace **does** carry document identity on purpose: a
-  namespace is the unit of a request, so a relying party asking for it alone must receive a
-  self-contained record - which document this is, when it was issued, who issued it, whether it is
-  official and complete, and who authorised its release. See "Who asks for which" in
+  go in their own namespace as a **supplement to the transcript, not a rival transcript**: the
+  transcript stays the single source for what was studied (programme, courses, marks), and a
+  registrar requests both. Open decision: whether the academic-record document identity
+  (`document_type`, `document_id`, `document_issued_at`) names the *registrar's* record - which is
+  information no other namespace holds, and justifies the elements - or merely repeats the
+  credential's own number, in which case drop or rename them. See "Who asks for which" in
   `docs/architecture/transcript-credential-architecture.md`.
 - **Jurisdiction-legal or privacy-sensitive claims** (consent framing, national identifiers,
   ethnicity, residency) do not go in the core namespace, and the ones we should not hold at all
