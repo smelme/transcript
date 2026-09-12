@@ -1,7 +1,9 @@
 # P0-15: Transcript credential type and issuance choice
 
 **Priority:** P0 — foundation for every other transcript story
-**Status:** In progress
+**Status:** Done — issuer, generator, registry, offer and share session all report the kind,
+verified by the unit suite, `scripts/test-academy-flow.mjs` and
+`scripts/smoke-share-transcript.mjs`. Deliverable pending: none.
 **Components:** Issuer service, credential generator, issuance sessions, share session creation
 **Protocol:** ISO/IEC 18013-5 mdoc; W3C Digital Credentials API `org-iso-mdoc`
 

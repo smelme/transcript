@@ -1,8 +1,10 @@
 # P0-18: Share a transcript by email
 
 **Priority:** P0 — the holder must be able to disclose a transcript outside an RP website
-**Status:** In progress — the issuer share path is done and covered by
-`issuer-service/scripts/smoke-share-transcript.mjs`; the wallet share entry point remains (P0-20)
+**Status:** In progress — increment 1 is done and covered by
+`issuer-service/scripts/smoke-share-transcript.mjs`. Remaining: increment 2 (recipient view and PDF
+labelled by kind - no kind label exists in `verifier-frontend` today) and increment 3 (wallet share
+entry point, delivered with P0-20).
 **Components:** Issuer share flow, wallet share entry point, share recipient page
 
 ## User story
