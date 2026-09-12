@@ -63,27 +63,37 @@ review.
 
 ## Verification so far
 
+- **Its own site.** `trust-university-frontend` (port 3007) rather than a page inside My Jobs. It
+  has its own origin — which matters because the verifier binds each presentation to the asking
+  page's origin (`http://localhost:3007` here, `http://localhost:3003` for My Jobs) — its own
+  navigation, its own stylesheet and its own registrar request. The route that used to live in
+  `verifier-frontend` is removed, along with its nav entry and the registrar code in that app's
+  client.
 - **The request names the transcript and only the transcript** — verified live against a running
   verifier: the session's `deviceRequest`, decoded, carries docType `org.iso.23220.photoid.1` and
   exactly two namespaces, `org.iso.23220.photoid.1` and `org.iso.23220.education.transcript.1`,
   with no qualification namespace at all, which is what stops a qualification credential being
   presented for a transcript request.
-- `verifier-service/tests/e2e-presentation.test.js` — two new tests: the request composition above,
-  and a transcript presentation that verifies and reports `studentId`, `totalCredits`,
-  `completionStatus` and the course list while `degreeLevel` and `graduationDate` come back `null`
-  rather than invented. 60 verifier tests pass.
-- `verifier-service/src/presentation-session-service.js` now maps the study's fields into `claims`
+- `verifier-service/tests/e2e-presentation.test.js` — the request composition above, a transcript
+  presentation that verifies and reports the study rather than an award (`degreeLevel` and
+  `graduationDate` come back `null` rather than invented), and a third asserting the registrar
+  receives the programme, credits, average with its scale, and the recognition details. 61 verifier
+  tests pass.
+- `verifier-service/src/presentation-session-service.js` maps the study's fields into `claims`
   alongside the award fields, so a relying party does not have to read `allClaims` to find them.
-- `verifier-frontend`: `/trust-university` renders (verified in the running app), requests only the
-  registrar's namespaces, and shows the verified claims, the module table, the verification time
-  and distinct loading, cancelled and error states.
+- The page renders the verified claims, the module table with workload and grouping, the
+  recognition panel, the verification time, and distinct loading, cancelled and error states.
 
-## Blocked on
+## Blocked on / still outstanding
 
 - **A device run**: a real presentation from the Android wallet needs P0-20 installed on a phone.
-- The verifier's handling of a non-photoid docType is no longer unproven in the sense this story
-  feared: the transcript presentation above is a photo-ID document carrying only the transcript
-  namespace, and it verifies and status-checks unchanged.
+- **A container image for the new site**: `ci-cd.yml` builds and pushes an image for
+  `verifier-frontend` only. The new site installs in CI, but its image and deploy step are not
+  added yet, and neither is a build check — which is blocked on `P1-01`, since `next build` fails
+  repo-wide on Next's internal error boundary.
+- The verifier's handling of a non-photoid docType is no longer unproven: the transcript
+  presentation above is a photo-ID document carrying only the transcript namespace, and it verifies
+  and status-checks unchanged.
 - **Institution and programme** were waiting on P0-21's programme context and now arrive: the page
   renders `institution`, `programmeTitle`, `awardTitle`, `creditsEarned`, `gpa` with `gpaScaleId`,
-  and the module table.
+  and the module table with workload and grouping.

@@ -1,0 +1,301 @@
+/* Trust University: a standalone relying-party site. Its own stylesheet rather than a copy of
+   another site's, so the two can diverge without dragging each other's rules along. */
+
+:root {
+  --ink: #14161c;
+  --muted: #5a6273;
+  --bg: #f6f7f9;
+  --surface: #ffffff;
+  --border: #e2e5ea;
+  --border-strong: #c9cfd8;
+  --brand: #0b2d5c;
+  --brand-ink: #ffffff;
+  --ok: #1a7f45;
+  --ok-bg: #e6f4ea;
+  --err: #b3261e;
+  --err-bg: #fdecea;
+  --warn-bg: #fff4e5;
+  --radius: 12px;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--ink);
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+  font-size: 16px;
+  line-height: 1.6;
+}
+
+.container {
+  width: 100%;
+  max-width: 880px;
+  margin: 0 auto;
+  padding: 0 20px;
+}
+
+/* ── Header and footer ─────────────────────────────────────────────────── */
+
+.site-header {
+  background: var(--brand);
+  color: var(--brand-ink);
+}
+
+.header-inner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+  padding: 14px 20px;
+  flex-wrap: wrap;
+}
+
+.brand {
+  color: var(--brand-ink);
+  text-decoration: none;
+  font-weight: 700;
+  font-size: 17px;
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+}
+
+.brand-sub {
+  font-weight: 400;
+  font-size: 13px;
+  opacity: 0.8;
+}
+
+.nav {
+  display: flex;
+  gap: 18px;
+  flex-wrap: wrap;
+}
+
+.nav a {
+  color: var(--brand-ink);
+  text-decoration: none;
+  font-size: 14px;
+  opacity: 0.88;
+}
+
+.nav a:hover,
+.nav a:focus-visible {
+  opacity: 1;
+  text-decoration: underline;
+}
+
+.site-footer {
+  margin-top: 56px;
+  border-top: 1px solid var(--border);
+  background: var(--surface);
+}
+
+.site-footer p {
+  color: var(--muted);
+  font-size: 13px;
+  margin: 18px 0;
+}
+
+/* ── Page furniture ───────────────────────────────────────────────────── */
+
+main {
+  padding-top: 32px;
+}
+
+h1 {
+  font-size: 30px;
+  letter-spacing: -0.02em;
+  margin: 0 0 12px;
+}
+
+h2 {
+  font-size: 20px;
+  margin: 0 0 8px;
+}
+
+h3 {
+  font-size: 16px;
+  margin: 0 0 6px;
+}
+
+.lede {
+  font-size: 17px;
+  color: var(--muted);
+  margin: 0 0 24px;
+}
+
+.muted {
+  color: var(--muted);
+}
+
+.card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 20px;
+  margin: 20px 0;
+}
+
+.stack > * + * {
+  margin-top: 16px;
+}
+
+/* ── Actions ──────────────────────────────────────────────────────────── */
+
+.btn {
+  font: inherit;
+  font-weight: 600;
+  border-radius: 10px;
+  border: 1px solid transparent;
+  padding: 12px 20px;
+  cursor: pointer;
+}
+
+.btn-primary {
+  background: var(--brand);
+  color: var(--brand-ink);
+}
+
+.btn-primary:disabled {
+  opacity: 0.6;
+  cursor: progress;
+}
+
+.btn-secondary {
+  background: var(--surface);
+  border-color: var(--border-strong);
+  color: var(--ink);
+}
+
+/* ── Notices and badges ───────────────────────────────────────────────── */
+
+.notice {
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 12px 14px;
+  background: var(--surface);
+  font-size: 14px;
+}
+
+.notice.ok {
+  background: var(--ok-bg);
+  border-color: #bfe3cb;
+  color: #14532d;
+}
+
+.notice.err {
+  background: var(--err-bg);
+  border-color: #f3c4c0;
+  color: var(--err);
+}
+
+.badge {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 12px;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.badge.ok {
+  background: var(--ok-bg);
+  color: var(--ok);
+}
+
+.badge.warn {
+  background: var(--warn-bg);
+  color: #8a5a00;
+}
+
+/* ── Verified record ──────────────────────────────────────────────────── */
+
+dl {
+  display: grid;
+  grid-template-columns: minmax(140px, 220px) 1fr;
+  gap: 8px 16px;
+  margin: 16px 0;
+}
+
+dt {
+  color: var(--muted);
+  font-size: 14px;
+}
+
+dd {
+  margin: 0;
+  font-weight: 600;
+}
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-top: 8px;
+  font-size: 14px;
+}
+
+caption {
+  text-align: left;
+  font-size: 13px;
+  margin-bottom: 6px;
+}
+
+th,
+td {
+  text-align: left;
+  padding: 8px 10px;
+  border-bottom: 1px solid var(--border);
+}
+
+thead th {
+  font-size: 13px;
+  color: var(--muted);
+  border-bottom-color: var(--border-strong);
+}
+
+details {
+  border-top: 1px solid var(--border);
+  padding-top: 12px;
+}
+
+summary {
+  cursor: pointer;
+  font-weight: 600;
+}
+
+/* ── How it works ─────────────────────────────────────────────────────── */
+
+.steps {
+  display: grid;
+  gap: 14px;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  margin-top: 12px;
+}
+
+.step {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 16px;
+}
+
+.step p {
+  margin: 0;
+  color: var(--muted);
+  font-size: 14px;
+}
+
+@media (max-width: 560px) {
+  dl {
+    grid-template-columns: 1fr;
+    gap: 2px 0;
+  }
+
+  dd {
+    margin-bottom: 10px;
+  }
+}

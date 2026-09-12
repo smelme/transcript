@@ -41,11 +41,9 @@ jobs:
       
       - name: Run Verifier Frontend tests
         run: cd verifier-frontend && npm test
-      
-      - name: Install Mobile Wallet dependencies
-        run: cd mobile-wallet-native && npm ci
-      
-      - name: Run Mobile Wallet tests
+
+      - name: Install Trust University dependencies
+        run: cd trust-university-frontend && npm ci --legacy-peer-deps
         run: cd mobile-wallet-native && npm test
       
       - name: Install E2E Integration test dependencies

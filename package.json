@@ -11,6 +11,7 @@
     "quals-portal",
     "verifier-service",
     "verifier-frontend",
+    "trust-university-frontend",
     "mobile-wallet"
   ],
   "scripts": {
