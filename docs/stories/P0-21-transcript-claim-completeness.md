@@ -51,6 +51,22 @@ can make an admission decision without contacting the issuing institution.
 - Document metadata: transcript type, version, and the attesting office and capacity.
 - Grade distribution (cohort context) where the institution can supply it.
 
+## Namespace strategy
+
+Decided before implementing, because it changes where every new element goes:
+
+- The **shared core** (institution, programme, results with scale, credits with scheme, period,
+  outcome, aggregates) stays in `org.iso.23220.education.transcript.1`, scheme-qualified, so one
+  credential serves a European recognition officer and a US registrar alike.
+- The **administrative-record extras** (attempted vs earned, averages with range and quality
+  points, summary types, credit basis, official/partial status, release authorisation,
+  destination) go in their own namespace, named for its content rather than for the country.
+- **Jurisdiction-legal or privacy-sensitive claims** (consent framing, national identifiers,
+  ethnicity, residency) do not go in the core namespace, and the ones we should not hold at all
+  are simply not modelled.
+- **A total is always per scheme**: credits of different schemes are never summed or converted
+  inside the credential.
+
 ## Acceptance criteria
 
 1. A presented transcript alone answers: which programme, at which institution, over which
@@ -65,6 +81,9 @@ can make an admission decision without contacting the issuing institution.
 6. Trust University's registration page renders programme, period, credits and outcome from
    the verified claims only.
 7. Revocation, status-list and selective-disclosure behaviour are unchanged.
+8. No value carries an ambiguous unit or scale: each states its scheme, and totals are per scheme.
+9. The shared core can be requested on its own, and the administrative-record namespace can be
+   requested on its own, without either depending on the other.
 
 ## Explicit non-goals
 

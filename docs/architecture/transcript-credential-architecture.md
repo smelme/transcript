@@ -72,6 +72,43 @@ identity fields exactly as sharing a qualification does today.
   the disclosed claims.
 - **Wallet** stores and labels each credential by kind and shares one kind at a time.
 
+## Claim sets: what is compatible with what
+
+The EU (ELMO/EuroLMAI) and US (PESC/CEDS) transcript models are not rival formats to choose
+between. They describe largely the same study, and their differences fall into three groups, only
+the third of which needs structural separation.
+
+| Kind of difference | Examples | How to carry it |
+|---|---|---|
+| **Same concept, different vocabulary or scale** | credits (ECTS vs US credit hours), marks (10-point scale vs 4.00 GPA vs letter), level (EQF vs class standing), programme classification (ISCED-F vs CIP), institution identifier (SCHAC/Erasmus vs a national institution code), academic period (free-text term vs coded session) | One element, **scheme-qualified**: a value never travels without the scheme it belongs to (`gradingSchemeLocalId`/`identifier type=…` in ELMO, one element per coding system in PESC). This is how both standards solve it internally |
+| **Concept that exists on only one side** | *US:* attempted vs earned credits, grade point average with quality points, several summaries, credit basis and override school, official/partial document status, release authorisation, destination and tracking. *EU:* ECTS grade, EQF level, language of instruction, diploma supplement | Additive elements. Nothing conflicts; a reader ignores what it does not understand |
+| **Genuinely conflicting or jurisdiction-legal** | credit arithmetic (ECTS and credit hours must never be summed or silently converted), consent framing (a FERPA release is not a GDPR purpose limitation), identifiers we should not model at all (national insurance/SSN, ethnicity, residency) | A separate namespace, or not modelled |
+
+### Namespace strategy
+
+1. **The transcript namespace carries the shared core**, model-neutral and scheme-qualified:
+   institution with a typed identifier, programme with a coded classification (scheme named),
+   results with the scale beside every mark, credits with their scheme, the academic period, the
+   outcome, and the aggregates.
+2. **One additional namespace carries the administrative-record extras** that a US-style reader
+   asks for: attempted versus earned credits, averages with their range and quality points,
+   summary types, credit basis and override school, official or partial status, release
+   authorisation, destination and tracking reference.
+3. **A third namespace, only if it is ever needed, carries EU recognition extras**: ECTS grade,
+   EQF level, language of instruction, diploma supplement reference.
+4. **A total is always per scheme.** This one rule is what prevents the dangerous failure mode:
+   a US registrar reading ECTS as credit hours, or someone quietly converting 27 ECTS into credit
+   hours and averaging them together.
+
+A namespace groups claims that are requested together; it does not make a credential compatible.
+Compatibility comes from values that state their scheme. The reasons to separate at all are to let
+a relying party ask for one audience's view without the other's, and to keep jurisdiction-legal
+elements off the surface every presentation exposes.
+
+Naming should follow content rather than audience: the administrative-record namespace will be
+named for what it holds, not for the country whose practice it came from, because practice changes
+and content does not.
+
 ## API contract direction
 
 - `POST /academy/requests` gains `include`: `qualification` (default), `transcript`, or
