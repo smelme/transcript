@@ -28,18 +28,51 @@ const COUNTRIES = [
 ];
 
 const PROGRAMMES = [
-  // `cip` is the programme's subject in the US CIP 2020 taxonomy, and `award` the title the
-  // record leads to. Both belong to the institution's programme catalogue; these are the
-  // demo's values and the academy's own list replaces them when it supplies one.
-  { level: 'Bachelor', field: 'Computer Science', code: 'BSC-CS', cip: '11.0101', award: 'Bachelor of Science' },
-  { level: 'Bachelor', field: 'Business Administration', code: 'BSC-BA', cip: '52.0201', award: 'Bachelor of Business Administration' },
-  { level: 'Bachelor', field: 'Mechanical Engineering', code: 'BSC-ME', cip: '14.1901', award: 'Bachelor of Science' },
-  { level: 'Bachelor', field: 'Psychology', code: 'BSC-PS', cip: '42.0101', award: 'Bachelor of Arts' },
-  { level: 'Master', field: 'Data Science', code: 'MSC-DS', cip: '30.7001', award: 'Master of Science' },
-  { level: 'Master', field: 'Public Health', code: 'MSC-PH', cip: '51.2201', award: 'Master of Public Health' },
-  { level: 'Master', field: 'Finance', code: 'MSC-FI', cip: '52.0801', award: 'Master of Science' },
-  { level: 'Master', field: 'Architecture', code: 'MSC-AR', cip: '04.0201', award: 'Master of Architecture' },
+  // `cip` is the programme's subject in the US CIP 2020 taxonomy, `award` the title the record
+  // leads to, and `alt` the title as the institution publishes it in its own second language.
+  // All four belong to the institution's programme catalogue; these are the demo's values and
+  // the academy's own list replaces them when it supplies one.
+  { level: 'Bachelor', field: 'Computer Science', code: 'BSC-CS', cip: '11.0101', award: 'Bachelor of Science', alt: 'Informatica' },
+  { level: 'Bachelor', field: 'Business Administration', code: 'BSC-BA', cip: '52.0201', award: 'Bachelor of Business Administration', alt: 'Bedrijfskunde' },
+  { level: 'Bachelor', field: 'Mechanical Engineering', code: 'BSC-ME', cip: '14.1901', award: 'Bachelor of Science', alt: 'Werktuigbouwkunde' },
+  { level: 'Bachelor', field: 'Psychology', code: 'BSC-PS', cip: '42.0101', award: 'Bachelor of Arts', alt: 'Psychologie' },
+  { level: 'Master', field: 'Data Science', code: 'MSC-DS', cip: '30.7001', award: 'Master of Science', alt: 'Datawetenschap' },
+  { level: 'Master', field: 'Public Health', code: 'MSC-PH', cip: '51.2201', award: 'Master of Public Health', alt: 'Volksgezondheid' },
+  { level: 'Master', field: 'Finance', code: 'MSC-FI', cip: '52.0801', award: 'Master of Science', alt: 'Financien' },
+  { level: 'Master', field: 'Architecture', code: 'MSC-AR', cip: '04.0201', award: 'Master of Architecture', alt: 'Architectuur' },
 ];
+
+/**
+ * Recognition details (P0-21 Tier 2): who the institution is beyond its name, what the codes
+ * are codes in, how much work a module was, and who attested the document.
+ *
+ * These are the demo's samples, shaped the way a real institution would supply them - a SCHAC
+ * identifier is a domain, an Erasmus code is the country and city form, a ROR identifier is a
+ * URL. They are fixed rather than generated, because an identifier that changes per student is
+ * not an identifier; the academy's own values replace them verbatim.
+ */
+export const RECOGNITION_SAMPLES = {
+  institutionId: 'smartacademy.example',
+  institutionIdScheme: 'schac',
+  institutionRor: 'https://ror.org/04demo123',
+  institutionErasmusCode: 'NL AMSTERD01',
+  learnerIdScheme: 'institution-student-number',
+  courseCodeScheme: 'institution-course-catalogue',
+  institutionNameAlt: 'Smart Academie',
+  institutionNameAltLanguage: 'nl',
+  languageOfInstruction: 'en',
+  attestingOffice: 'Office of the Registrar',
+  attestingCapacity: 'Registrar',
+  transcriptType: 'official-transcript',
+  documentVersion: '1',
+};
+
+/**
+ * How much work a module was: US practice counts one credit hour as fifteen contact hours and
+ * forty-five hours of total student work over a fifteen-week semester.
+ */
+const CONTACT_HOURS_PER_CREDIT = 15;
+const WORKLOAD_HOURS_PER_CREDIT = 45;
 
 /**
  * The grading scheme every record in this demo is issued under: the US 4.00 grade point
@@ -302,11 +335,24 @@ function pickLetterGrade(rng) {
 /**
  * Build the academic record for a student, projected onto the requested kinds.
  *
- * @param {{ institution: string, studentId: string, fullName?: string, include?: string }} input
+ * `recognition` decides whether the record also carries the recognition details (Tier 2): who
+ * the institution is beyond its name, what its codes are codes in, how much work each module
+ * was, and who attested the document. They are optional because they are recognisability rather
+ * than interpretability - a record without them still reads - and because every element enlarges
+ * what a presentation can disclose.
+ *
+ * @param {{ institution: string, studentId: string, fullName?: string, include?: string,
+ *   recognition?: boolean }} input
  * @returns {{ records: Array<{ kind: string, label: string, docType: string,
- *   academicNamespace: string, credentialData: object, display: object }> }}
+ *   academicNamespace: string, recognition: boolean, credentialData: object, display: object }> }}
  */
-export function generateAcademicRecord({ institution, studentId, fullName, include = DEFAULT_KIND }) {
+export function generateAcademicRecord({
+  institution,
+  studentId,
+  fullName,
+  include = DEFAULT_KIND,
+  recognition = true,
+}) {
   const rng = makeRng(seedFrom(institution, studentId));
 
   const given = fullName?.trim().split(/\s+/)[0] || pick(rng, FIRST_NAMES);
@@ -353,7 +399,7 @@ export function generateAcademicRecord({ institution, studentId, fullName, inclu
     const isProject = /Project|Thesis|Studio/i.test(courseName);
     const credits = isProject ? 6 : 3 + Math.floor(rng() * 2);
     const term = terms[Math.min(terms.length - 1, courses.length)];
-    courses.push({
+    const course = {
       courseCode,
       courseName,
       credits,
@@ -364,7 +410,25 @@ export function generateAcademicRecord({ institution, studentId, fullName, inclu
       term: term.title,
       termStart: term.start,
       termEnd: term.end,
-    });
+    };
+    if (recognition) {
+      // A registrar needs to map the module onto their own programme, which means knowing how
+      // much work it was, whether it was required, and how the cohort did on it.
+      Object.assign(course, {
+        codeScheme: RECOGNITION_SAMPLES.courseCodeScheme,
+        grouping: courses.length < 3 || isProject ? 'mandatory' : 'optional',
+        componentType: /Studio/i.test(courseName)
+          ? 'studio'
+          : /Project|Thesis/i.test(courseName)
+            ? 'project'
+            : 'lecture',
+        contactHours: credits * CONTACT_HOURS_PER_CREDIT,
+        workloadHours: credits * WORKLOAD_HOURS_PER_CREDIT,
+        cohortSize: 18 + Math.floor(rng() * 40),
+        cohortMeanGradePoint: Math.round((2.4 + rng() * 0.9) * 100) / 100,
+      });
+    }
+    courses.push(course);
   }
 
   // The aggregates are computed from the marks rather than asserted, credit-weighted, and
@@ -404,6 +468,18 @@ export function generateAcademicRecord({ institution, studentId, fullName, inclu
       // use, so it is never read as a mark out of ten or as a percentage.
       gpa_scale_id: US_GRADING_SCALE.id,
       gpa_scale_maximum: US_GRADING_SCALE.maximum,
+      ...(recognition
+        ? {
+            // An employer checking an award needs to recognise the institution, not just read
+            // its name, so the same identifiers travel with the qualification.
+            institution_id: RECOGNITION_SAMPLES.institutionId,
+            institution_id_scheme: RECOGNITION_SAMPLES.institutionIdScheme,
+            institution_ror: RECOGNITION_SAMPLES.institutionRor,
+            institution_name_alt: RECOGNITION_SAMPLES.institutionNameAlt,
+            language_of_instruction: RECOGNITION_SAMPLES.languageOfInstruction,
+            field_of_study_alt: programme.alt,
+          }
+        : {}),
     },
     education_transcript: {
       // Who and where
@@ -440,6 +516,22 @@ export function generateAcademicRecord({ institution, studentId, fullName, inclu
       credits_earned: creditsEarned,
       // Kept so a credential issued before the outcome vocabulary existed stays readable.
       status: 'completed',
+      ...(recognition
+        ? {
+            // Recognition details: who the institution is beyond its name, what its codes are
+            // codes in, and in which language the study was taught.
+            institution_id: RECOGNITION_SAMPLES.institutionId,
+            institution_id_scheme: RECOGNITION_SAMPLES.institutionIdScheme,
+            institution_ror: RECOGNITION_SAMPLES.institutionRor,
+            institution_erasmus_code: RECOGNITION_SAMPLES.institutionErasmusCode,
+            institution_name_alt: RECOGNITION_SAMPLES.institutionNameAlt,
+            institution_name_alt_language: RECOGNITION_SAMPLES.institutionNameAltLanguage,
+            programme_title_alt: programme.alt,
+            programme_title_alt_language: RECOGNITION_SAMPLES.institutionNameAltLanguage,
+            language_of_instruction: RECOGNITION_SAMPLES.languageOfInstruction,
+            student_id_scheme: RECOGNITION_SAMPLES.learnerIdScheme,
+          }
+        : {}),
     },
     education_academic_record: {
       // The same study in the reader's own units, and the figures that reader computes.
@@ -461,6 +553,16 @@ export function generateAcademicRecord({ institution, studentId, fullName, inclu
       // This demo record is an excerpt of the programme rather than the whole of it, and it
       // says so instead of claiming to be complete.
       document_completeness: 'partial',
+      ...(recognition
+        ? {
+            // Which document this is, and who attested it in what capacity: a registrar can
+            // check the attestation against a known office rather than a known person.
+            transcript_type: RECOGNITION_SAMPLES.transcriptType,
+            document_version: RECOGNITION_SAMPLES.documentVersion,
+            attesting_office: RECOGNITION_SAMPLES.attestingOffice,
+            attesting_capacity: RECOGNITION_SAMPLES.attestingCapacity,
+          }
+        : {}),
     },
   };
 
@@ -475,6 +577,7 @@ export function generateAcademicRecord({ institution, studentId, fullName, inclu
     totalCredits: creditsEarned,
     courseCount: courses.length,
     gpa,
+    recognition,
   };
 
   // Each credential carries the personal components plus only its own academic
@@ -497,6 +600,8 @@ export function generateAcademicRecord({ institution, studentId, fullName, inclu
       label: spec.label,
       docType: spec.docType,
       academicNamespace: spec.academicNamespace,
+      // Whether this record carries the recognition details, so a caller can tell what it got.
+      recognition,
       credentialData,
       display: {
         ...display,

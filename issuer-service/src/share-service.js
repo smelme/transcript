@@ -45,6 +45,13 @@ const SHARE_CATEGORIES = {
         // The scale the average is on, so the number is never read as a mark out of ten.
         'gpa_scale_id',
         'gpa_scale_maximum',
+        // Recognition details, when the credential carries them.
+        'institution_id',
+        'institution_id_scheme',
+        'institution_ror',
+        'institution_name_alt',
+        'language_of_instruction',
+        'field_of_study_alt',
       ],
     },
   },
@@ -81,6 +88,18 @@ const SHARE_CATEGORIES = {
         'credits_attempted',
         'credits_earned',
         'status',
+        // Recognition details, when the credential carries them: absent from a credential
+        // issued without them, in which case asking for them discloses nothing.
+        'institution_id',
+        'institution_id_scheme',
+        'institution_ror',
+        'institution_erasmus_code',
+        'institution_name_alt',
+        'institution_name_alt_language',
+        'programme_title_alt',
+        'programme_title_alt_language',
+        'language_of_instruction',
+        'student_id_scheme',
       ],
       // The US-practice supplement describes the same study in a credit-hour reader's units
       // and states the record's own standing, so it is requested with the transcript.
@@ -99,6 +118,10 @@ const SHARE_CATEGORIES = {
         'document_issued_at',
         'document_status',
         'document_completeness',
+        'transcript_type',
+        'document_version',
+        'attesting_office',
+        'attesting_capacity',
       ],
     },
   },

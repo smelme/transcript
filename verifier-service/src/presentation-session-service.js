@@ -276,6 +276,18 @@ export class PresentationSessionService {
         gpa: claims.overall_mark ?? null,
         gpaScaleId: claims.overall_mark_scale_id || null,
         courses: claims.courses || null,
+        // Recognition details, when the credential was issued with them: how the institution
+        // is identified outside its own name, in which language the study was taught, and who
+        // attested the document. Null rather than guessed when absent.
+        institutionId: claims.institution_id || null,
+        institutionIdScheme: claims.institution_id_scheme || null,
+        institutionRor: claims.institution_ror || null,
+        institutionNameAlt: claims.institution_name_alt || null,
+        programmeTitleAlt: claims.programme_title_alt || null,
+        languageOfInstruction: claims.language_of_instruction || null,
+        transcriptType: claims.transcript_type || null,
+        attestingOffice: claims.attesting_office || null,
+        attestingCapacity: claims.attesting_capacity || null,
       },
       // Full disclosed element values (flattened, keyed by element identifier)
       // so callers such as the issuer's "share" flow can persist every

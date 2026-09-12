@@ -95,6 +95,8 @@ export default function TrustUniversityRegistration() {
                   <th scope="col">Title</th>
                   <th scope="col">Credits</th>
                   <th scope="col">Mark</th>
+                  <th scope="col">Workload</th>
+                  <th scope="col">Required</th>
                 </tr>
               </thead>
               <tbody>
@@ -104,6 +106,8 @@ export default function TrustUniversityRegistration() {
                     <td>{course.courseName || course.courseTitle || '—'}</td>
                     <td>{course.credits ?? '—'}</td>
                     <td>{course.grade ?? '—'}</td>
+                    <td>{course.workloadHours != null ? `${course.workloadHours} h` : '—'}</td>
+                    <td>{course.grouping || '—'}</td>
                   </tr>
                 ))}
               </tbody>
@@ -112,6 +116,69 @@ export default function TrustUniversityRegistration() {
             <p className="muted">
               The transcript was verified, but no module list was disclosed.
             </p>
+          )}
+
+          {(claims?.institutionId ||
+            claims?.attestingOffice ||
+            claims?.languageOfInstruction ||
+            claims?.institutionNameAlt) && (
+            <details style={{ marginTop: 16 }}>
+              <summary>
+                Recognition details the university matched this record against
+              </summary>
+              <dl>
+                {claims?.institutionId && (
+                  <>
+                    <dt>Institution identifier</dt>
+                    <dd>
+                      {claims.institutionId} ({claims.institutionIdScheme})
+                    </dd>
+                  </>
+                )}
+                {claims?.institutionRor && (
+                  <>
+                    <dt>Research organisation registry</dt>
+                    <dd>{claims.institutionRor}</dd>
+                  </>
+                )}
+                {claims?.institutionNameAlt && (
+                  <>
+                    <dt>Recognised name</dt>
+                    <dd>{claims.institutionNameAlt}</dd>
+                  </>
+                )}
+                {claims?.programmeTitleAlt && (
+                  <>
+                    <dt>Recognised programme</dt>
+                    <dd>{claims.programmeTitleAlt}</dd>
+                  </>
+                )}
+                {claims?.languageOfInstruction && (
+                  <>
+                    <dt>Language of instruction</dt>
+                    <dd>{claims.languageOfInstruction}</dd>
+                  </>
+                )}
+                {claims?.transcriptType && (
+                  <>
+                    <dt>Document</dt>
+                    <dd>
+                      {claims.transcriptType} · {claims.documentStatus} ·{' '}
+                      {claims.documentCompleteness}
+                    </dd>
+                  </>
+                )}
+                {claims?.attestingOffice && (
+                  <>
+                    <dt>Attested by</dt>
+                    <dd>
+                      {claims.attestingOffice}
+                      {claims.attestingCapacity ? `, as ${claims.attestingCapacity}` : ''}
+                    </dd>
+                  </>
+                )}
+              </dl>
+            </details>
           )}
 
           <p className="muted" style={{ marginTop: 12 }}>

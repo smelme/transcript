@@ -336,6 +336,13 @@ class IssuerService {
       // ten or as a percentage.
       ['gpa_scale_id', eq.gpa_scale_id],
       ['gpa_scale_maximum', numberOrNull(eq.gpa_scale_maximum), 'number'],
+      // Recognition details (Tier 2), present only when the caller asked for them.
+      ['institution_id', eq.institution_id],
+      ['institution_id_scheme', eq.institution_id_scheme],
+      ['institution_ror', eq.institution_ror],
+      ['institution_name_alt', eq.institution_name_alt],
+      ['language_of_instruction', eq.language_of_instruction],
+      ['field_of_study_alt', eq.field_of_study_alt],
     ]);
     if (qual.length) {
       namespaces['org.iso.23220.education.qualification.1'] = qual;
@@ -372,6 +379,17 @@ class IssuerService {
       ['overall_mark_scale_id', tr.overall_mark_scale_id],
       ['credits_attempted', numberOrNull(tr.credits_attempted), 'uint'],
       ['credits_earned', numberOrNull(tr.credits_earned), 'uint'],
+      // Recognition details (Tier 2): present only when the caller asked for them.
+      ['institution_id', tr.institution_id],
+      ['institution_id_scheme', tr.institution_id_scheme],
+      ['institution_ror', tr.institution_ror],
+      ['institution_erasmus_code', tr.institution_erasmus_code],
+      ['institution_name_alt', tr.institution_name_alt],
+      ['institution_name_alt_language', tr.institution_name_alt_language],
+      ['programme_title_alt', tr.programme_title_alt],
+      ['programme_title_alt_language', tr.programme_title_alt_language],
+      ['language_of_instruction', tr.language_of_instruction],
+      ['student_id_scheme', tr.student_id_scheme],
       // Kept for credentials issued before the outcome vocabulary existed.
       ['status', tr.status],
     ]);
@@ -398,6 +416,11 @@ class IssuerService {
       ['document_issued_at', ar.document_issued_at, 'date'],
       ['document_status', ar.document_status],
       ['document_completeness', ar.document_completeness],
+      // Recognition details (Tier 2): which document this is and who attested it.
+      ['transcript_type', ar.transcript_type],
+      ['document_version', ar.document_version],
+      ['attesting_office', ar.attesting_office],
+      ['attesting_capacity', ar.attesting_capacity],
     ]);
     if (academicRecord.length) {
       namespaces['org.iso.23220.education.academic-record.1'] = academicRecord;
@@ -1865,11 +1888,18 @@ app.post('/academy/requests', async (req, res) => {
 
     // The applicant chooses what to hold: a qualification, a transcript, or both. Each
     // kind becomes its own credential, with its own status index and its own revocation.
+    //
+    // The recognition details are a second, independent option: a caller that does not want
+    // them (they describe the institution and the module, and enlarge what a presentation can
+    // disclose) passes `recognition: false`. Absent means the demo's default, which is to
+    // include them, so the test sites have a recognisable record to show.
+    const recognition = req.body?.recognition !== false && req.body?.recognition !== 'false';
     const { records } = generateAcademicRecord({
       institution: ACADEMY_NAME,
       studentId,
       fullName: req.body?.fullName,
       include: req.body?.include,
+      recognition,
     });
 
     // One session per requested kind. A request for something the student already holds
@@ -1940,6 +1970,9 @@ app.post('/academy/requests', async (req, res) => {
         label: record.label,
         docType: record.docType,
         academicNamespace: record.academicNamespace,
+        // Whether this credential carries the recognition details, so a caller can tell what
+        // it asked for and the app can say what the holder will receive.
+        recognition: record.recognition === true,
         // `reused` means this request matched credentials already prepared, so the same
         // session (and the same offer) is returned rather than a duplicate being created.
         reused,

@@ -81,13 +81,21 @@ presentation.
 
 ## F. Tier 2 sourcing
 
+The structure is built and the demo now issues **sample values** behind the `recognition` option
+(`RECOGNITION_SAMPLES` in `issuer-service/src/credential-generator.js`), so the test sites can show
+what recognition data does. The samples are shaped like the real thing - a SCHAC identifier is a
+domain, an Erasmus code is the country-and-city form, a ROR identifier is a URL - but they are not
+the academy's, and each row below is still its to supply.
+
 | # | Fact needed | Answer |
 |---|---|---|
-| F1 | Workload hours per course, and whether that means contact hours or total notional hours | |
-| F2 | Course grouping (mandatory / optional / elective) and component type | |
-| F3 | Language of instruction, per programme and per course | |
-| F4 | Multi-language titles for institution and programme | |
-| F5 | Grade distribution / cohort context - can the academy supply it at all? | |
+| F1 | Institution identifiers: SCHAC, Erasmus, ROR, or a national register | sample: `smartacademy.example`, `NL AMSTERD01`, `https://ror.org/04demo123` |
+| F2 | What the learner id and course codes are codes *in* | sample: `institution-student-number`, `institution-course-catalogue` |
+| F3 | Second-language titles for the institution and each programme, and the language of instruction | sample: `Smart Academie` / `Informatica` (`nl`), taught in `en` |
+| F4 | Workload per module, and whether that means contact hours or total student hours | sample: 45 contact hours and 135 total hours per 3 credit hours |
+| F5 | Course grouping (mandatory/optional/elective) and component type | sample: first three and any project mandatory, the rest optional; `lecture`/`studio`/`project` |
+| F6 | Grade distribution / cohort context - can the academy supply it at all? | sample: cohort size and mean, not a full distribution |
+| F7 | Which document this is, and who attests it in what capacity | sample: `official-transcript`, `Office of the Registrar`, `Registrar` |
 
 ## What happens to each answer
 

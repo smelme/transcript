@@ -302,5 +302,85 @@ check(
   JSON.stringify(narrower.credentials || []),
 );
 
+// 9. The recognition details are an issuance option rather than a property of the kind: a
+//    holder may take a smaller, less disclosing credential, and the record still reads.
+const recognitionEmail = `recognition-${Date.now()}@example.com`;
+const withDetails = (await call('POST', '/academy/requests', {
+  email: recognitionEmail,
+  include: 'transcript',
+})).data;
+check(
+  'recognition details are included by default',
+  withDetails.credentials?.[0]?.recognition === true,
+  JSON.stringify(withDetails.credentials?.[0]?.recognition),
+);
+check(
+  'and that credential is still a transcript',
+  withDetails.credentials?.[0]?.kind === 'transcript',
+  withDetails.credentials?.[0]?.kind,
+);
+
+const plainEmail = `plain-${Date.now()}@example.com`;
+const withoutDetails = (await call('POST', '/academy/requests', {
+  email: plainEmail,
+  include: 'transcript',
+  recognition: false,
+})).data;
+check(
+  'they can be turned off',
+  withoutDetails.credentials?.[0]?.recognition === false,
+  JSON.stringify(withoutDetails.credentials?.[0]?.recognition),
+);
+
+// The difference has to be in the credential, not only in the answer: claim the one issued
+// without them and check the transcript namespace carries no recognition elements at all.
+const plainOtp = (await call('POST', '/auth/otp', { email: plainEmail })).data;
+const plainToken = (await call('POST', '/auth/token', { email: plainEmail, otp: plainOtp.otp })).data;
+const plainOffer = (await call(
+  'POST',
+  `/academy/credentials/${withoutDetails.sessionId}/offer`,
+  {},
+  { authorization: `Bearer ${plainToken.accessToken}` },
+)).data;
+const plainOfferPayload = JSON.parse(
+  Buffer.from(String(plainOffer.offerUrl).split('credential_offer=')[1], 'base64url').toString('utf8'),
+);
+const plainPac =
+  plainOfferPayload.grants['urn:ietf:params:oauth:grant-type:pre-authorized_code'];
+const plainDevice = generateDeviceKeyPair();
+const plainCwt = buildCwt({
+  privateJwk: plainDevice.privateJwk,
+  devicePublicJwk: plainDevice.publicJwk,
+  issuer: 'smart-college-wallet',
+  subject: 'device-key',
+  audience: plainOfferPayload.issuer_id,
+  nonce: plainPac.nonce,
+}).toString('base64url');
+const plainClaim = (await call('POST', '/wallet/issuance', {
+  offerUrl: plainOffer.offerUrl,
+  accessToken: plainToken.accessToken,
+  cwt: plainCwt,
+})).data;
+
+const { verifyIssuerSigned } = await import('../../mdoc-core.js');
+const plainDocument = verifyIssuerSigned(plainClaim.mdocBase64url);
+const plainTranscript = plainDocument.namespaces['org.iso.23220.education.transcript.1'] || [];
+const plainIdentifiers = plainTranscript.map((item) => item.elementIdentifier);
+check(
+  'a credential issued without them carries none of them',
+  !plainIdentifiers.includes('institution_id') &&
+    !plainIdentifiers.includes('language_of_instruction') &&
+    !plainIdentifiers.includes('student_id_scheme'),
+  JSON.stringify(plainIdentifiers.filter((id) => id.includes('institution') || id.includes('_alt'))),
+);
+check(
+  'but still carries everything that makes it readable',
+  plainIdentifiers.includes('grading_scale_id') &&
+    plainIdentifiers.includes('credit_scheme') &&
+    plainIdentifiers.includes('courses') &&
+    plainIdentifiers.includes('overall_mark'),
+  JSON.stringify(plainIdentifiers),
+);
+
 console.log(failures === 0 ? '\nACADEMY_FLOW_PASSED' : `\n${failures} CHECK(S) FAILED`);
 process.exit(failures === 0 ? 0 : 1);

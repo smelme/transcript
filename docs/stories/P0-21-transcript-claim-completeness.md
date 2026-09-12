@@ -47,12 +47,38 @@ can make an admission decision without contacting the issuing institution.
 
 ## Scope — Tier 2 (recognisability), same story, second increment
 
+**Implemented behind an issuance option, with demo sample values** (see "Recognition details"
+below). It stays a separate increment because it is recognisability rather than interpretability: a
+record without it still reads, so the academy can replace the samples without invalidating anything,
+and a holder who would rather disclose less can leave it out at issuance.
+
 - Typed identifiers: institution (`schac`, `erasmus`, ROR), learner id scheme, course code
   scheme.
 - Multi-language titles for institution and programme, plus language of instruction.
 - Course grouping (mandatory/optional), component type, and workload hours.
 - Document metadata: transcript type, version, and the attesting office and capacity.
 - Grade distribution (cohort context) where the institution can supply it.
+
+### Recognition details, as implemented
+
+`POST /academy/requests` takes `recognition` (default true; `false` omits them), and the academy app
+offers it as a checkbox with the trade-off spelled out. When they are issued they are the
+institution's own identifiers and the module's own workload, never something a reader must infer:
+
+| Element | Sample value |
+|---|---|
+| `institution_id` + `_scheme` | `smartacademy.example` (SCHAC is a domain), with `institution_ror` and `institution_erasmus_code` alongside |
+| `student_id_scheme` | `institution-student-number` |
+| `institution_name_alt` / `programme_title_alt` (+ `_language`) | `Smart Academie` / `Informatica`, language `nl` |
+| `language_of_instruction` | `en` |
+| per course: `codeScheme`, `grouping`, `componentType`, `contactHours`, `workloadHours`, `cohortSize`, `cohortMeanGradePoint` | a 3-credit module is 45 contact hours and 135 hours of work; `mandatory`/`optional`; the cohort figure is size and mean, not a full distribution |
+| `transcript_type`, `document_version`, `attesting_office`, `attesting_capacity` | `official-transcript`, `1`, `Office of the Registrar`, `Registrar` |
+
+The samples live in one place, `RECOGNITION_SAMPLES` in `credential-generator.js`, and are fixed
+rather than generated - an identifier that changes per student is not an identifier. A qualification
+carries the institution identifiers too, so an employer checking an award can recognise the issuing
+institution by more than its name. Omitted values are absent rather than blank, so a reader can tell
+"not supplied" from "supplied empty".
 
 ## Namespace strategy
 
@@ -124,7 +150,8 @@ Decided before implementing, because it changes where every new element goes:
 2. **Partly** — the share categories request the new elements and Trust University renders them; the
    wallet and the portal still show only the kind, module count and credits, which is outstanding UI
    work in P0-17 and P0-20.
-3. Tier 2 claim set, gated on the academy supplying the data.
+3. Tier 2 claim set — **implemented behind the `recognition` option with demo samples**; the
+   academy's own values replace `RECOGNITION_SAMPLES` when it supplies them.
 4. Trust University renders the richer transcript (_P0-19_) — done with this story.
 
 ## US conventions used for now

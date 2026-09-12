@@ -27,6 +27,9 @@ export default function GetCredentialsPage() {
   const [email, setEmail] = useState('');
   const [fullName, setFullName] = useState('');
   const [include, setInclude] = useState<CredentialChoice>('qualification');
+  // On by default for the demo, so what a relying party can recognise is visible. A holder
+  // who would rather disclose less can turn it off before the credential is issued.
+  const [recognition, setRecognition] = useState(true);
   const [busy, setBusy] = useState(false);
   const [result, setResult] = useState<AcademyRequestResult | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -37,7 +40,7 @@ export default function GetCredentialsPage() {
     setError(null);
     setResult(null);
     try {
-      const r = await requestCredentials({ email, fullName: fullName || undefined, include });
+      const r = await requestCredentials({ email, fullName: fullName || undefined, include, recognition });
       if (r.success) setResult(r);
       else setError(r.error || 'We could not prepare your credentials.');
     } catch (err) {
@@ -121,6 +124,30 @@ export default function GetCredentialsPage() {
                 </div>
               </fieldset>
 
+              <label
+                className="credential-card"
+                style={{ marginTop: 14, alignItems: 'flex-start' }}
+              >
+                <input
+                  className="checkbox"
+                  type="checkbox"
+                  checked={recognition}
+                  onChange={(e) => setRecognition(e.target.checked)}
+                />
+                <span style={{ flex: 1 }}>
+                  <strong style={{ display: 'block', fontSize: 15, marginBottom: 4 }}>
+                    Include recognition details
+                  </strong>
+                  <span className="meta">
+                    How your institution and modules are identified to a registrar: institution
+                    identifiers, the recognised programme title, the language of instruction, how
+                    much work each module was, and the office that attested the record. Detailed
+                    records are accepted abroad more easily; leaving this off keeps the credential
+                    smaller and discloses less.
+                  </span>
+                </span>
+              </label>
+
               {error && (
                 <div className="notice err" style={{ marginTop: 20 }}>
                   {error}
@@ -163,6 +190,9 @@ export default function GetCredentialsPage() {
                   >
                     <span className="badge kind">{credential.label}</span>
                     <span>{credential.title}</span>
+                    {credential.recognition && (
+                      <span className="muted">Recognition details included</span>
+                    )}
                     {credential.inWallet ? (
                       <span className="badge ok">Already in your wallet</span>
                     ) : (

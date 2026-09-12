@@ -984,11 +984,12 @@ const elementsOf = (verified, namespace) =>
 const TRANSCRIPT_NS = 'org.iso.23220.education.transcript.1';
 const ACADEMIC_RECORD_NS = 'org.iso.23220.education.academic-record.1';
 
-function transcriptMdoc(issuer, studentId) {
+function transcriptMdoc(issuer, studentId, recognition = true) {
   const { records } = generateAcademicRecord({
     institution: 'Smart Academy',
     studentId,
     include: 'transcript',
+    recognition,
   });
   const mdoc = issuer.buildCredentialMdoc(records[0].credentialData);
   assert.ok(mdoc, 'expected a signed mdoc');
@@ -1132,8 +1133,7 @@ test('Transcript - the US supplement is not a kind discriminator', () => {
   assert.ok(core.student_id, 'the holder is still identified');
 });
 
-test('Qualification - its average is no longer on an unstated scale', () => {
-  const issuer = new IssuerService();
+test('Qualification - its average is no longer on an unstated scale', () => {  const issuer = new IssuerService();
   const { records } = generateAcademicRecord({
     institution: 'Smart Academy',
     studentId: 'SA-US-7',
@@ -1150,4 +1150,89 @@ test('Qualification - its average is no longer on an unstated scale', () => {
     'the number states the scale it is on instead of being read as a mark out of ten',
   );
   assert.strictEqual(qualification.gpa_scale_maximum, 4);
+});
+
+// ── Recognition details: an issuance option (P0-21, Tier 2) ────────────────
+//
+// They are recognisability rather than interpretability, so a caller may issue without them -
+// the record still reads - and when they are issued they are the institution's own identifiers
+// and the module's own workload, not something a reader has to infer.
+
+test('Recognition details - carried when asked for', () => {
+  const { core, supplement, record } = transcriptMdoc(new IssuerService(), 'SA-REC-1', true);
+
+  assert.strictEqual(
+    record.recognition,
+    true,
+    'the record says the details were requested, so a caller can tell what it issued',
+  );
+
+  // Who the institution is beyond its name.
+  assert.strictEqual(core.institution_id, 'smartacademy.example');
+  assert.strictEqual(core.institution_id_scheme, 'schac');
+  assert.match(core.institution_ror, /^https:\/\/ror\.org\//);
+  assert.strictEqual(core.institution_erasmus_code, 'NL AMSTERD01');
+  assert.strictEqual(core.institution_name_alt_language, 'nl');
+  assert.ok(core.institution_name_alt, 'the recognised name');
+  // What the codes are codes in.
+  assert.strictEqual(core.student_id_scheme, 'institution-student-number');
+  assert.strictEqual(core.language_of_instruction, 'en');
+  assert.ok(core.programme_title_alt, 'the recognised programme title');
+  assert.strictEqual(core.programme_title_alt_language, 'nl');
+  // Which document this is, and who attested it.
+  assert.strictEqual(supplement.transcript_type, 'official-transcript');
+  assert.strictEqual(supplement.attesting_office, 'Office of the Registrar');
+  assert.strictEqual(supplement.attesting_capacity, 'Registrar');
+
+  // How much work each module was, whether it was required, and how the cohort did.
+  for (const course of JSON.parse(core.courses)) {
+    assert.ok(['mandatory', 'optional'].includes(course.grouping), course.grouping);
+    assert.ok(
+      ['lecture', 'studio', 'project'].includes(course.componentType),
+      course.componentType,
+    );
+    assert.strictEqual(course.codeScheme, 'institution-course-catalogue');
+    assert.strictEqual(course.contactHours, course.credits * 15);
+    assert.strictEqual(course.workloadHours, course.credits * 45);
+    assert.ok(course.cohortSize >= 18 && course.cohortSize <= 57, String(course.cohortSize));
+    assert.ok(
+      course.cohortMeanGradePoint >= 2.4 && course.cohortMeanGradePoint <= 3.3,
+      String(course.cohortMeanGradePoint),
+    );
+  }
+});
+
+test('Recognition details - omitted when not asked for, with the record still readable', () => {
+  const { core, supplement, photoId, record } = transcriptMdoc(new IssuerService(), 'SA-REC-2', false);
+
+  assert.strictEqual(record.recognition, false);
+
+  for (const identifier of [
+    'institution_id',
+    'institution_id_scheme',
+    'institution_ror',
+    'institution_erasmus_code',
+    'institution_name_alt',
+    'institution_name_alt_language',
+    'programme_title_alt',
+    'programme_title_alt_language',
+    'language_of_instruction',
+    'student_id_scheme',
+  ]) {
+    assert.ok(!(identifier in core), `${identifier} must be absent, not blank`);
+  }
+  for (const identifier of ['transcript_type', 'document_version', 'attesting_office', 'attesting_capacity']) {
+    assert.ok(!(identifier in supplement), `${identifier} must be absent, not blank`);
+  }
+  for (const course of JSON.parse(core.courses)) {
+    assert.ok(!('workloadHours' in course), 'no workload when the details were not requested');
+    assert.ok(!('cohortSize' in course), 'no cohort context either');
+  }
+
+  // Interpretability is untouched: the elements that make the record readable are still there.
+  assert.strictEqual(core.grading_scale_id, 'us-gpa-4');
+  assert.strictEqual(core.credit_scheme, 'us-credit-hour');
+  assert.ok(core.programme_code && core.programme_code_scheme && core.award_title);
+  assert.ok(core.overall_mark != null && core.overall_mark_scale_id);
+  assert.ok(photoId.document_number, 'the identity document is unaffected');
 });

@@ -261,4 +261,13 @@ test('the registrar receives the programme, the credits and the average with its
     'the average never arrives without the scale it is on',
   );
   assert.equal(result.claims.creditsEarned, 24);
+  // Recognition details, so a registrar can identify the institution rather than read a name.
+  assert.equal(result.claims.institutionId, 'smartacademy.example');
+  assert.equal(result.claims.institutionIdScheme, 'schac');
+  assert.equal(result.claims.institutionNameAlt, 'Smart Academie');
+  assert.equal(result.claims.languageOfInstruction, 'en');
+  assert.equal(result.claims.programmeTitleAlt, 'Informatica');
+  assert.equal(result.claims.transcriptType, 'official-transcript');
+  assert.equal(result.claims.attestingOffice, 'Office of the Registrar');
+  assert.equal(result.claims.attestingCapacity, 'Registrar');
 });

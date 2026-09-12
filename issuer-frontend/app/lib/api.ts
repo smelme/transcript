@@ -147,6 +147,8 @@ export interface AcademyPreparedCredential {
   label: string;
   docType: string;
   academicNamespace: string;
+  /** True when this credential carries the recognition details (Tier 2). */
+  recognition?: boolean;
   /** True when this request matched a credential already prepared: nothing new was created. */
   reused: boolean;
   inWallet: boolean;
@@ -193,6 +195,8 @@ export function requestCredentials(payload: {
   email: string;
   fullName?: string;
   include?: CredentialChoice;
+  /** Whether to include the recognition details (identifiers, workload, cohort context). */
+  recognition?: boolean;
 }): Promise<AcademyRequestResult> {
   return request('/academy/requests', { method: 'POST', body: JSON.stringify(payload) });
 }
