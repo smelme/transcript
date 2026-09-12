@@ -22,8 +22,8 @@ recipient having an account anywhere.
 
 ## Acceptance criteria
 
-1. Sharing a transcript credential creates a session with docType
-   `org.iso.23220.education.transcript.1` and only transcript-category namespaces.
+1. Sharing a transcript credential creates a session with the photo-ID docType and only
+   transcript-category namespaces.
 2. The recipient sees transcript elements (courses, credits, status) and only the identity
    elements the sender selected.
 3. A revoked transcript cannot be shared or viewed; a revoked qualification behaves as

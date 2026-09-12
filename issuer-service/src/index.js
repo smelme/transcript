@@ -23,7 +23,13 @@ import { WalletAccountService } from './wallet-account-service.js';
 import { ShareService } from './share-service.js';
 import { AdminAuthService } from './admin-auth.js';
 import { ClientOrgService } from './client-orgs.js';
-import { generateAcademicRecord, CREDENTIAL_KINDS, DEFAULT_DOCTYPE, requestedDocTypes } from './credential-generator.js';
+import {
+  generateAcademicRecord,
+  PHOTOID_DOCTYPE,
+  kindOfCredentialData,
+  labelOfCredentialData,
+  academicNamespacesOf,
+} from './credential-generator.js';
 import * as emailService from './email-service.js';
 import { getDb } from '../../db.js';
 import {
@@ -127,7 +133,7 @@ class IssuerService {
       type: 'object',
       required: ['docType', 'full_name', 'date_of_birth', 'document_number', 'issuing_authority', 'issue_date', 'expiry_date'],
       properties: {
-        docType: { type: 'string', enum: Object.keys(CREDENTIAL_KINDS) },
+        docType: { type: 'string', const: PHOTOID_DOCTYPE },
         full_name: { type: 'string' },
         date_of_birth: { type: 'string', format: 'date' },
         document_number: { type: 'string' },
@@ -278,22 +284,22 @@ class IssuerService {
   }
 
   /**
-   * Build and sign an ISO 18013-5 IssuerSigned mdoc for one credential kind.
+   * Build and sign an ISO 18013-5 IssuerSigned mdoc for a credential.
    *
-   * The docType decides which namespaces are assembled, so a transcript credential never
-   * carries qualification claims (or the reverse) even when the academic record handed in
-   * holds both. `deviceJwk` (optional) is the holder's EC P-256 public JWK; when provided
-   * it is embedded in the MSO deviceKeyInfo as the device's mdoc authentication key.
+   * Both kinds are issued under the same docType (a photo-ID document carrying the
+   * holder's personal components); the academic namespace present in the record decides
+   * whether it is a qualification, a transcript, or one combined academic credential.
+   * `deviceJwk` (optional) is the holder's EC P-256 public JWK; when provided it is
+   * embedded in the MSO deviceKeyInfo as the device's mdoc authentication key.
    *
-   * Returns null when the kind is unknown or carries no claims, which the caller must
-   * treat as a failure rather than issuing a credential that cannot be presented.
+   * Returns null when the docType is unknown or the record carries no claims at all,
+   * which the caller must treat as a failure rather than issuing a credential that
+   * cannot be presented.
    */
   buildCredentialMdoc(credentialData, deviceJwk = null, statusIndex = null) {
-    const docType = credentialData.docType || DEFAULT_DOCTYPE;
-    const spec = CREDENTIAL_KINDS[docType];
-    if (!spec) return null;
+    const docType = credentialData.docType || PHOTOID_DOCTYPE;
+    if (docType !== PHOTOID_DOCTYPE) return null;
 
-    const wanted = new Set(spec.namespaces);
     const namespaces = {};
     const fullName = (credentialData.full_name || '').trim();
     const parts = fullName.split(/\s+/);
@@ -314,7 +320,7 @@ class IssuerService {
         photoId.push(['portrait', new Cbor().bstr(Buffer.from(credentialData.portrait, 'base64')).encode()]);
       } catch (e) { /* ignore invalid portrait */ }
     }
-    if (photoId.length && wanted.has('org.iso.23220.photoid.1')) {
+    if (photoId.length) {
       namespaces['org.iso.23220.photoid.1'] = photoId;
     }
 
@@ -325,7 +331,7 @@ class IssuerService {
     if (eq.field_of_study) qual.push(['field_of_study', new Cbor().tstr(eq.field_of_study).encode()]);
     if (eq.graduation_date) qual.push(['graduation_date', fullDate(eq.graduation_date)]);
     if (typeof eq.gpa === 'number') qual.push(['gpa', new Cbor().f64(eq.gpa).encode()]);
-    if (qual.length && wanted.has('org.iso.23220.education.qualification.1')) {
+    if (qual.length) {
       namespaces['org.iso.23220.education.qualification.1'] = qual;
     }
 
@@ -340,7 +346,7 @@ class IssuerService {
     }
     if (typeof tr.total_credits === 'number') transcript.push(['total_credits', new Cbor().uint(tr.total_credits).encode()]);
     if (tr.status) transcript.push(['status', new Cbor().tstr(tr.status).encode()]);
-    if (transcript.length && wanted.has('org.iso.23220.education.transcript.1')) {
+    if (transcript.length) {
       namespaces['org.iso.23220.education.transcript.1'] = transcript;
     }
 
@@ -397,9 +403,9 @@ class IssuerService {
     let credential = null;
     let mdocBase64url = null;
     
-    if (CREDENTIAL_KINDS[credentialData.docType]) {
-      // A credential kind this issuer publishes (qualification or transcript),
-      // validated against the ISO 23220 shape and issued as a signed mdoc.
+    if (credentialData.docType === PHOTOID_DOCTYPE) {
+      // A photo-ID-shaped credential: identity plus whichever academic namespace the
+      // record holds, validated against the ISO 23220 shape and issued as a signed mdoc.
       if (!this.validatePhotoIDRequest(credentialData)) {
         return {
           success: false,
@@ -442,6 +448,9 @@ class IssuerService {
         education_qualification: credentialData.education_qualification,
         education_transcript: credentialData.education_transcript,
         credentialType: 'PhotoID',
+        // The academic namespace this credential holds decides its kind, which is what the
+        // portal and the wallet label it by: both kinds share the photo-ID docType.
+        kind: kindOfCredentialData(credentialData),
         status: 'active',
         signature: `sig_${uuidv4()}`,
         deviceKey: deviceKeyJwk,
@@ -467,7 +476,7 @@ class IssuerService {
         if (!mdoc) {
           return {
             success: false,
-            error: `No claims to issue for ${credentialData.docType}: a ${CREDENTIAL_KINDS[credentialData.docType].label} needs its own academic data`,
+            error: `No claims to issue: a ${labelOfCredentialData(credentialData)} needs its own academic data`,
           };
         }
         mdocBase64url = mdoc.base64url;
@@ -544,7 +553,7 @@ class IssuerService {
     return {
       success: true,
       credentialId,
-      docType: credentialData.docType || DEFAULT_DOCTYPE,
+      docType: credentialData.docType || PHOTOID_DOCTYPE,
       status: 'active',
       deviceKey: credential.deviceKey || null,
       deviceBound: credential.deviceBound || false,
@@ -754,7 +763,7 @@ class IssuerService {
     if (session.status === 'issued') {
       return { success: false, error: 'Issuance session already claimed' };
     }
-    const docType = session.credentialData?.docType || DEFAULT_DOCTYPE;
+    const docType = session.credentialData?.docType || PHOTOID_DOCTYPE;
     const statusIndex = this._allocateStatusIndex();
     const mdoc = this.buildCredentialMdoc(session.credentialData, deviceJwk, statusIndex);
     if (!mdoc) return { success: false, error: `No claims to issue for ${docType}` };
@@ -770,6 +779,7 @@ class IssuerService {
       institution: session.institution,
       ...session.credentialData,
       credentialType: 'PhotoID',
+      kind: kindOfCredentialData(session.credentialData),
       status: 'active',
       statusIndex,
       deviceKey: deviceJwk,
@@ -1636,16 +1646,19 @@ const isEmail = (value) => /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(String(value || '')
 
 /** The docType a stored issuance session will issue. */
 function docTypeOf(session) {
-  return session?.credentialData?.docType || DEFAULT_DOCTYPE;
+  return session?.credentialData?.docType || PHOTOID_DOCTYPE;
 }
 
-/** The kind label for a session, derived from its docType rather than guessed. */
+/**
+ * The kind of a session, from the academic namespace its record holds rather than from
+ * its docType, which every kind shares.
+ */
 function kindOf(session) {
-  return CREDENTIAL_KINDS[docTypeOf(session)]?.kind || 'credential';
+  return kindOfCredentialData(session?.credentialData || {});
 }
 
 function kindLabel(session) {
-  return CREDENTIAL_KINDS[docTypeOf(session)]?.label || docTypeOf(session);
+  return labelOfCredentialData(session?.credentialData || {});
 }
 
 function bearerToken(req) {
@@ -1726,6 +1739,7 @@ app.post('/academy/requests', async (req, res) => {
         kind: record.kind,
         label: record.label,
         docType: record.docType,
+        academicNamespace: record.academicNamespace,
         title: record.display.title,
         graduationDate: record.display.graduationDate ?? null,
         totalCredits: record.display.totalCredits ?? null,
@@ -1765,6 +1779,9 @@ app.get('/academy/credentials', async (req, res) => {
         kind: kindOf(session),
         label: kindLabel(session),
         docType: docTypeOf(session),
+        // What tells this credential apart from the organisation's other kind: they share
+        // a docType, so the academic namespace is the discriminator.
+        academicNamespaces: academicNamespacesOf(session.credentialData || {}),
         title: session.display?.title || 'Academic credential',
         institution: session.display?.institution || session.institution,
         degreeLevel: session.display?.degreeLevel || null,

@@ -36,9 +36,9 @@ a transcript by email through the same verification path as today.
 
 ## Unknowns to settle before building
 
-- **Identity in the transcript credential.** Does a transcript credential need to
-  carry the student's name for a registrar to accept it, or is the holder's device
-  authentication plus the student id enough? Decision recorded in the architecture note.
+- **Identity in the transcript credential.** Settled: the transcript is issued as a
+  photo-ID document, so it carries the same personal components as a qualification, with
+  the grades in their own namespace (`org.iso.23220.education.transcript.1`).
 - **`id-verifier` behaviour for a non-photoid docType**: whether it validates a
   transcript docType and returns its namespace claims unchanged (to be proven by the
   Trust University story, not assumed).

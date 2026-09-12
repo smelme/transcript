@@ -11,8 +11,9 @@ know which one I am presenting or sharing and can choose deliberately.
 
 ## Scope
 
-- Registry entries carry a kind derived from the credential's docType, with a readable
-  label and, for a transcript, summary information (courses, credits).
+- Registry entries carry a kind derived from the academic namespace the credential holds
+  (both kinds share the photo-ID docType), with a readable label and, for a transcript,
+  summary information (courses, credits).
 - The credential list and detail screens distinguish the two kinds visually and in text
   without inventing new decoration.
 - Sharing and presentment act on a single credential of a chosen kind; the share UI offers

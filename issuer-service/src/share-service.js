@@ -4,7 +4,7 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import { renderSharePdf } from './pdf.js';
 import { devOtpAllowed } from './email-service.js';
-import { CREDENTIAL_KINDS, DEFAULT_DOCTYPE } from './credential-generator.js';
+import { PHOTOID_DOCTYPE } from './credential-generator.js';
 
 /**
  * Selective-disclosure "share" flow for recipients that cannot integrate with
@@ -57,14 +57,6 @@ const SHARE_CATEGORIES = {
     },
   },
 };
-
-/**
- * Namespaces assumed when a credential predates the kind registry: every category,
- * which is how a single credential used to carry all three namespaces.
- */
-const defaultNamespaces = Object.values(SHARE_CATEGORIES).flatMap((category) =>
-  Object.keys(category.nameSpaces),
-);
 
 const DEFAULT_TTL_DAYS = parseInt(process.env.SHARE_TTL_DAYS || '30', 10);
 const OTP_TTL_MS = 10 * 60 * 1000;
@@ -150,7 +142,7 @@ export class ShareService {
   }
 
   // ── Helpers ──────────────────────────────────────────────────────────────
-  async verifierCreateSession(nameSpaces, credentialId = null, docType = DEFAULT_DOCTYPE) {
+  async verifierCreateSession(nameSpaces, credentialId = null, docType = PHOTOID_DOCTYPE) {
     const response = await fetch(`${this.verifierApiUrl}/presentation/sessions`, {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
@@ -222,12 +214,15 @@ export class ShareService {
     const selected = [...new Set(categories)].filter((c) => SHARE_CATEGORIES[c]);
     if (selected.length === 0) throw new Error('Select at least one category to share');
 
-    // Only categories this credential actually holds: asking a transcript credential
-    // for qualification claims (or the reverse) would disclose nothing and confuse the
-    // holder, so it is refused up front.
-    const supported = new Set(
-      CREDENTIAL_KINDS[credential.credential.docType]?.namespaces || defaultNamespaces,
-    );
+    // What the credential actually holds, not what its docType implies: every kind shares
+    // the photo-ID docType and they are told apart by their academic namespace.
+    const supported = new Set(['org.iso.23220.photoid.1']);
+    if (credential.credential.education_qualification) {
+      supported.add('org.iso.23220.education.qualification.1');
+    }
+    if (credential.credential.education_transcript) {
+      supported.add('org.iso.23220.education.transcript.1');
+    }
     for (const category of selected) {
       const namespaces = Object.keys(SHARE_CATEGORIES[category].nameSpaces);
       if (!namespaces.some((ns) => supported.has(ns))) {

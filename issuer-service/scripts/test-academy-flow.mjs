@@ -175,9 +175,10 @@ check(
   JSON.stringify(transcriptRequest.credentials?.map((c) => c.docType)),
 );
 check(
-  'the transcript credential names its own docType',
-  transcriptRequest.credentials?.[0]?.docType === 'org.iso.23220.education.transcript.1',
-  transcriptRequest.credentials?.[0]?.docType,
+  'the transcript credential is a photo-ID document holding the transcript namespace',
+  transcriptRequest.credentials?.[0]?.docType === 'org.iso.23220.photoid.1' &&
+    transcriptRequest.credentials?.[0]?.academicNamespace === 'org.iso.23220.education.transcript.1',
+  `${transcriptRequest.credentials?.[0]?.docType} / ${transcriptRequest.credentials?.[0]?.academicNamespace}`,
 );
 check(
   'the transcript credential is labelled as a transcript',
@@ -197,8 +198,10 @@ check('the wallet sees one credential to add', (transcriptList.credentials || []
 check(
   'the wallet is told it is a transcript',
   transcriptList.credentials?.[0]?.kind === 'transcript' &&
-    transcriptList.credentials?.[0]?.label === 'Academic transcript',
-  `${transcriptList.credentials?.[0]?.kind} / ${transcriptList.credentials?.[0]?.label}`,
+    transcriptList.credentials?.[0]?.label === 'Academic transcript' &&
+    JSON.stringify(transcriptList.credentials?.[0]?.academicNamespaces) ===
+      JSON.stringify(['org.iso.23220.education.transcript.1']),
+  `${transcriptList.credentials?.[0]?.kind} / ${transcriptList.credentials?.[0]?.label} / ${JSON.stringify(transcriptList.credentials?.[0]?.academicNamespaces)}`,
 );
 
 const transcriptOffer = (await call(
@@ -208,17 +211,19 @@ const transcriptOffer = (await call(
   transcriptAuth,
 )).data;
 check(
-  'the offer names the transcript docType',
-  transcriptOffer.docType === 'org.iso.23220.education.transcript.1',
-  transcriptOffer.docType,
+  'the offer names the photo-ID docType and reports the kind',
+  transcriptOffer.docType === 'org.iso.23220.photoid.1' && transcriptOffer.kind === 'transcript',
+  `${transcriptOffer.docType} / ${transcriptOffer.kind}`,
 );
 const transcriptOfferPayload = JSON.parse(
   Buffer.from(String(transcriptOffer.offerUrl || '').split('credential_offer=')[1] || '', 'base64url').toString('utf8'),
 );
 check(
-  'the offered credential is the transcript',
-  transcriptOfferPayload.credentials?.[0] === 'org.iso.23220.education.transcript.1',
-  JSON.stringify(transcriptOfferPayload.credentials),
+  'the offer points at this session, which is what resolves the kind',
+  transcriptOfferPayload.grants?.['urn:ietf:params:oauth:grant-type:pre-authorized_code']?.[
+    'pre-authorized_code'
+  ] === transcriptRequest.sessionId,
+  transcriptOfferPayload.credentials?.join(','),
 );
 
 const bothRequest = (await call('POST', '/academy/requests', {
@@ -240,8 +245,9 @@ const unknownChoice = (await call('POST', '/academy/requests', {
 check(
   'an unknown choice falls back to a qualification',
   (unknownChoice.credentials || []).length === 1 &&
+    unknownChoice.credentials[0].kind === 'qualification' &&
     unknownChoice.credentials[0].docType === 'org.iso.23220.photoid.1',
-  JSON.stringify((unknownChoice.credentials || []).map((c) => c.docType)),
+  JSON.stringify((unknownChoice.credentials || []).map((c) => `${c.kind}:${c.docType}`)),
 );
 
 console.log(failures === 0 ? '\nACADEMY_FLOW_PASSED' : `\n${failures} CHECK(S) FAILED`);

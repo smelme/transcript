@@ -14,15 +14,16 @@ university without me sending documents or the university contacting Smart Acade
 
 - A Trust University registration page alongside the existing My Jobs portal, sharing the
   same verifier service and the same one-time session model.
-- The session requests docType `org.iso.23220.education.transcript.1` with the transcript
-  namespace, plus the name elements a registrar needs to identify the applicant.
+- The session requests the photo-ID docType (`org.iso.23220.photoid.1`) with the
+  transcript namespace, plus the name elements a registrar needs to identify the applicant.
 - The page renders only server-verified claims: applicant name, institution, programme,
   courses with credits, total credits and completion status, with a clear verified state.
 
 ## Acceptance criteria
 
 1. The relying party is identified as Trust University in the session (`relyingPartyId`),
-   and the request names the transcript docType and its namespaces.
+   and the request names the photo-ID docType with the transcript namespace - the namespace
+   is what limits it to the transcript credential.
 2. A wallet holding both kinds is asked for the transcript and discloses only the
    requested namespaces.
 3. The verifier validates the DeviceResponse, resolves status from the signed MSO and

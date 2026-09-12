@@ -124,38 +124,84 @@ function isoDate(year, month, day) {
 }
 
 /**
- * The credential kinds this issuer issues, keyed by the docType carried in the mdoc.
+ * The document type both credential kinds are issued under: a photo-ID document carrying
+ * the holder's personal components.
+ */
+export const PHOTOID_DOCTYPE = 'org.iso.23220.photoid.1';
+
+export const PHOTOID_NAMESPACE = 'org.iso.23220.photoid.1';
+export const QUALIFICATION_NAMESPACE = 'org.iso.23220.education.qualification.1';
+export const TRANSCRIPT_NAMESPACE = 'org.iso.23220.education.transcript.1';
+
+/**
+ * The credential kinds this issuer offers, keyed by kind.
  *
- * Both kinds carry the holder's identity so a relying party can bind the claims to a
- * person; each kind adds only the namespace that belongs to it, so a transcript
- * credential never carries qualification claims and vice versa.
+ * Both kinds are issued under the same docType - a photo-ID document carrying the
+ * holder's personal components - and are told apart by the academic namespace they
+ * hold: the qualification credential carries the qualification claims, the transcript
+ * credential carries the grades. A relying party selects by namespace, not by docType.
  */
 export const CREDENTIAL_KINDS = {
-  'org.iso.23220.photoid.1': {
-    kind: 'qualification',
+  qualification: {
     label: 'Qualification',
-    namespaces: ['org.iso.23220.photoid.1', 'org.iso.23220.education.qualification.1'],
+    docType: PHOTOID_DOCTYPE,
+    academicNamespace: QUALIFICATION_NAMESPACE,
+    academicField: 'education_qualification',
+    namespaces: [PHOTOID_NAMESPACE, QUALIFICATION_NAMESPACE],
   },
-  'org.iso.23220.education.transcript.1': {
-    kind: 'transcript',
+  transcript: {
     label: 'Academic transcript',
-    namespaces: ['org.iso.23220.photoid.1', 'org.iso.23220.education.transcript.1'],
+    docType: PHOTOID_DOCTYPE,
+    academicNamespace: TRANSCRIPT_NAMESPACE,
+    academicField: 'education_transcript',
+    namespaces: [PHOTOID_NAMESPACE, TRANSCRIPT_NAMESPACE],
   },
 };
 
-export const DEFAULT_DOCTYPE = 'org.iso.23220.photoid.1';
+export const DEFAULT_KIND = 'qualification';
 
 /**
- * The docTypes a request asks for: `qualification` (the default and historic
- * behaviour), `transcript`, or `both`. Anything unrecognised is treated as
- * `qualification` rather than rejected here, so a typo cannot silently issue two
- * credentials.
+ * The kinds a request asks for: `qualification` (the default and historic behaviour),
+ * `transcript`, or `both`. Anything unrecognised is treated as `qualification` rather
+ * than rejected here, so a typo cannot silently issue two credentials.
  */
-export function requestedDocTypes(include) {
+export function requestedKinds(include) {
   const value = String(include ?? '').trim().toLowerCase();
-  if (value === 'transcript') return ['org.iso.23220.education.transcript.1'];
-  if (value === 'both') return [DEFAULT_DOCTYPE, 'org.iso.23220.education.transcript.1'];
-  return [DEFAULT_DOCTYPE];
+  if (value === 'transcript') return ['transcript'];
+  if (value === 'both') return ['qualification', 'transcript'];
+  return [DEFAULT_KIND];
+}
+
+/**
+ * The kind a credential carries, decided by the academic namespace it holds rather than
+ * by its docType (which both kinds share). A credential holding both is one combined
+ * academic credential, which is what this issuer produced before the choice existed.
+ */
+export function kindOfCredentialData(credentialData = {}) {
+  const hasQualification = Boolean(credentialData.education_qualification);
+  const hasTranscript = Boolean(credentialData.education_transcript);
+  if (hasQualification && hasTranscript) return 'academic';
+  if (hasTranscript) return 'transcript';
+  if (hasQualification) return 'qualification';
+  return 'credential';
+}
+
+/** How a credential should be labelled, from the claims it actually holds. */
+export function labelOfCredentialData(credentialData) {
+  const kind = kindOfCredentialData(credentialData);
+  if (kind === 'academic') return 'Qualification and transcript';
+  return CREDENTIAL_KINDS[kind]?.label || 'Credential';
+}
+
+/**
+ * The academic namespaces a credential holds: one for a qualification or a transcript,
+ * both for a combined academic credential, none for an identity-only credential. This is
+ * what tells the two kinds apart, since they share a docType.
+ */
+export function academicNamespacesOf(credentialData = {}) {
+  return Object.values(CREDENTIAL_KINDS)
+    .filter((spec) => Boolean(credentialData[spec.academicField]))
+    .map((spec) => spec.academicNamespace);
 }
 
 /** The identity elements both credential kinds carry. */
@@ -174,9 +220,9 @@ const IDENTITY_FIELDS = [
  *
  * @param {{ institution: string, studentId: string, fullName?: string, include?: string }} input
  * @returns {{ records: Array<{ kind: string, label: string, docType: string,
- *   credentialData: object, display: object }> }}
+ *   academicNamespace: string, credentialData: object, display: object }> }}
  */
-export function generateAcademicRecord({ institution, studentId, fullName, include = 'qualification' }) {
+export function generateAcademicRecord({ institution, studentId, fullName, include = DEFAULT_KIND }) {
   const rng = makeRng(seedFrom(institution, studentId));
 
   const given = fullName?.trim().split(/\s+/)[0] || pick(rng, FIRST_NAMES);
@@ -251,41 +297,43 @@ export function generateAcademicRecord({ institution, studentId, fullName, inclu
     gpa,
   };
 
-  // Each credential carries only its own academic namespace: the holder chooses the
-  // kind, and a relying party must never receive qualification claims it did not ask
-  // for (or the reverse).
-  const records = requestedDocTypes(include).map((docType) => {
-    const spec = CREDENTIAL_KINDS[docType];
-    const credentialData = { docType };
+  // Each credential carries the personal components plus only its own academic
+  // namespace: the holder chooses the kind, and a relying party must never receive
+  // qualification claims it did not ask for (or the reverse).
+  const records = requestedKinds(include).map((kind) => {
+    const spec = CREDENTIAL_KINDS[kind];
+    const credentialData = { docType: spec.docType };
     for (const field of IDENTITY_FIELDS) credentialData[field] = record[field];
+    credentialData[spec.academicField] = record[spec.academicField];
 
-    if (spec.kind === 'transcript') {
-      credentialData.education_transcript = record.education_transcript;
-      return {
-        kind: spec.kind,
-        label: spec.label,
-        docType,
-        credentialData,
-        display: {
-          ...display,
-          kind: spec.kind,
-          label: spec.label,
-          title: `Academic transcript — ${programme.level} of ${programme.field}`,
-        },
-      };
-    }
-
-    credentialData.education_qualification = record.education_qualification;
     return {
-      kind: spec.kind,
+      kind,
       label: spec.label,
-      docType,
+      docType: spec.docType,
+      academicNamespace: spec.academicNamespace,
       credentialData,
-      display: { ...display, kind: spec.kind, label: spec.label, title: qualificationTitle },
+      display: {
+        ...display,
+        kind,
+        label: spec.label,
+        title:
+          kind === 'transcript'
+            ? `Academic transcript — ${programme.level} of ${programme.field}`
+            : qualificationTitle,
+      },
     };
   });
 
   return { records };
 }
 
-export default { generateAcademicRecord, CREDENTIAL_KINDS, DEFAULT_DOCTYPE, requestedDocTypes };
+export default {
+  generateAcademicRecord,
+  CREDENTIAL_KINDS,
+  DEFAULT_KIND,
+  PHOTOID_DOCTYPE,
+  requestedKinds,
+  kindOfCredentialData,
+  labelOfCredentialData,
+  academicNamespacesOf,
+};

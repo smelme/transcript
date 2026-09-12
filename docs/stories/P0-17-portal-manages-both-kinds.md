@@ -20,8 +20,8 @@ and act on it.
 
 ## Acceptance criteria
 
-1. Each row states its kind, derived from the credential's docType, never from a guess
-   about its contents.
+1. Each row states its kind, derived from the academic namespace the credential holds
+   (both kinds share the docType), never from a guess about its contents.
 2. Filtering by kind returns only that kind, and the count matches the filter.
 3. The organisation's own credentials only; a cross-organisation revoke is refused with the
    existing 403.

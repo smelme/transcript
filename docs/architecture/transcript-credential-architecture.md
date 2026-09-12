@@ -14,8 +14,8 @@ unchanged, and revocation must stay per credential.
 | Option | Benefits | Risks | Decision |
 |---|---|---|---|
 | Keep one credential with all namespaces; choose only at presentation | No issuer change | Wallet cannot tell a qualification from a transcript; a registrar must request the identity credential and receive qualification claims with it; one status applies to everything | Rejected |
-| Separate docType per kind: `org.iso.23220.photoid.1` (identity + qualification) and `org.iso.23220.education.transcript.1` (identity + transcript) | Additive, no change to existing credentials or My Jobs; each kind has its own status index, registry row and revocation; the wallet and portal can label by docType; the RP asks for exactly what it needs | Two credentials per student when both are chosen; two sessions to claim | **Selected** |
-| Move qualification out of `photoid.1` into its own docType | Symmetric kinds | Breaks every qualification credential already in a wallet and the My Jobs request | Rejected |
+| One docType for both kinds - `org.iso.23220.photoid.1`, carrying the personal components - with the academic claims in their own namespace: `org.iso.23220.education.qualification.1` or `org.iso.23220.education.transcript.1` | The transcript keeps the personal components a registrar needs; the academic claims are separated per kind; existing credentials and the My Jobs request are untouched; a relying party selects by namespace, which is what the protocol is for | docType no longer identifies the kind, so the wallet, the portal and the credential offer must label by namespace | **Selected** |
+| A distinct docType per kind (`org.iso.23220.education.transcript.1` for the transcript) | The kind is visible in the docType | Splits the document type away from the personal components it shares with a qualification; an unfamiliar docType to wallets and relying parties | Rejected |
 
 ## Selected design
 
@@ -25,8 +25,8 @@ flowchart TD
   Academy -->|POST /academy/requests include=...| Issuer[Issuer service]
   Issuer -->|one issuance session per kind, own status index| Sessions[Issuance sessions]
   Sessions -->|claim with device key| Wallet[Android wallet]
-  Wallet --> Qual[Qualification credential<br/>docType photoid.1]
-  Wallet --> Transcript[Transcript credential<br/>docType education.transcript.1]
+  Wallet --> Qual[Qualification credential<br/>photo-ID docType<br/>qualification namespace]
+  Wallet --> Transcript[Transcript credential<br/>photo-ID docType<br/>transcript namespace]
 
   Registrar[Trust University RP] -->|POST /presentation/sessions<br/>docType education.transcript.1| Verifier[Verifier service]
   Verifier -->|org-iso-mdoc request| Wallet
@@ -40,10 +40,20 @@ flowchart TD
 
 ### Credential kinds
 
-| Kind | docType | Namespaces | Used by |
+Both kinds are issued as a photo-ID document (`org.iso.23220.photoid.1`) carrying the
+holder's personal components; the academic namespace decides the kind.
+
+| Kind | docType | Namespaces held | Used by |
 |---|---|---|---|
-| Qualification | `org.iso.23220.photoid.1` | `org.iso.23220.photoid.1`, `org.iso.23220.education.qualification.1` | My Jobs, existing credentials |
-| Transcript | `org.iso.23220.education.transcript.1` | `org.iso.23220.photoid.1`, `org.iso.23220.education.transcript.1` | Trust University, sharing |
+| Qualification | `org.iso.23220.photoid.1` | `org.iso.23220.photoid.1` (personal), `org.iso.23220.education.qualification.1` | My Jobs, existing credentials |
+| Transcript | `org.iso.23220.photoid.1` | `org.iso.23220.photoid.1` (personal), `org.iso.23220.education.transcript.1` (grades) | Trust University, sharing |
+
+Selection is by namespace, not by docType: a registrar asking for the photo-ID docType with
+the transcript namespace can only be satisfied by the transcript credential. Because the
+docType is shared, the kind is reported explicitly (`kind`, `label`,
+`academicNamespaces`) so the wallet, the portal and the academy app label a credential from
+what it holds rather than guessing. A credential holding both academic namespaces - the
+combined credential issued before the choice existed - is reported as `academic`.
 
 Identity travels with both kinds so a registrar can bind a transcript to a person. The
 holder still discloses namespace by namespace, so sharing a transcript can withhold
@@ -70,9 +80,14 @@ identity fields exactly as sharing a qualification does today.
 - `GET /academy/credentials` entries gain `kind` and `docType`.
 - `credentialData.docType` decides what `POST /credentials/issue`,
   `POST /issuance-sessions` and the claim path build; `docType` is no longer hard-coded.
-- `POST /shares` uses the credential's own docType when it creates the verifier session.
+- `POST /shares` uses the credential's own docType when it creates the verifier session,
+  and refuses a category the credential does not hold.
 - Relying parties pass `docType` and `nameSpaces` per session; Trust University asks for
-  the transcript docType and, for registration, the transcript namespace plus the name.
+  the photo-ID docType with the transcript namespace, plus the name elements a registrar
+  needs. My Jobs keeps asking for the qualification namespace.
+- One limitation to note: the OpenID4VCI credential offer names the docType, so both kinds
+  look alike in an offer. The offer's pre-authorized code is the session, which is what
+  carries the kind; the academy app is told it separately.
 
 ## Failure behavior and rollback
 

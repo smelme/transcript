@@ -23,7 +23,9 @@ process.on('exit', () => {
 
 const { IssuerService } = await import('../src/index.js');
 const { getDb } = await import('../../db.js');
-const { generateAcademicRecord } = await import('../src/credential-generator.js');
+const { generateAcademicRecord, kindOfCredentialData, academicNamespacesOf } = await import(
+  '../src/credential-generator.js'
+);
 const { verifyIssuerSigned } = await import('../../mdoc-core.js');
 
 // Every test asserts against an empty store, but issued credentials are
@@ -41,14 +43,19 @@ test('Credential kinds - a transcript is its own credential', () => {
   });
   assert.strictEqual(records.length, 1);
   assert.strictEqual(records[0].kind, 'transcript');
-  assert.strictEqual(records[0].docType, 'org.iso.23220.education.transcript.1');
+  assert.strictEqual(
+    records[0].docType,
+    'org.iso.23220.photoid.1',
+    'both kinds are issued as photo-ID documents',
+  );
+  assert.strictEqual(records[0].academicNamespace, 'org.iso.23220.education.transcript.1');
   assert.ok(records[0].credentialData.education_transcript, 'expected transcript data');
   assert.strictEqual(
     records[0].credentialData.education_qualification,
     undefined,
     'a transcript credential must not carry qualification data',
   );
-  assert.ok(records[0].credentialData.full_name, 'identity travels with the transcript');
+  assert.ok(records[0].credentialData.full_name, 'the personal components travel with it');
 });
 
 test('Credential kinds - both means two credentials, one per kind', () => {
@@ -58,11 +65,15 @@ test('Credential kinds - both means two credentials, one per kind', () => {
     include: 'both',
   });
   assert.deepStrictEqual(records.map((record) => record.kind), ['qualification', 'transcript']);
-  assert.deepStrictEqual(records.map((record) => record.docType), [
-    'org.iso.23220.photoid.1',
+  assert.deepStrictEqual(
+    records.map((record) => record.docType),
+    ['org.iso.23220.photoid.1', 'org.iso.23220.photoid.1'],
+    'the docType does not tell the kinds apart',
+  );
+  assert.deepStrictEqual(records.map((record) => record.academicNamespace), [
+    'org.iso.23220.education.qualification.1',
     'org.iso.23220.education.transcript.1',
   ]);
-  assert.deepStrictEqual(records.map((record) => record.display.kind), ['qualification', 'transcript']);
 });
 
 test('Credential kinds - qualification is the default, even for an unknown choice', () => {
@@ -73,10 +84,25 @@ test('Credential kinds - qualification is the default, even for an unknown choic
       include,
     });
     assert.strictEqual(records.length, 1, `include=${include}`);
+    assert.strictEqual(records[0].kind, 'qualification');
     assert.strictEqual(records[0].docType, 'org.iso.23220.photoid.1');
     assert.ok(records[0].credentialData.education_qualification);
     assert.strictEqual(records[0].credentialData.education_transcript, undefined);
   }
+});
+
+test('Credential kinds - the kind comes from the academic namespace, not the docType', () => {
+  assert.strictEqual(kindOfCredentialData({ docType: 'org.iso.23220.photoid.1' }), 'credential');
+  assert.strictEqual(kindOfCredentialData({ education_qualification: {} }), 'qualification');
+  assert.strictEqual(kindOfCredentialData({ education_transcript: {} }), 'transcript');
+  assert.strictEqual(
+    kindOfCredentialData({ education_qualification: {}, education_transcript: {} }),
+    'academic',
+    'a credential holding both is the combined academic credential issued before the choice existed',
+  );
+  assert.deepStrictEqual(academicNamespacesOf({ education_transcript: {} }), [
+    'org.iso.23220.education.transcript.1',
+  ]);
 });
 
 test('Credential kinds - a transcript mdoc carries no qualification namespace', () => {
@@ -90,7 +116,7 @@ test('Credential kinds - a transcript mdoc carries no qualification namespace', 
   assert.ok(mdoc, 'expected a signed mdoc');
 
   const verified = verifyIssuerSigned(mdoc.base64url);
-  assert.strictEqual(verified.docType, 'org.iso.23220.education.transcript.1');
+  assert.strictEqual(verified.docType, 'org.iso.23220.photoid.1');
   assert.deepStrictEqual(Object.keys(verified.namespaces).sort(), [
     'org.iso.23220.education.transcript.1',
     'org.iso.23220.photoid.1',
@@ -115,7 +141,7 @@ test('Credential kinds - a qualification mdoc carries no transcript namespace', 
   ]);
 });
 
-test('Credential kinds - issuing a transcript records its own docType', () => {
+test('Credential kinds - issuing a transcript records its kind', () => {
   const issuer = new IssuerService();
   const { records } = generateAcademicRecord({
     institution: 'Smart Academy',
@@ -124,10 +150,12 @@ test('Credential kinds - issuing a transcript records its own docType', () => {
   });
   const result = issuer.issue(records[0].credentialData);
   assert.strictEqual(result.success, true, result.error);
-  assert.strictEqual(result.docType, 'org.iso.23220.education.transcript.1');
+  assert.strictEqual(result.docType, 'org.iso.23220.photoid.1');
 
   const stored = issuer.getCredential(result.credentialId);
-  assert.strictEqual(stored.credential.docType, 'org.iso.23220.education.transcript.1');
+  assert.strictEqual(stored.credential.kind, 'transcript');
+  assert.strictEqual(stored.credential.education_qualification, undefined);
+  assert.ok(stored.credential.education_transcript, 'the grades are on the credential');
   assert.notStrictEqual(
     stored.credential.statusIndex,
     undefined,

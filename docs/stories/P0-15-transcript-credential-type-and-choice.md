@@ -13,31 +13,35 @@ without receiving qualification claims I did not offer.
 
 ## Scope
 
-- A second credential kind, docType `org.iso.23220.education.transcript.1`, carrying the
-  identity namespace plus the transcript namespace; the existing qualification credential
-  keeps docType `org.iso.23220.photoid.1` and is unchanged.
-- Namespace assembly is decided by the requested kind; a credential never carries a
-  namespace belonging to another kind.
+- Both kinds are issued as a photo-ID document (`org.iso.23220.photoid.1`) carrying the
+  holder's personal components; the academic namespace decides the kind:
+  `org.iso.23220.education.qualification.1` or `org.iso.23220.education.transcript.1`
+  (the grades). The existing qualification credential is unchanged.
+- Namespace assembly follows the record: a qualification credential never carries the
+  grades, and a transcript credential never carries qualification claims.
 - `POST /academy/requests` accepts `include`: `qualification` (default), `transcript`, or
   `both`, and creates one issuance session per requested kind.
-- `docType` stops being hard-coded in `issue()`, `issueForSession()` and the share
-  session creation; the credential's own docType is used.
-- `GET /academy/credentials` reports `kind` and `docType` per entry.
+- The kind is reported explicitly (`kind`, `label`, `academicNamespaces`) because the
+  docType is shared, and it is recorded on the credential.
+- `GET /academy/credentials` reports `kind`, `label`, `docType` and `academicNamespaces`
+  per entry.
 
 ## Acceptance criteria
 
 1. Requesting `transcript` yields exactly one mdoc with docType
-   `org.iso.23220.education.transcript.1` containing the identity and transcript
-   namespaces and **no** qualification namespace.
-2. Requesting `qualification` yields today's credential byte-for-byte in structure
-   (identity + qualification namespaces, docType `org.iso.23220.photoid.1`).
+   `org.iso.23220.photoid.1` containing the personal namespace and the transcript
+   namespace, and **no** qualification namespace.
+2. Requesting `qualification` yields today's credential in structure (personal +
+   qualification namespaces).
 3. Requesting `both` yields two credentials, each with its own status index, registry row
    and independent revocation.
 4. An unknown or absent `include` behaves as `qualification`.
-5. `POST /credentials/issue` rejects a body whose docType is not a known kind.
-6. The registry row, the returned `docType` and the share session all name the credential's
-   actual docType.
+5. `POST /credentials/issue` rejects a body whose docType is not a known document type.
+6. The registry row, the returned `kind`, the credential offer and the share session all
+   name the credential's actual document type and kind.
 7. Revocation and status-list behaviour are unchanged for both kinds.
+8. A credential holding both academic namespaces (issued before the choice existed) is
+   reported as `academic` rather than mislabelled as one kind.
 
 ## Explicit non-goals
 
