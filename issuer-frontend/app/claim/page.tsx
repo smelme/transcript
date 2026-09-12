@@ -15,6 +15,21 @@ function ClaimFlow() {
   const params = useSearchParams();
   const invitedEmail = (params.get('email') || '').trim().toLowerCase();
 
+  /**
+   * What the applicant asked for, carried in the link by the request step. The claim page shows
+   * that rather than every credential the account happens to hold from earlier requests - which is
+   * otherwise confusing after a second request, or when testing. A link without a choice (an older
+   * invitation) shows everything.
+   */
+  const requestedKinds = (() => {
+    const include = (params.get('include') || '').trim().toLowerCase();
+    if (include === 'both') return ['qualification', 'transcript'];
+    if (include === 'transcript') return ['transcript'];
+    if (include === 'qualification') return ['qualification'];
+    return null;
+  })();
+  const [showAll, setShowAll] = useState(false);
+
   const [email, setEmail] = useState(invitedEmail);
   const [codeSent, setCodeSent] = useState(false);
   const [otp, setOtp] = useState('');
@@ -44,6 +59,21 @@ function ClaimFlow() {
     const available = (list.credentials || []).filter((c) => !c.inWallet);
     setSelected(available[0]?.sessionId || null);
   }, []);
+
+  /** What the holder is being shown: what they asked for, unless they asked to see everything. */
+  const visibleCredentials = (credentials || []).filter(
+    (credential) => showAll || !requestedKinds || requestedKinds.includes(credential.kind),
+  );
+
+  // Keep the selection on something visible: after filtering, the previously selected credential
+  // may no longer be on screen.
+  useEffect(() => {
+    if (!credentials) return;
+    if (visibleCredentials.some((credential) => credential.sessionId === selected)) return;
+    setSelected(
+      visibleCredentials.find((credential) => !credential.inWallet)?.sessionId || null,
+    );
+  }, [credentials, showAll, selected]);
 
   /** How a credential is named in messages: its kind, not its session id. */
   function labelFor(sessionId: string | null) {
@@ -210,7 +240,9 @@ function ClaimFlow() {
               Your credentials
             </h1>
             <p style={{ fontSize: 16, lineHeight: 1.65, color: 'var(--muted)', marginBottom: 28 }}>
-              Select a credential to add to your wallet. You can add the rest later.
+              {requestedKinds && !showAll
+                ? `You asked for ${requestedKinds.map((kind) => (kind === 'transcript' ? 'an academic transcript' : 'your qualification certificate')).join(' and ')}. Add it to your wallet whenever you are ready.`
+                : 'Select a credential to add to your wallet. You can add the rest later.'}
             </p>
 
             {credentials.length === 0 ? (
@@ -220,13 +252,28 @@ function ClaimFlow() {
                   or contact the academy registry.
                 </p>
               </div>
+            ) : visibleCredentials.length === 0 ? (
+              <div className="panel">
+                <p className="muted" style={{ margin: 0 }}>
+                  Nothing waiting for {email} matches what you asked for. Your account may already
+                  hold it, or you can see everything on it.
+                </p>
+                <button
+                  type="button"
+                  className="btn btn-outline"
+                  style={{ marginTop: 14 }}
+                  onClick={() => setShowAll(true)}
+                >
+                  Show everything on my account
+                </button>
+              </div>
             ) : (
               <div
                 role="radiogroup"
                 aria-label="Choose a credential to add to your wallet"
                 style={{ display: 'grid', gap: 14, marginBottom: 26 }}
               >
-                {credentials.map((c) => {
+                {visibleCredentials.map((c) => {
                   const isSelected = selected === c.sessionId;
                   return (
                     <label
@@ -286,6 +333,18 @@ function ClaimFlow() {
               </button>
               <span className="muted">You must accept the terms to continue.</span>
             </div>
+
+            {requestedKinds && !showAll && (
+              <p style={{ marginTop: 18 }}>
+                <button
+                  type="button"
+                  className="btn btn-outline"
+                  onClick={() => setShowAll(true)}
+                >
+                  Show everything on my account
+                </button>
+              </p>
+            )}
           </>
         )}
 

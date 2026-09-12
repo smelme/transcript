@@ -55,8 +55,28 @@ contains.
 Acceptance criteria are demonstrated against a running academy app and issuer, including
 the `both` path, and the change is submitted for review on a feature branch.
 
-## Verification
+## Accepted criteria, as implemented
 
+**Reuse is claim-aware (added after a device test).** A prepared credential is reused only when it
+carries the claims this issuer would produce *now*, compared by value and independent of key order.
+Reusing one whose claims have since changed is how a student ends up presenting a record the issuer
+no longer produces — in the reported case, marks on a scale that had been replaced and none of the
+programme context, so every derived field showed a dash. So:
+
+- same claims → the same session comes back (a repeat request still creates nothing new);
+- a **prepared** credential with older claims → replaced (`status: 'superseded'`), since it was
+  never claimed and nothing is taken from the holder; it also stops being offered and its link says
+  so rather than issuing the old record;
+- a **claimed** credential with older claims → left alone in the wallet, and a current credential is
+  prepared alongside it, because a holder cannot undo a claim and may legitimately want the new one.
+
+**The choice drives the claiming step.** The claim link now carries what was asked for
+(`/claim?email=…&include=transcript`), and the claim page shows that rather than every credential the
+account happens to hold from earlier requests, with a "show everything on my account" button beside
+it. Before this, a second request showed the previous requests' credentials too, which is confusing
+in use and worse when testing.
+
+## Verification
 - `issuer-service/scripts/test-academy-flow.mjs` — 43 checks pass against a running issuer,
   including the chosen kind reflected in the response, the offer and the wallet list; asking twice
   reusing the same sessions with `reused: true` and no duplicate created; asking for a subset

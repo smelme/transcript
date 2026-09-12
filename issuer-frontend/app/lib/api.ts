@@ -151,6 +151,8 @@ export interface AcademyPreparedCredential {
   recognition?: boolean;
   /** True when this request matched a credential already prepared: nothing new was created. */
   reused: boolean;
+  /** How many prepared credentials were replaced because they held an older claim set. */
+  superseded?: number;
   inWallet: boolean;
   title: string;
   graduationDate?: string | null;

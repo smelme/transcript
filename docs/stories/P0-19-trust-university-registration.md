@@ -83,6 +83,16 @@ review.
   alongside the award fields, so a relying party does not have to read `allClaims` to find them.
 - The page renders the verified claims, the module table with workload and grouping, the
   recognition panel, the verification time, and distinct loading, cancelled and error states.
+- **What it shows, after a device test asked for more:** the institution (name, recognised name and
+  identifier), the programme with its CIP code, the level with the framework that defines it, the
+  award, the **period of study**, the credit scheme and credits earned against attempted, the average
+  with its scale and maximum, the outcome, the language of instruction, and - per module - the
+  **term** it was taken in, its credits, its mark with its grade points, its workload and whether it
+  was required.
+- **When a field shows a dash it says why**, rather than leaving the reader to guess: a credential
+  issued before the current claim set carries only modules and credits, and some credentials carry
+  modules without the terms they were taken in. It says plainly that nothing is inferred and that a
+  field which is needed means asking the applicant for a newly issued transcript.
 
 ## Blocked on / still outstanding
 

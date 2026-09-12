@@ -272,9 +272,13 @@ export class PresentationSessionService {
         programmeLevel: claims.programme_level || null,
         programmeLevelFramework: claims.programme_level_framework || null,
         awardTitle: claims.award_title || null,
+        // When the study happened: a registrar places a record by its period as much as by its marks.
+        enrolmentStart: claims.enrolment_start || null,
+        enrolmentEnd: claims.enrolment_end || null,
         // The average and the scale it is on, never one without the other.
         gpa: claims.overall_mark ?? null,
         gpaScaleId: claims.overall_mark_scale_id || null,
+        gpaScaleMaximum: claims.grading_scale_maximum ?? null,
         courses: claims.courses || null,
         // Recognition details, when the credential was issued with them: how the institution
         // is identified outside its own name, in which language the study was taught, and who

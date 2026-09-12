@@ -151,6 +151,8 @@ export function buildTranscriptCredential({ signerKeyPem, certDer, status = null
         ['programme_level', new Cbor().tstr("Bachelor's degree").encode()],
         ['programme_level_framework', new Cbor().tstr('IPEDS-award-level').encode()],
         ['award_title', new Cbor().tstr('Bachelor of Science').encode()],
+        ['enrolment_start', fullDate('2022-08-29')],
+        ['enrolment_end', fullDate('2025-06-01')],
         ['grading_scale_id', new Cbor().tstr('us-gpa-4').encode()],
         ['grading_scale_maximum', new Cbor().f64(4).encode()],
         ['credit_scheme', new Cbor().tstr('us-credit-hour').encode()],

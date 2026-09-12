@@ -780,47 +780,56 @@ class IssuerService {
       return [];
     }
     const normalizedEmail = email ? String(email).trim().toLowerCase() : null;
-    return rows
-      .map((row) => this._hydrateIssuanceSession(row))
-      .filter((session) => {
-        if (sub && session.sub === sub) return true;
-        if (normalizedEmail && session.email === normalizedEmail) return true;
-        return links.some(
-          (l) => l.institution === session.institution && l.studentId === session.studentId,
-        );
-      });
+    const filterSession = (session) => {
+      if (session.status === 'superseded') return false;
+      if (sub && session.sub === sub) return true;
+      if (normalizedEmail && session.email === normalizedEmail) return true;
+      return links.some(
+        (l) => l.institution === session.institution && l.studentId === session.studentId,
+      );
+    };
+    return rows.map((row) => this._hydrateIssuanceSession(row)).filter(filterSession);
   }
 
   /**
-   * An issuance session this student already holds for one academic namespace.
-   *
-   * A repeat request must not mint a duplicate credential, and the academic namespace is
-   * what tells the kinds apart (both share a docType). A pending session is preferred, so
-   * a link the student already has keeps working, but an issued one is still returned: the
-   * academy's non-goal is self-service re-issue, so the caller reports it as already held.
+   * Every session this student already has for one academic namespace, pending before issued and
+   * newest first. The caller decides whether any of them is what it would issue now: a prepared
+   * credential from an older claim set must not be handed back as if it were current.
    */
-  findIssuanceSessionFor({ studentId, institution, academicNamespace }) {
-    if (!studentId || !academicNamespace) return undefined;
+  findIssuanceSessionsFor({ studentId, institution, academicNamespace }) {
+    if (!studentId || !academicNamespace) return [];
     let rows;
     try {
       rows = this.db
         .prepare(
           `SELECT * FROM issuance_sessions
-            WHERE student_id = ? AND institution = ?
+            WHERE student_id = ? AND institution = ? AND status != 'superseded'
             ORDER BY (status = 'pending') DESC, created_at DESC`,
         )
         .all(String(studentId), String(institution));
     } catch (e) {
       console.error('[issuer] issuance session lookup by namespace failed:', e.message);
-      return undefined;
+      return [];
     }
-    for (const row of rows) {
-      const session = this._hydrateIssuanceSession(row);
-      if (academicNamespacesOf(session.credentialData || {}).includes(academicNamespace)) {
-        return session;
-      }
-    }
-    return undefined;
+    return rows
+      .map((row) => this._hydrateIssuanceSession(row))
+      .filter((session) =>
+        academicNamespacesOf(session.credentialData || {}).includes(academicNamespace),
+      );
+  }
+
+  /**
+   * Retire a prepared credential that is no longer what the issuer would produce, so a repeat
+   * request yields one current credential rather than a stale one plus a fresh one. The holder
+   * never claimed it, so nothing is taken away from them.
+   */
+  supersedeIssuanceSession(sessionId) {
+    const session = this.getIssuanceSession(sessionId);
+    if (!session || session.status !== 'pending') return undefined;
+    session.status = 'superseded';
+    session.supersededAt = new Date().toISOString();
+    this._persistIssuanceSession(session);
+    return session;
   }
 
   /** Attach an account to a session created before the holder signed in. */
@@ -894,6 +903,12 @@ class IssuerService {
     if (session.status === 'issued') {
       return { success: false, error: 'Issuance session already claimed' };
     }
+    if (session.status === 'superseded') {
+      return {
+        success: false,
+        error: 'This credential was replaced by a newer one — open your latest invitation link',
+      };
+    }
     const docType = session.credentialData?.docType || PHOTOID_DOCTYPE;
     const statusIndex = this._allocateStatusIndex();
     const mdoc = this.buildCredentialMdoc(session.credentialData, deviceJwk, statusIndex);
@@ -953,6 +968,13 @@ class IssuerService {
     if (!session) return { success: false, status: 404, error: 'Issuance session not found' };
     if (session.status === 'issued') {
       return { success: false, status: 409, error: 'Issuance session already claimed' };
+    }
+    if (session.status === 'superseded') {
+      return {
+        success: false,
+        status: 409,
+        error: 'This credential was replaced by a newer one — open your latest invitation link',
+      };
     }
 
     let payload;
@@ -1821,6 +1843,29 @@ const isEmail = (value) => /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(String(value || '')
 const numberOrNull = (value) => (typeof value === 'number' && Number.isFinite(value) ? value : null);
 
 /**
+ * Whether two claim sets are the same credential, compared by value and independent of key order.
+ *
+ * This is what decides whether a prepared credential may be reused: reusing one whose claims have
+ * since changed would hand the holder a record the issuer would no longer produce - which is how a
+ * student ends up presenting marks on a scale the issuer stopped using.
+ */
+function sameClaimSet(a, b) {  const stable = (value) => {
+    if (Array.isArray(value)) return value.map(stable);
+    if (value && typeof value === 'object') {
+      return Object.fromEntries(
+        Object.keys(value)
+          .sort()
+          .map((key) => [key, stable(value[key])]),
+      );
+    }
+    return value;
+  };
+  return JSON.stringify(stable(a)) === JSON.stringify(stable(b));
+}
+
+export { sameClaimSet };
+
+/**
  * How an element value is written into an mdoc. An element is one identifier/value pair, so a
  * scheme is a sibling element rather than a nested map (nested structures are opaque to
  * selective disclosure and to most mdoc debuggers), and the encoders are named rather than
@@ -1902,22 +1947,31 @@ app.post('/academy/requests', async (req, res) => {
       recognition,
     });
 
-    // One session per requested kind. A request for something the student already holds
-    // reuses the existing session instead of minting a duplicate credential, and keeps the
-    // same session id so a link or QR code they already have stays valid.
+    // One session per requested kind, and only when it is what this request would issue today:
+    // a credential prepared under older claims is replaced (it was never claimed, so nothing is
+    // taken away), while one already in the wallet stays there and a current credential is
+    // prepared alongside it, since re-issuing is not something the holder can undo.
     const issued = records.map((record) => {
-      const existing = issuer.findIssuanceSessionFor({
+      const candidates = issuer.findIssuanceSessionsFor({
         studentId,
         institution: ACADEMY_NAME,
         academicNamespace: record.academicNamespace,
       });
-      if (existing) {
-        issuer.linkIssuanceSession(existing.sessionId, { email, sub });
-        return { record, session: existing, reused: true };
+      const matching = candidates.find((session) =>
+        sameClaimSet(session.credentialData, record.credentialData),
+      );
+      if (matching) {
+        issuer.linkIssuanceSession(matching.sessionId, { email, sub });
+        return { record, session: matching, reused: true, superseded: 0 };
       }
+
+      const stale = candidates.filter((session) => session.status === 'pending');
+      for (const session of stale) issuer.supersedeIssuanceSession(session.sessionId);
+
       return {
         record,
         reused: false,
+        superseded: stale.length,
         session: issuer.createIssuanceSession({
           studentId,
           institution: ACADEMY_NAME,
@@ -1930,7 +1984,12 @@ app.post('/academy/requests', async (req, res) => {
       };
     });
 
-    const claimUrl = `${ACADEMY_SITE_URL}/claim?email=${encodeURIComponent(email)}`;
+    // The link carries what was asked for, so the claiming page shows that rather than every
+    // credential the account happens to hold from earlier requests.
+    const claimParams = new URLSearchParams({ email });
+    if (req.body?.include) claimParams.set('include', String(req.body.include));
+    if (!recognition) claimParams.set('recognition', 'false');
+    const claimUrl = `${ACADEMY_SITE_URL}/claim?${claimParams.toString()}`;
     // Only mail a link when something is still claimable: repeating a request the student
     // has already acted on must not send them a second "your credentials are ready".
     const claimable = issued.some(({ session }) => session.status !== 'issued');
@@ -1964,7 +2023,7 @@ app.post('/academy/requests', async (req, res) => {
         title: primary.record.display.title,
         graduationDate: primary.record.display.graduationDate,
       },
-      credentials: issued.map(({ record, session, reused }) => ({
+      credentials: issued.map(({ record, session, reused, superseded }) => ({
         sessionId: session.sessionId,
         kind: record.kind,
         label: record.label,
@@ -1976,6 +2035,9 @@ app.post('/academy/requests', async (req, res) => {
         // `reused` means this request matched credentials already prepared, so the same
         // session (and the same offer) is returned rather than a duplicate being created.
         reused,
+        // How many prepared credentials were replaced because they no longer carried the claims
+        // this issuer would produce - an older claim set is not handed back as if it were current.
+        superseded: superseded ?? 0,
         inWallet: session.status === 'issued',
         title: record.display.title,
         graduationDate: record.display.graduationDate ?? null,
@@ -2057,6 +2119,12 @@ app.post('/academy/credentials/:sessionId/offer', async (req, res) => {
 
     if (session.status === 'issued') {
       return res.json({ success: true, alreadyInWallet: true, sessionId: session.sessionId });
+    }
+    if (session.status === 'superseded') {
+      return res.status(409).json({
+        success: false,
+        error: 'This credential was replaced by a newer one — open your latest invitation link',
+      });
     }
 
     if (session.termsRequired && !session.termsAcceptedAt) {

@@ -21,7 +21,7 @@ process.on('exit', () => {
   }
 });
 
-const { IssuerService } = await import('../src/index.js');
+const { IssuerService, sameClaimSet } = await import('../src/index.js');
 const { getDb } = await import('../../db.js');
 const { generateAcademicRecord, kindOfCredentialData, academicNamespacesOf } = await import(
   '../src/credential-generator.js'
@@ -731,7 +731,7 @@ const academySession = (issuer, studentId, record) =>
     display: record.display,
   });
 
-test('Academy request - a repeat request reuses the credential already prepared', () => {
+test('Academy request - a repeat request finds the credential it already prepared', () => {
   const issuer = new IssuerService();
   const studentId = 'SA-DEDUPE-1';
   dropSessionsFor(studentId);
@@ -743,24 +743,31 @@ test('Academy request - a repeat request reuses the credential already prepared'
   const prepared = records.map((record) => academySession(issuer, studentId, record));
   assert.strictEqual(sessionsFor(studentId).length, 2);
 
-  const found = records.map((record) =>
-    issuer.findIssuanceSessionFor({
+  const candidates = records.map((record) =>
+    issuer.findIssuanceSessionsFor({
       studentId,
       institution: 'Smart Academy',
       academicNamespace: record.academicNamespace,
     }),
   );
 
-  assert.deepStrictEqual(
-    found.map((session) => session.sessionId),
-    prepared.map((session) => session.sessionId),
-    'the same sessions come back, in the order they were requested',
-  );
+  for (const [index, found] of candidates.entries()) {
+    assert.deepStrictEqual(
+      found.map((session) => session.sessionId),
+      [prepared[index].sessionId],
+      'the one prepared credential for that kind comes back',
+    );
+    assert.strictEqual(
+      sameClaimSet(found[0].credentialData, records[index].credentialData),
+      true,
+      'and it carries the claims this request would issue, which is what makes it reusable',
+    );
+  }
   assert.strictEqual(sessionsFor(studentId).length, 2, 'and nothing duplicate was created');
   dropSessionsFor(studentId);
 });
 
-test('Academy request - the namespace decides which credential is reused', () => {
+test('Academy request - the namespace decides which credential is offered', () => {
   const issuer = new IssuerService();
   const studentId = 'SA-DEDUPE-2';
   dropSessionsFor(studentId);
@@ -771,30 +778,28 @@ test('Academy request - the namespace decides which credential is reused', () =>
   });
   const transcript = academySession(issuer, studentId, records[0]);
 
-  assert.strictEqual(
-    issuer.findIssuanceSessionFor({
-      studentId,
-      institution: 'Smart Academy',
-      academicNamespace: 'org.iso.23220.education.transcript.1',
-    }).sessionId,
-    transcript.sessionId,
-  );
-  assert.strictEqual(
-    issuer.findIssuanceSessionFor({
+  const found = issuer.findIssuanceSessionsFor({
+    studentId,
+    institution: 'Smart Academy',
+    academicNamespace: 'org.iso.23220.education.transcript.1',
+  });
+  assert.deepStrictEqual(found.map((session) => session.sessionId), [transcript.sessionId]);
+  assert.deepStrictEqual(
+    issuer.findIssuanceSessionsFor({
       studentId,
       institution: 'Smart Academy',
       academicNamespace: 'org.iso.23220.education.qualification.1',
     }),
-    undefined,
+    [],
     'a kind the student does not hold is not answered with the kind they do',
   );
-  assert.strictEqual(
-    issuer.findIssuanceSessionFor({
+  assert.deepStrictEqual(
+    issuer.findIssuanceSessionsFor({
       studentId: 'SA-SOMEONE-ELSE',
       institution: 'Smart Academy',
       academicNamespace: 'org.iso.23220.education.transcript.1',
     }),
-    undefined,
+    [],
     'another student is never answered with this one',
   );
   dropSessionsFor(studentId);
@@ -813,14 +818,72 @@ test('Academy request - a credential already in the wallet is reported, not re-i
   session.status = 'issued';
   issuer._persistIssuanceSession(session);
 
-  const found = issuer.findIssuanceSessionFor({
+  const found = issuer.findIssuanceSessionsFor({
     studentId,
     institution: 'Smart Academy',
     academicNamespace: 'org.iso.23220.education.qualification.1',
   });
-  assert.strictEqual(found.sessionId, session.sessionId);
-  assert.strictEqual(found.status, 'issued');
+  assert.deepStrictEqual(found.map((s) => s.sessionId), [session.sessionId]);
+  assert.strictEqual(found[0].status, 'issued', 'still in the wallet, so it is not re-issued');
   assert.strictEqual(sessionsFor(studentId).length, 1, 'self-service re-issue is not offered');
+  dropSessionsFor(studentId);
+});
+
+test('Academy request - a credential prepared from older claims is replaced, not reused', () => {
+  const issuer = new IssuerService();
+  const studentId = 'SA-DEDUPE-5';
+  dropSessionsFor(studentId);
+  const { records } = generateAcademicRecord({
+    institution: 'Smart Academy',
+    studentId,
+    include: 'transcript',
+  });
+
+  // What an earlier revision of the issuer produced: the same kind, different claims - a marks
+  // scale that is no longer used, and none of the programme context.
+  const staleData = {
+    ...records[0].credentialData,
+    education_transcript: {
+      student_id: studentId,
+      courses: [{ courseCode: 'FI510', courseName: 'Asset Pricing', credits: 6, grade: 9.9 }],
+      total_credits: 6,
+      status: 'completed',
+    },
+  };
+  const stale = issuer.createIssuanceSession({
+    studentId,
+    institution: 'Smart Academy',
+    credentialData: staleData,
+    display: records[0].display,
+  });
+
+  assert.strictEqual(
+    sameClaimSet(stale.credentialData, records[0].credentialData),
+    false,
+    'the claims differ, which is what stops it being handed back as current',
+  );
+
+  const superseded = issuer.supersedeIssuanceSession(stale.sessionId);
+  assert.strictEqual(superseded.status, 'superseded');
+  assert.strictEqual(
+    issuer.getIssuanceSession(stale.sessionId).status,
+    'superseded',
+    'and the replacement is persisted, not only held in memory',
+  );
+  assert.deepStrictEqual(
+    issuer.findIssuanceSessionsFor({
+      studentId,
+      institution: 'Smart Academy',
+      academicNamespace: records[0].academicNamespace,
+    }),
+    [],
+    'a replaced credential is no longer offered',
+  );
+  assert.strictEqual(
+    issuer.issueForSession(issuer.getIssuanceSession(stale.sessionId), null).success,
+    false,
+    'and a link to it says so rather than issuing the old record',
+  );
   dropSessionsFor(studentId);
 });
 

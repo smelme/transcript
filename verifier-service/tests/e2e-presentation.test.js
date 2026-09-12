@@ -213,9 +213,15 @@ test('the registrar receives the programme, the credits and the average with its
         'programme_title',
         'programme_code',
         'programme_code_scheme',
+        'programme_level',
+        'programme_level_framework',
         'award_title',
+        'enrolment_start',
+        'enrolment_end',
         'credit_scheme',
         'total_credits',
+        'credits_attempted',
+        'credits_earned',
         'outcome',
         'overall_mark',
         'overall_mark_scale_id',
@@ -260,7 +266,14 @@ test('the registrar receives the programme, the credits and the average with its
     'us-gpa-4',
     'the average never arrives without the scale it is on',
   );
+  assert.equal(result.claims.gpaScaleMaximum, 4);
   assert.equal(result.claims.creditsEarned, 24);
+  // When the study happened, and at what level: a registrar places a record by these as much as
+  // by its marks.
+  assert.equal(result.claims.enrolmentStart, '2022-08-29');
+  assert.equal(result.claims.enrolmentEnd, '2025-06-01');
+  assert.equal(result.claims.programmeLevel, "Bachelor's degree");
+  assert.equal(result.claims.programmeLevelFramework, 'IPEDS-award-level');
   // Recognition details, so a registrar can identify the institution rather than read a name.
   assert.equal(result.claims.institutionId, 'smartacademy.example');
   assert.equal(result.claims.institutionIdScheme, 'schac');

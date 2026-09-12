@@ -27,7 +27,13 @@ const request = (await call('POST', '/academy/requests', { email })).data;
 check('request succeeds', request.success === true, request.error || '');
 check('request returns a claim link', typeof request.claimUrl === 'string' && request.claimUrl.includes('/claim'));
 check('request reports email delivery', typeof request.emailSent === 'boolean', `emailSent=${request.emailSent}`);
-check('claim link carries the invited email', decodeURIComponent(request.claimUrl.split('email=')[1]) === email);
+const claimParams = new URL(request.claimUrl).searchParams;
+check('claim link carries the invited email', claimParams.get('email') === email, request.claimUrl);
+check(
+  'the claim link carries what was asked for',
+  claimParams.get('include') === null || claimParams.get('include') === 'qualification',
+  request.claimUrl,
+);
 
 // 2. Sign in with OTP (the academy account already exists).
 const otpRes = (await call('POST', '/auth/otp', { email })).data;
@@ -184,6 +190,11 @@ check(
   'the transcript credential is labelled as a transcript',
   transcriptRequest.credentials?.[0]?.kind === 'transcript',
   transcriptRequest.credentials?.[0]?.kind,
+);
+check(
+  'the transcript request carries its choice in the claim link',
+  new URL(transcriptRequest.claimUrl).searchParams.get('include') === 'transcript',
+  transcriptRequest.claimUrl,
 );
 check(
   'the first credential is still reported for callers written before the choice',
