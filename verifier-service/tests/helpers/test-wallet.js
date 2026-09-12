@@ -121,7 +121,8 @@ export function buildAcademicCredential({ signerKeyPem, certDer, status = null }
 
 /**
  * The same holder, but issued a transcript credential: the photo-ID document the shared
- * docType implies, carrying the transcript namespace instead of the qualification one.
+ * docType implies, carrying the transcript namespace instead of the qualification one, with
+ * the programme context and the US grading and credit schemes stated beside their values.
  */
 export function buildTranscriptCredential({ signerKeyPem, certDer, status = null }) {
   return buildCredential({
@@ -134,15 +135,32 @@ export function buildTranscriptCredential({ signerKeyPem, certDer, status = null
         ['family_name', new Cbor().tstr('Doe').encode()],
       ],
       'org.iso.23220.education.transcript.1': [
+        ['institution_name', new Cbor().tstr('Smart Academy').encode()],
         ['student_id', new Cbor().tstr('SA-TRUST-1').encode()],
+        ['programme_title', new Cbor().tstr('Bachelor of Computer Science').encode()],
+        ['programme_type', new Cbor().tstr('degree').encode()],
+        ['programme_code', new Cbor().tstr('11.0101').encode()],
+        ['programme_code_scheme', new Cbor().tstr('CIP-2020').encode()],
+        ['programme_level', new Cbor().tstr("Bachelor's degree").encode()],
+        ['programme_level_framework', new Cbor().tstr('IPEDS-award-level').encode()],
+        ['award_title', new Cbor().tstr('Bachelor of Science').encode()],
+        ['grading_scale_id', new Cbor().tstr('us-gpa-4').encode()],
+        ['grading_scale_maximum', new Cbor().f64(4).encode()],
+        ['credit_scheme', new Cbor().tstr('us-credit-hour').encode()],
         ['total_credits', new Cbor().uint(24).encode()],
-        ['status', new Cbor().tstr('completed').encode()],
+        ['outcome', new Cbor().tstr('completed').encode()],
+        ['outcome_scheme', new Cbor().tstr('programme-outcome').encode()],
+        ['overall_mark', new Cbor().f64(3.5).encode()],
+        ['overall_mark_scale_id', new Cbor().tstr('us-gpa-4').encode()],
+        ['credits_attempted', new Cbor().uint(24).encode()],
+        ['credits_earned', new Cbor().uint(24).encode()],
         [
           'courses',
           new Cbor()
             .tstr('[{"courseCode":"CS101","credits":6},{"courseCode":"CS210","credits":6}]')
             .encode(),
         ],
+        ['status', new Cbor().tstr('completed').encode()],
       ],
     },
   });

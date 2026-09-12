@@ -28,14 +28,50 @@ const COUNTRIES = [
 ];
 
 const PROGRAMMES = [
-  { level: 'Bachelor', field: 'Computer Science', code: 'BSC-CS' },
-  { level: 'Bachelor', field: 'Business Administration', code: 'BSC-BA' },
-  { level: 'Bachelor', field: 'Mechanical Engineering', code: 'BSC-ME' },
-  { level: 'Bachelor', field: 'Psychology', code: 'BSC-PS' },
-  { level: 'Master', field: 'Data Science', code: 'MSC-DS' },
-  { level: 'Master', field: 'Public Health', code: 'MSC-PH' },
-  { level: 'Master', field: 'Finance', code: 'MSC-FI' },
-  { level: 'Master', field: 'Architecture', code: 'MSC-AR' },
+  // `cip` is the programme's subject in the US CIP 2020 taxonomy, and `award` the title the
+  // record leads to. Both belong to the institution's programme catalogue; these are the
+  // demo's values and the academy's own list replaces them when it supplies one.
+  { level: 'Bachelor', field: 'Computer Science', code: 'BSC-CS', cip: '11.0101', award: 'Bachelor of Science' },
+  { level: 'Bachelor', field: 'Business Administration', code: 'BSC-BA', cip: '52.0201', award: 'Bachelor of Business Administration' },
+  { level: 'Bachelor', field: 'Mechanical Engineering', code: 'BSC-ME', cip: '14.1901', award: 'Bachelor of Science' },
+  { level: 'Bachelor', field: 'Psychology', code: 'BSC-PS', cip: '42.0101', award: 'Bachelor of Arts' },
+  { level: 'Master', field: 'Data Science', code: 'MSC-DS', cip: '30.7001', award: 'Master of Science' },
+  { level: 'Master', field: 'Public Health', code: 'MSC-PH', cip: '51.2201', award: 'Master of Public Health' },
+  { level: 'Master', field: 'Finance', code: 'MSC-FI', cip: '52.0801', award: 'Master of Science' },
+  { level: 'Master', field: 'Architecture', code: 'MSC-AR', cip: '04.0201', award: 'Master of Architecture' },
+];
+
+/**
+ * The grading scheme every record in this demo is issued under: the US 4.00 grade point
+ * average scale, with the pass mark that scale is normally read at. Stated in the credential
+ * as a scale of its own, so a reader never has to assume what a number means.
+ */
+export const US_GRADING_SCALE = {
+  id: 'us-gpa-4',
+  label: 'US 4.00 grade point average scale',
+  minimum: 0,
+  maximum: 4,
+  passMark: 2,
+};
+
+/** The credit unit: US semester credit hours. */
+export const US_CREDIT_SCHEME = 'us-credit-hour';
+
+/**
+ * Letter grades with their 4.00 scale values and how often the demo awards each. Every
+ * attempt shown passed: an `F` would be an attempt that earned nothing, and this record has
+ * none - the elements exist so a record that does can say so.
+ */
+const LETTER_GRADES = [
+  { letter: 'A', points: 4.0, weight: 18 },
+  { letter: 'A-', points: 3.7, weight: 12 },
+  { letter: 'B+', points: 3.3, weight: 14 },
+  { letter: 'B', points: 3.0, weight: 14 },
+  { letter: 'B-', points: 2.7, weight: 10 },
+  { letter: 'C+', points: 2.3, weight: 8 },
+  { letter: 'C', points: 2.0, weight: 6 },
+  { letter: 'C-', points: 1.7, weight: 4 },
+  { letter: 'D', points: 1.0, weight: 2 },
 ];
 
 const COURSE_POOL = {
@@ -134,6 +170,14 @@ export const QUALIFICATION_NAMESPACE = 'org.iso.23220.education.qualification.1'
 export const TRANSCRIPT_NAMESPACE = 'org.iso.23220.education.transcript.1';
 
 /**
+ * The US-practice supplement to the transcript: the same study in the reader's units, the
+ * figures that reader computes, and the standing of the record itself. Separate from the
+ * transcript namespace because it answers a different question - not what was studied, but
+ * what a credit-hour registrar needs on top of it, and how the record stands as a document.
+ */
+export const ACADEMIC_RECORD_NAMESPACE = 'org.iso.23220.education.academic-record.1';
+
+/**
  * The credential kinds this issuer offers, keyed by kind.
  *
  * Both kinds are issued under the same docType - a photo-ID document carrying the
@@ -216,6 +260,46 @@ const IDENTITY_FIELDS = [
 ];
 
 /**
+ * US-style semesters, oldest first, ending with the term a study finishes in. An academic
+ * year N runs Fall N (late August to mid December) then Spring N+1 (mid January to mid May),
+ * so the terms of a record are counted backwards from its final one and the record never
+ * runs past the graduation it leads to. The demo's academic calendar; the academy's own
+ * dates replace them when it supplies them.
+ */
+function usTermsEndingAt(lastAcademicYear, count) {
+  const terms = [];
+  for (let back = 0; back < count; back += 1) {
+    const academicYear = lastAcademicYear - Math.floor(back / 2);
+    const isSpring = back % 2 === 0;
+    terms.unshift(
+      isSpring
+        ? {
+            title: `Spring ${academicYear + 1}`,
+            start: `${academicYear + 1}-01-16`,
+            end: `${academicYear + 1}-05-10`,
+          }
+        : {
+            title: `Fall ${academicYear}`,
+            start: `${academicYear}-08-28`,
+            end: `${academicYear}-12-15`,
+          },
+    );
+  }
+  return terms;
+}
+
+/** A letter grade drawn from the demo's distribution, with its 4.00-scale value. */
+function pickLetterGrade(rng) {
+  const total = LETTER_GRADES.reduce((sum, grade) => sum + grade.weight, 0);
+  let roll = rng() * total;
+  for (const grade of LETTER_GRADES) {
+    roll -= grade.weight;
+    if (roll <= 0) return grade;
+  }
+  return LETTER_GRADES[0];
+}
+
+/**
  * Build the academic record for a student, projected onto the requested kinds.
  *
  * @param {{ institution: string, studentId: string, fullName?: string, include?: string }} input
@@ -242,21 +326,62 @@ export function generateAcademicRecord({ institution, studentId, fullName, inclu
   const expiryYear = graduationYear + 10;
   const expiryDate = isoDate(expiryYear, graduationMonth, 30);
 
-  const gpa = Math.round((3.0 + rng() * 1.0) * 100) / 100; // 3.00 – 4.00
-
+  // ── The study ──────────────────────────────────────────────────────────
   const pool = COURSE_POOL[programme.code] || COURSE_POOL['BSC-CS'];
   const courseCount = Math.min(pool.length, 5 + Math.floor(rng() * 2));
-  const courses = [];
-  const used = new Set();
-  while (courses.length < courseCount) {
-    const idx = Math.floor(rng() * pool.length) % pool.length;
-    if (used.has(idx)) break;
-    used.add(idx);
-    const [courseCode, courseName, credits] = pool[idx];
-    const grade = (5.5 + rng() * 4.5).toFixed(1); // 5.5 – 10.0
-    courses.push({ courseCode, courseName, credits, grade: Number(grade) });
+  const firstTermYear = graduationYear - (programme.level === 'Master' ? 1 : 2);
+  // Graduation falls in June or July, which is the end of the academic year that began the
+  // previous August, so the final term is that year's Spring.
+  const lastAcademicYear = graduationYear - 1;
+  const terms = usTermsEndingAt(lastAcademicYear, programme.level === 'Master' ? 4 : 6);
+
+  // Chosen by shuffling the programme's pool with the seeded generator: the same student
+  // always gets the same record, and the record always holds the intended number of courses
+  // - drawing at random and stopping at the first repeat could quietly return fewer.
+  const order = pool.map((_, index) => index);
+  for (let i = order.length - 1; i > 0; i -= 1) {
+    const j = Math.floor(rng() * (i + 1));
+    [order[i], order[j]] = [order[j], order[i]];
   }
-  const totalCredits = courses.reduce((sum, c) => sum + c.credits, 0);
+
+  const courses = [];
+  for (const idx of order.slice(0, courseCount)) {
+    const [courseCode, courseName] = pool[idx];
+    const grade = pickLetterGrade(rng);
+    // A project, thesis or studio carries more credit hours than a taught module, as it does
+    // on a US record; everything else here is a standard three- or four-hour course.
+    const isProject = /Project|Thesis|Studio/i.test(courseName);
+    const credits = isProject ? 6 : 3 + Math.floor(rng() * 2);
+    const term = terms[Math.min(terms.length - 1, courses.length)];
+    courses.push({
+      courseCode,
+      courseName,
+      credits,
+      grade: grade.letter,
+      gradePoints: grade.points,
+      markScaleId: US_GRADING_SCALE.id,
+      outcome: grade.points >= US_GRADING_SCALE.passMark ? 'passed' : 'failed',
+      term: term.title,
+      termStart: term.start,
+      termEnd: term.end,
+    });
+  }
+
+  // The aggregates are computed from the marks rather than asserted, credit-weighted, and
+  // the arithmetic travels with the credential so a reader can check it: quality points are
+  // the sum of (grade points x credit hours), and the average is that sum over the credits
+  // counted towards it. Every attempt on this record passed, so attempted and earned are
+  // equal here - the elements exist so a record where they differ can say so.
+  const creditsAttempted = courses.reduce((sum, course) => sum + course.credits, 0);
+  const creditsEarned = courses
+    .filter((course) => course.outcome === 'passed')
+    .reduce((sum, course) => sum + course.credits, 0);
+  const creditsForAverage = creditsAttempted;
+  const qualityPoints =
+    Math.round(courses.reduce((sum, course) => sum + course.gradePoints * course.credits, 0) * 100) / 100;
+  const gpa = creditsForAverage
+    ? Math.round((qualityPoints / creditsForAverage) * 100) / 100
+    : 0;
 
   const documentNumber = `SA-${String(seedFrom(studentId) % 1000000).padStart(6, '0')}`;
   const qualificationTitle = `${programme.level} of ${programme.field}`;
@@ -275,12 +400,67 @@ export function generateAcademicRecord({ institution, studentId, fullName, inclu
       field_of_study: programme.field,
       graduation_date: graduationDate,
       gpa,
+      // The scale the number is on, stated beside it: the same scheme the transcript's marks
+      // use, so it is never read as a mark out of ten or as a percentage.
+      gpa_scale_id: US_GRADING_SCALE.id,
+      gpa_scale_maximum: US_GRADING_SCALE.maximum,
     },
     education_transcript: {
+      // Who and where
+      institution_name: institution,
       student_id: studentId,
+      // Programme context: the classification code names its own scheme, and the level names
+      // the framework that defines it, so neither is a bare number or a bare word.
+      programme_title: qualificationTitle,
+      programme_type: 'degree',
+      programme_code: programme.cip,
+      programme_code_scheme: 'CIP-2020',
+      programme_level: programme.level === 'Master' ? "Master's degree" : "Bachelor's degree",
+      programme_level_framework: 'IPEDS-award-level',
+      award_title: programme.award,
+      enrolment_start: terms[0].start,
+      enrolment_end: graduationDate,
+      // How marks and credits are scaled
+      grading_scale_id: US_GRADING_SCALE.id,
+      grading_scale_label: US_GRADING_SCALE.label,
+      grading_scale_minimum: US_GRADING_SCALE.minimum,
+      grading_scale_maximum: US_GRADING_SCALE.maximum,
+      grading_scale_pass_mark: US_GRADING_SCALE.passMark,
+      credit_scheme: US_CREDIT_SCHEME,
+      total_credits: creditsEarned,
+      // What was studied, and how it ended
       courses,
-      total_credits: totalCredits,
+      outcome: 'completed',
+      outcome_scheme: 'programme-outcome',
+      // Aggregates, as their own elements so a summary can be disclosed without the course
+      // list - the list is one element and therefore all or nothing.
+      overall_mark: gpa,
+      overall_mark_scale_id: US_GRADING_SCALE.id,
+      credits_attempted: creditsAttempted,
+      credits_earned: creditsEarned,
+      // Kept so a credential issued before the outcome vocabulary existed stays readable.
       status: 'completed',
+    },
+    education_academic_record: {
+      // The same study in the reader's own units, and the figures that reader computes.
+      credit_hours_scheme: US_CREDIT_SCHEME,
+      credit_hours_attempted: creditsAttempted,
+      credit_hours_earned: creditsEarned,
+      credit_hours_for_average: creditsForAverage,
+      average_cumulative: gpa,
+      average_weighting: 'credit-weighted',
+      average_range_minimum: US_GRADING_SCALE.minimum,
+      average_range_maximum: US_GRADING_SCALE.maximum,
+      quality_points: qualityPoints,
+      // The record as a document. Its identity is the record's own, not the identity
+      // document's number: they are different artefacts, which is why both are carried.
+      document_type: 'academic-record',
+      document_id: `AR-${String(seedFrom(studentId) % 1000000).padStart(6, '0')}`,
+      document_issued_at: issueDate,
+      document_status: 'official',
+      // This demo record is an excerpt of the programme rather than the whole of it, and it
+      // says so instead of claiming to be complete.
+      document_completeness: 'partial',
     },
   };
 
@@ -292,7 +472,7 @@ export function generateAcademicRecord({ institution, studentId, fullName, inclu
     graduationDate,
     studentId,
     country: country.label,
-    totalCredits,
+    totalCredits: creditsEarned,
     courseCount: courses.length,
     gpa,
   };
@@ -305,6 +485,12 @@ export function generateAcademicRecord({ institution, studentId, fullName, inclu
     const credentialData = { docType: spec.docType };
     for (const field of IDENTITY_FIELDS) credentialData[field] = record[field];
     credentialData[spec.academicField] = record[spec.academicField];
+    // The US-practice supplement rides with the transcript: it describes the same study and
+    // the record's own standing, so a transcript without it would be missing exactly what a
+    // registrar reads. A qualification credential does not carry it.
+    if (kind === 'transcript') {
+      credentialData.education_academic_record = record.education_academic_record;
+    }
 
     return {
       kind,

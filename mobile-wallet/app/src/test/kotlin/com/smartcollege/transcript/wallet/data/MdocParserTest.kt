@@ -202,6 +202,17 @@ class PresentationEligibilityTest {
     }
 
     @Test
+    fun `a transcript also answers a request for the academic-record supplement`() {
+        val supplement = setOf(AcademicNamespaces.ACADEMIC_RECORD)
+        assertTrue(PresentationEligibility.satisfies(AcademicNamespaces.KIND_TRANSCRIPT, supplement))
+        assertTrue(PresentationEligibility.satisfies(AcademicNamespaces.KIND_BOTH, supplement))
+        assertFalse(
+            "a qualification holds no such namespace",
+            PresentationEligibility.satisfies(AcademicNamespaces.KIND_QUALIFICATION, supplement),
+        )
+    }
+
+    @Test
     fun `knows when nothing stored can answer the request`() {
         val kinds = listOf(AcademicNamespaces.KIND_QUALIFICATION, AcademicNamespaces.KIND_UNKNOWN)
         assertFalse(PresentationEligibility.anySatisfies(kinds, transcriptOnly))

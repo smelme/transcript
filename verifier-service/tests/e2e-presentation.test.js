@@ -197,3 +197,68 @@ test('verifies a transcript presentation and reports the study, not an award', a
   );
   assert.equal(result.claims.graduationDate, null);
 });
+
+test('the registrar receives the programme, the credits and the average with its scale', async () => {
+  const issuerKeys = loadIssuerKeys();
+  const service = serviceWithStatusList(issuerKeys);
+  const session = await service.create({
+    relyingPartyId: 'trust-university',
+    origin: 'https://trust-university.example',
+    docType: 'org.iso.23220.photoid.1',
+    nameSpaces: {
+      'org.iso.23220.photoid.1': ['given_name', 'family_name'],
+      'org.iso.23220.education.transcript.1': [
+        'institution_name',
+        'student_id',
+        'programme_title',
+        'programme_code',
+        'programme_code_scheme',
+        'award_title',
+        'credit_scheme',
+        'total_credits',
+        'outcome',
+        'overall_mark',
+        'overall_mark_scale_id',
+        'courses',
+        'status',
+      ],
+    },
+  });
+
+  const record = service.sessions.get(session.sessionId);
+  const credential = buildTranscriptCredential({
+    ...issuerKeys,
+    status: { idx: STATUS_INDEX, uri: STATUS_URI },
+  });
+  const response = await buildEncryptedDeviceResponse({
+    origin: record.origin,
+    nonceHex: record.nonce,
+    readerJwk: record.jwk,
+    issuerSigned: credential.issuerSigned,
+    docType: 'org.iso.23220.photoid.1',
+    devicePrivateJwk: credential.device.privateJwk,
+  });
+
+  const result = await service.verify(session.sessionId, {
+    relyingPartyId: 'trust-university',
+    origin: 'https://trust-university.example',
+    credential: { protocol: 'org-iso-mdoc', data: { response } },
+  });
+
+  assert.equal(result.claims.institution, 'Smart Academy');
+  assert.equal(result.claims.programmeTitle, 'Bachelor of Computer Science');
+  assert.equal(result.claims.programmeCode, '11.0101');
+  assert.equal(
+    result.claims.programmeCodeScheme,
+    'CIP-2020',
+    'the classification code names the scheme that defines it',
+  );
+  assert.equal(result.claims.awardTitle, 'Bachelor of Science');
+  assert.equal(result.claims.gpa, 3.5);
+  assert.equal(
+    result.claims.gpaScaleId,
+    'us-gpa-4',
+    'the average never arrives without the scale it is on',
+  );
+  assert.equal(result.claims.creditsEarned, 24);
+});

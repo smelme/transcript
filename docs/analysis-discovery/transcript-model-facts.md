@@ -1,9 +1,17 @@
 # Transcript model facts needed before P0-21
 
+> **Status: the US conventions below are in use as the demo's values (decided 2026-09-13), so
+> Tier 1 is implemented and the rows are marked *US default*. They are the demo's, not the
+> academy's: every one of them is a value the institution owns, and supplying the real ones is a
+> configuration change rather than a code change. The one thing that must not happen is a scale
+> being invented and read as real, which is why each value states its own scheme in the
+> credential and anything unknown is omitted.**
+
 **Why this exists:** the generator must not invent grading or credit facts. A wrong scale is worse
 than a missing one, because a reader cannot tell an invented scale from a real one - and the
-current demo already does this: it marks courses on a 1-10 scale (`5.5 + rng() * 4.5`) while
-carrying a 4.00-scale `gpa`, under a Dutch institution, with no scheme stated anywhere.
+current demo already does this: it used to mark courses on a 1-10 scale (`5.5 + rng() * 4.5`)
+while carrying a 4.00-scale `gpa`, under a Dutch institution, with no scheme stated anywhere. That
+contradiction is gone: marks are letters with 4.00-scale points, and the scale travels with them.
 
 **How to answer:** write after each `Answer:`. The *demo default* column is what the generator does
 today - a placeholder, not a decision. If a fact is unknown, answer **omit** and the element is

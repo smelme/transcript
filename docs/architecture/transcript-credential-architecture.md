@@ -151,24 +151,51 @@ The consequences of B:
 
 ### The element sets, as decoded from a signed mdoc
 
+As issued today, under US conventions (see "US conventions for now" below). Every value that could
+be read two ways states the scheme that defines it.
+
 Shared core — `org.iso.23220.education.transcript.1`:
 
-`student_id`, `student_id_scheme`, `institution_name`, `institution_id`,
-`institution_id_scheme`, `programme_title`, `programme_type`, `programme_code`,
-`programme_code_scheme`, `programme_level`, `programme_level_framework`, `enrolment_start`,
-`enrolment_end`, `credit_scheme`, `total_credits`, `grading_scale_id`,
-`grading_scale_minimum`, `grading_scale_maximum`, `grading_scale_pass_mark`,
-`grading_scale_label`, `outcome`, `outcome_scheme`, `overall_mark`, `overall_mark_scale_id`,
-`courses`.
+`institution_name`, `student_id`, `programme_title`, `programme_type`, `programme_code`,
+`programme_code_scheme`, `programme_level`, `programme_level_framework`, `award_title`,
+`enrolment_start`, `enrolment_end`, `grading_scale_id`, `grading_scale_label`,
+`grading_scale_minimum`, `grading_scale_maximum`, `grading_scale_pass_mark`, `credit_scheme`,
+`total_credits`, `courses`, `outcome`, `outcome_scheme`, `overall_mark`, `overall_mark_scale_id`,
+`credits_attempted`, `credits_earned`, `status`.
 
 Administrative record — `org.iso.23220.education.academic-record.1`:
 
-`credit_hours_scheme`, `credit_hours_attempted`, `credit_hours_earned`,
-`credit_hours_for_average`, `average_institutional`, `average_cumulative`,
-`average_range_minimum`, `average_range_maximum`, `quality_points`, `transferred_credits`,
-`transfer_source_institution`, `document_type`, `document_id`, `document_status`,
-`document_completeness`, `document_issued_at`, `release_authorised`, `release_method`,
-`issued_to`, `request_reference`.
+`credit_hours_scheme`, `credit_hours_attempted`, `credit_hours_earned`, `credit_hours_for_average`,
+`average_cumulative`, `average_weighting`, `average_range_minimum`, `average_range_maximum`,
+`quality_points`, `document_type`, `document_id`, `document_issued_at`, `document_status`,
+`document_completeness`.
+
+A qualification credential adds the scale beside its average too (`gpa_scale_id`,
+`gpa_scale_maximum`), so the same number is never read two different ways depending on the
+credential it arrived in.
+
+### US conventions for now
+
+The academy has not yet supplied its own grading and credit model, so the record is issued under US
+conventions, which are stated rather than assumed:
+
+| Element | Value | Why |
+|---|---|---|
+| `grading_scale_*` | `us-gpa-4`, 0-4.00, pass 2.00 | The scale is named, and every mark repeats its id |
+| marks | letter `A`-`D`, with `gradePoints` on the same scale | A letter and its 4.00 points travel together |
+| `credit_scheme` | `us-credit-hour` | Semester credit hours, in the core and the supplement alike |
+| `programme_code_scheme` | `CIP-2020` | The classification names the taxonomy that defines its code |
+| `programme_level_framework` | `IPEDS-award-level` | So "Bachelor's degree" is not a bare word |
+| terms | Fall (late Aug - mid Dec), Spring (mid Jan - mid May) | Counted back from the record's last term, so no term ends after the graduation |
+
+The aggregates are computed rather than asserted: `quality_points` is the sum of (grade points x
+credit hours), the average is that sum over the credits counted, and `average_weighting` says
+credit-weighted. A reader can check the arithmetic instead of trusting the number.
+
+What the academy still owns, and supplies later: its real scale, pass mark and result words; its
+credit scheme; its programme titles, award titles and CIP mappings; its institution identifier; its
+term calendar; and the student id scheme (a national identifier would change the namespace
+question rather than just the value). Each is a value in the generator, not a structure.
 
 ### What the mdoc encoding forces
 

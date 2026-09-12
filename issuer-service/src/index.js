@@ -326,28 +326,81 @@ class IssuerService {
 
     const eq = credentialData.education_qualification || {};
     const qual = [];
-    if (eq.institution_name) qual.push(['institution_name', new Cbor().tstr(eq.institution_name).encode()]);
-    if (eq.degree_level) qual.push(['degree_level', new Cbor().tstr(eq.degree_level).encode()]);
-    if (eq.field_of_study) qual.push(['field_of_study', new Cbor().tstr(eq.field_of_study).encode()]);
-    if (eq.graduation_date) qual.push(['graduation_date', fullDate(eq.graduation_date)]);
-    if (typeof eq.gpa === 'number') qual.push(['gpa', new Cbor().f64(eq.gpa).encode()]);
+    pushElements(qual, [
+      ['institution_name', eq.institution_name],
+      ['degree_level', eq.degree_level],
+      ['field_of_study', eq.field_of_study],
+      ['graduation_date', eq.graduation_date, 'date'],
+      ['gpa', numberOrNull(eq.gpa), 'number'],
+      // The scale the average is on travels beside it, so it is never read as a mark out of
+      // ten or as a percentage.
+      ['gpa_scale_id', eq.gpa_scale_id],
+      ['gpa_scale_maximum', numberOrNull(eq.gpa_scale_maximum), 'number'],
+    ]);
     if (qual.length) {
       namespaces['org.iso.23220.education.qualification.1'] = qual;
     }
 
+    // The transcript: what was studied, scheme-qualified throughout, plus the aggregates as
+    // their own elements - the course list is one element, so anything a reader may want
+    // without the marks cannot live inside it.
     const tr = credentialData.education_transcript || {};
     const transcript = [];
-    if (tr.student_id) transcript.push(['student_id', new Cbor().tstr(tr.student_id).encode()]);
-    if (Array.isArray(tr.courses) && tr.courses.length) {
-      // Encode the course list as a flat JSON text string rather than a nested
-      // CBOR array of maps: nested structures are not renderable by every mdoc
-      // debugger (e.g. Paradym), and a flat string is maximally portable.
-      transcript.push(['courses', new Cbor().tstr(JSON.stringify(tr.courses)).encode()]);
-    }
-    if (typeof tr.total_credits === 'number') transcript.push(['total_credits', new Cbor().uint(tr.total_credits).encode()]);
-    if (tr.status) transcript.push(['status', new Cbor().tstr(tr.status).encode()]);
+    pushElements(transcript, [
+      ['institution_name', tr.institution_name],
+      ['student_id', tr.student_id],
+      ['programme_title', tr.programme_title],
+      ['programme_type', tr.programme_type],
+      ['programme_code', tr.programme_code],
+      ['programme_code_scheme', tr.programme_code_scheme],
+      ['programme_level', tr.programme_level],
+      ['programme_level_framework', tr.programme_level_framework],
+      ['award_title', tr.award_title],
+      ['enrolment_start', tr.enrolment_start, 'date'],
+      ['enrolment_end', tr.enrolment_end, 'date'],
+      ['grading_scale_id', tr.grading_scale_id],
+      ['grading_scale_label', tr.grading_scale_label],
+      ['grading_scale_minimum', numberOrNull(tr.grading_scale_minimum), 'number'],
+      ['grading_scale_maximum', numberOrNull(tr.grading_scale_maximum), 'number'],
+      ['grading_scale_pass_mark', numberOrNull(tr.grading_scale_pass_mark), 'number'],
+      ['credit_scheme', tr.credit_scheme],
+      ['total_credits', numberOrNull(tr.total_credits), 'uint'],
+      ['courses', Array.isArray(tr.courses) && tr.courses.length ? tr.courses : null, 'json'],
+      ['outcome', tr.outcome],
+      ['outcome_scheme', tr.outcome_scheme],
+      ['overall_mark', numberOrNull(tr.overall_mark), 'number'],
+      ['overall_mark_scale_id', tr.overall_mark_scale_id],
+      ['credits_attempted', numberOrNull(tr.credits_attempted), 'uint'],
+      ['credits_earned', numberOrNull(tr.credits_earned), 'uint'],
+      // Kept for credentials issued before the outcome vocabulary existed.
+      ['status', tr.status],
+    ]);
     if (transcript.length) {
       namespaces['org.iso.23220.education.transcript.1'] = transcript;
+    }
+
+    // The US-practice supplement: the same study in a credit-hour reader's units, the figures
+    // that reader computes, and the record's own standing as a document.
+    const ar = credentialData.education_academic_record || {};
+    const academicRecord = [];
+    pushElements(academicRecord, [
+      ['credit_hours_scheme', ar.credit_hours_scheme],
+      ['credit_hours_attempted', numberOrNull(ar.credit_hours_attempted), 'uint'],
+      ['credit_hours_earned', numberOrNull(ar.credit_hours_earned), 'uint'],
+      ['credit_hours_for_average', numberOrNull(ar.credit_hours_for_average), 'uint'],
+      ['average_cumulative', numberOrNull(ar.average_cumulative), 'number'],
+      ['average_weighting', ar.average_weighting],
+      ['average_range_minimum', numberOrNull(ar.average_range_minimum), 'number'],
+      ['average_range_maximum', numberOrNull(ar.average_range_maximum), 'number'],
+      ['quality_points', numberOrNull(ar.quality_points), 'number'],
+      ['document_type', ar.document_type],
+      ['document_id', ar.document_id],
+      ['document_issued_at', ar.document_issued_at, 'date'],
+      ['document_status', ar.document_status],
+      ['document_completeness', ar.document_completeness],
+    ]);
+    if (academicRecord.length) {
+      namespaces['org.iso.23220.education.academic-record.1'] = academicRecord;
     }
 
     if (!Object.keys(namespaces).length) return null;
@@ -1740,6 +1793,35 @@ const ACADEMY_SITE_URL =
   process.env.ACADEMY_SITE_URL || process.env.ISSUER_FRONTEND_URL || 'http://localhost:3002';
 
 const isEmail = (value) => /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(String(value || '').trim());
+
+/** A number that is present, or null so the calling table omits the element. */
+const numberOrNull = (value) => (typeof value === 'number' && Number.isFinite(value) ? value : null);
+
+/**
+ * How an element value is written into an mdoc. An element is one identifier/value pair, so a
+ * scheme is a sibling element rather than a nested map (nested structures are opaque to
+ * selective disclosure and to most mdoc debuggers), and the encoders are named rather than
+ * inlined so a claim set can be read as a table.
+ */
+const ELEMENT_ENCODERS = {
+  text: (value) => new Cbor().tstr(String(value)).encode(),
+  date: (value) => fullDate(value),
+  uint: (value) => new Cbor().uint(value).encode(),
+  number: (value) => new Cbor().f64(value).encode(),
+  /** The course list travels as one JSON string: a flat value is maximally portable. */
+  json: (value) => new Cbor().tstr(JSON.stringify(value)).encode(),
+};
+
+/**
+ * Append `[identifier, value, encoder?]` rows, omitting anything absent - an element is left
+ * out rather than emitted empty, so a reader can tell "not recorded" from "recorded as blank".
+ */
+function pushElements(target, rows) {
+  for (const [identifier, value, encoder] of rows) {
+    if (value === null || value === undefined || value === '') continue;
+    target.push([identifier, ELEMENT_ENCODERS[encoder || 'text'](value)]);
+  }
+}
 
 /** The docType a stored issuance session will issue. */
 function docTypeOf(session) {

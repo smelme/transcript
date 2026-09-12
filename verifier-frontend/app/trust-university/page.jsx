@@ -68,10 +68,20 @@ export default function TrustUniversityRegistration() {
           <dl>
             <dt>Applicant</dt>
             <dd>{claims?.name || '—'}</dd>
+            <dt>Institution</dt>
+            <dd>{claims?.institution || '—'}</dd>
+            <dt>Programme</dt>
+            <dd>{claims?.programmeTitle || '—'}</dd>
+            <dt>Award</dt>
+            <dd>{claims?.awardTitle || '—'}</dd>
             <dt>Student ID</dt>
             <dd>{claims?.studentId || '—'}</dd>
-            <dt>Total credits</dt>
-            <dd>{claims?.totalCredits ?? '—'}</dd>
+            <dt>Credits earned</dt>
+            <dd>{claims?.creditsEarned ?? claims?.totalCredits ?? '—'}</dd>
+            <dt>Average</dt>
+            <dd>
+              {claims?.gpa != null ? `${claims.gpa} on ${claims.gpaScaleId}` : '—'}
+            </dd>
             <dt>Completion</dt>
             <dd>{claims?.completionStatus || '—'}</dd>
           </dl>

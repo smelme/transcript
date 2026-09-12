@@ -1,8 +1,10 @@
 # P0-21: Transcript claim completeness
 
 **Priority:** P0 — the transcript is not interpretable without Tier 1
-**Status:** Blocked on the institution's answers to `docs/analysis-discovery/transcript-model-facts.md`
-(sections A-E); Tier 2 additionally on F
+**Status:** In progress — Tier 1 is implemented under **US conventions** (see below), because the
+academy has not supplied its own grading and credit model. Every value the academy owns is a value
+in the generator rather than a structure, so swapping them is a configuration change. Tier 2 is
+still gated on the academy supplying the data
 **Components:** Credential generator, mdoc builder, share categories, portal, wallet, Trust University RP
 **Analysis:** `docs/analysis-discovery/transcript-claims-gap-analysis.md` (ELMO/EuroLMAI pattern)
 
@@ -117,11 +119,62 @@ Decided before implementing, because it changes where every new element goes:
 
 ## Delivery increments
 
-1. Tier 1 claim set in the generator and the mdoc builder, with unit tests asserting the
-   scheme accompanies every mark and that aggregates are separately disclosable.
-2. Share categories and portal labelling for the new elements; the wallet summary (_P0-20_).
+1. **Done** — Tier 1 claim set in the generator and the mdoc builder, with unit tests asserting the
+   scheme accompanies every mark and that the aggregates are separately disclosable.
+2. **Partly** — the share categories request the new elements and Trust University renders them; the
+   wallet and the portal still show only the kind, module count and credits, which is outstanding UI
+   work in P0-17 and P0-20.
 3. Tier 2 claim set, gated on the academy supplying the data.
-4. Trust University renders the richer transcript (_P0-19_).
+4. Trust University renders the richer transcript (_P0-19_) — done with this story.
+
+## US conventions used for now
+
+Decided 2026-09-13, because the academy's own model is not available. Every one of these is stated in
+the credential rather than left for the reader to assume: the 4.00 grade point average scale
+(`us-gpa-4`, pass 2.00) with letter marks carrying their own grade points; semester credit hours
+(`us-credit-hour`); the CIP 2020 taxonomy for the programme's subject; the IPEDS award level for its
+level; and Fall/Spring terms counted back from the final one, so no term ends after the graduation.
+Anything unknown is omitted rather than invented, and a qualification carries the same scale beside
+its average so one number is never read two ways.
+
+## Verification
+
+Acceptance criteria, as implemented:
+
+1. **Met** — the decoded record answers all of it: `programme_title` / `award_title`, institution,
+   `enrolment_start` / `enrolment_end`, letter marks with `gradePoints` and a scale id, credits with
+   their scheme plus `credits_attempted` / `credits_earned`, a per-result term, and `outcome`.
+2. **Met** — `grading_scale_id`, `_label`, `_minimum`, `_maximum`, `_pass_mark` are elements of the
+   transcript and every course repeats `markScaleId`; no scale is left to be assumed.
+3. **Met** — the average carries `average_range_minimum` / `_maximum` and `average_weighting`, so a
+   figure like 2.71 is unambiguously on the 4.00 scale.
+4. **Met** — `total_credits`, `credits_attempted`, `credits_earned`, `overall_mark`,
+   `overall_mark_scale_id` and `outcome` are elements beside `courses`, not inside it, so a holder
+   can disclose the summary without the module list.
+5. **Met** — `status` is still emitted, and a credential without the new elements still verifies.
+6. **Partly** — the wallet shows the kind, module count and credits and the portal shows the kind;
+   showing the programme and the outcome beside them is outstanding UI work in P0-17 and P0-20.
+7. **Met** — Trust University renders the institution, programme, award, credits earned, the average
+   with its scale, and the module table, all from verified claims.
+8. **Met** — revocation, status-list and selective-disclosure behaviour are untouched: 73 issuer,
+   61 verifier and 27 wallet tests pass, with both share smoke tests and the academy flow.
+9. **Met** — every value states its scheme and each total is per scheme: the core names
+   `credit_scheme`, the supplement names `credit_hours_scheme`, and neither converts.
+10. **Met** — the core is requestable on its own, and the supplement is a separate namespace a
+    relying party may request with it or not at all.
+
+Findings while implementing:
+
+- **The generator could return fewer courses than it intended** — it drew at random and stopped at
+  the first repeat. Courses are now chosen by a seeded shuffle, so a record always holds the number
+  it means to.
+- **Terms were not chronological and could end after graduation.** They are now counted back from
+  the record's final term, and a test asserts both properties.
+- **The release framing is settled:** `document_status`, `document_completeness`, `document_type`,
+  `document_id` and `document_issued_at` are carried — the record's own identity, separate from the
+  identity document's number — while `issued_to`, `release_method` and `request_reference` are not.
+  A reusable credential is issued once and presented many times, so those belong to the presentation
+  the verifier records rather than to the credential.
 
 ## Definition of done
 

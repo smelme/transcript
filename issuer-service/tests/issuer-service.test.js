@@ -118,9 +118,14 @@ test('Credential kinds - a transcript mdoc carries no qualification namespace', 
   const verified = verifyIssuerSigned(mdoc.base64url);
   assert.strictEqual(verified.docType, 'org.iso.23220.photoid.1');
   assert.deepStrictEqual(Object.keys(verified.namespaces).sort(), [
+    'org.iso.23220.education.academic-record.1',
     'org.iso.23220.education.transcript.1',
     'org.iso.23220.photoid.1',
   ]);
+  assert.ok(
+    !Object.keys(verified.namespaces).includes('org.iso.23220.education.qualification.1'),
+    'a transcript credential must not carry the award namespace',
+  );
 });
 
 test('Credential kinds - a qualification mdoc carries no transcript namespace', () => {
@@ -139,6 +144,10 @@ test('Credential kinds - a qualification mdoc carries no transcript namespace', 
     'org.iso.23220.education.qualification.1',
     'org.iso.23220.photoid.1',
   ]);
+  assert.ok(
+    !Object.keys(verified.namespaces).includes('org.iso.23220.education.academic-record.1'),
+    'the US-practice supplement belongs to the transcript, not to the award',
+  );
 });
 
 test('Credential kinds - issuing a transcript records its kind', () => {
@@ -952,4 +961,193 @@ test('Portal - the audit trail records the kind with the event', () => {
     'a revocation is readable without looking the credential up',
   );
   dropSessionsFor('SA-AUDIT-1');
+});
+
+// ── The transcript's claim set (P0-21, US conventions) ────────────────────
+//
+// Every value states its own scheme rather than leaving the reader to assume one - the
+// grading scale, the credit unit and the programme's classification each travel with the
+// value they describe - and the aggregates are elements in their own right, because the
+// course list is one element and therefore all or nothing.
+
+const elementsOf = (verified, namespace) =>
+  Object.fromEntries(
+    (verified.namespaces[namespace] || []).map((item) => [
+      item.elementIdentifier,
+      // A date element decodes as the tagged object it is, so read the date it carries.
+      item.elementValue && item.elementValue.type === 'date'
+        ? item.elementValue.value
+        : item.elementValue,
+    ]),
+  );
+
+const TRANSCRIPT_NS = 'org.iso.23220.education.transcript.1';
+const ACADEMIC_RECORD_NS = 'org.iso.23220.education.academic-record.1';
+
+function transcriptMdoc(issuer, studentId) {
+  const { records } = generateAcademicRecord({
+    institution: 'Smart Academy',
+    studentId,
+    include: 'transcript',
+  });
+  const mdoc = issuer.buildCredentialMdoc(records[0].credentialData);
+  assert.ok(mdoc, 'expected a signed mdoc');
+  const verified = verifyIssuerSigned(mdoc.base64url);
+  assert.strictEqual(verified.valid, true, verified.error || 'the mdoc must verify');
+  return {
+    record: records[0],
+    verified,
+    core: elementsOf(verified, TRANSCRIPT_NS),
+    supplement: elementsOf(verified, ACADEMIC_RECORD_NS),
+    photoId: elementsOf(verified, 'org.iso.23220.photoid.1'),
+  };
+}
+
+test('Transcript - every mark states the scale it is on', () => {
+  const { core } = transcriptMdoc(new IssuerService(), 'SA-US-1');
+
+  assert.strictEqual(core.grading_scale_id, 'us-gpa-4');
+  assert.strictEqual(core.grading_scale_minimum, 0);
+  assert.strictEqual(core.grading_scale_maximum, 4);
+  assert.strictEqual(core.grading_scale_pass_mark, 2);
+  assert.ok(String(core.grading_scale_label).includes('4.00'), core.grading_scale_label);
+
+  const courses = JSON.parse(core.courses);
+  assert.ok(courses.length >= 5, 'expected the course list');
+  for (const course of courses) {
+    assert.match(course.grade, /^[A-D][+-]?$/, `a letter mark, got ${course.grade}`);
+    assert.ok(course.gradePoints >= 0 && course.gradePoints <= 4, String(course.gradePoints));
+    assert.strictEqual(
+      course.markScaleId,
+      'us-gpa-4',
+      'a mark never travels without the scale it was awarded on',
+    );
+    assert.ok(['passed', 'failed'].includes(course.outcome), course.outcome);
+    assert.ok(course.term, 'each result carries its academic term');
+    assert.match(course.termStart, /^\d{4}-\d{2}-\d{2}$/);
+    assert.match(course.termEnd, /^\d{4}-\d{2}-\d{2}$/);
+  }
+
+  // The terms run forwards and the study does not outlast its own graduation: a record whose
+  // semesters are out of order, or which ends after the award, is not a record anyone accepts.
+  const starts = courses.map((course) => course.termStart);
+  assert.deepStrictEqual(starts, [...starts].sort(), 'the terms are in chronological order');
+  for (const course of courses) {
+    assert.ok(course.termEnd <= core.enrolment_end, `${course.term} ends within the enrolment`);
+    assert.ok(course.termStart >= core.enrolment_start, `${course.term} begins after it did`);
+  }
+});
+
+test('Transcript - the aggregates are separately disclosable elements', () => {
+  const { core, supplement } = transcriptMdoc(new IssuerService(), 'SA-US-2');
+
+  // Their own elements, so a holder can disclose a summary without the course list.
+  for (const identifier of [
+    'total_credits',
+    'credits_attempted',
+    'credits_earned',
+    'overall_mark',
+    'overall_mark_scale_id',
+    'outcome',
+    'outcome_scheme',
+  ]) {
+    assert.ok(identifier in core, `${identifier} must be an element of its own`);
+  }
+  assert.strictEqual(core.total_credits, core.credits_earned);
+  assert.strictEqual(core.overall_mark_scale_id, 'us-gpa-4');
+  assert.strictEqual(core.outcome, 'completed');
+  assert.strictEqual(core.status, 'completed', 'the pre-vocabulary field stays readable');
+
+  const courses = JSON.parse(core.courses);
+  const attempted = courses.reduce((sum, course) => sum + course.credits, 0);
+  assert.strictEqual(core.credits_attempted, attempted, 'the total matches the course list');
+  assert.strictEqual(
+    supplement.credit_hours_attempted,
+    attempted,
+    'and both namespaces agree on what was attempted',
+  );
+});
+
+test('Transcript - the arithmetic in the credential is consistent', () => {
+  const { core, supplement } = transcriptMdoc(new IssuerService(), 'SA-US-3');
+  const courses = JSON.parse(core.courses);
+
+  const qualityPoints =
+    Math.round(courses.reduce((sum, course) => sum + course.gradePoints * course.credits, 0) * 100) / 100;
+  assert.strictEqual(supplement.quality_points, qualityPoints);
+  assert.strictEqual(
+    supplement.average_cumulative,
+    Math.round((qualityPoints / supplement.credit_hours_for_average) * 100) / 100,
+    'the average is the quality points over the credits counted towards it',
+  );
+  assert.strictEqual(supplement.average_range_minimum, 0);
+  assert.strictEqual(supplement.average_range_maximum, 4);
+  assert.strictEqual(
+    supplement.average_weighting,
+    'credit-weighted',
+    'how the average was computed is stated, not assumed',
+  );
+  assert.strictEqual(core.overall_mark, supplement.average_cumulative);
+});
+
+test('Transcript - the programme context names its frameworks', () => {
+  const { core } = transcriptMdoc(new IssuerService(), 'SA-US-4');
+
+  assert.match(core.programme_code, /^\d{2}\.\d{4}$/, 'a CIP code');
+  assert.strictEqual(core.programme_code_scheme, 'CIP-2020');
+  assert.strictEqual(core.programme_level_framework, 'IPEDS-award-level');
+  assert.match(core.programme_level, /degree$/, core.programme_level);
+  assert.ok(core.programme_title && core.award_title, 'the programme and its award are named');
+  assert.strictEqual(core.programme_type, 'degree');
+  assert.strictEqual(core.credit_scheme, 'us-credit-hour');
+  assert.strictEqual(core.institution_name, 'Smart Academy');
+  assert.match(core.enrolment_start, /^\d{4}-\d{2}-\d{2}$/);
+  assert.match(core.enrolment_end, /^\d{4}-\d{2}-\d{2}$/);
+});
+
+test('Transcript - the record states its own standing and identity', () => {
+  const { supplement, photoId, core } = transcriptMdoc(new IssuerService(), 'SA-US-5');
+
+  assert.strictEqual(supplement.document_type, 'academic-record');
+  assert.strictEqual(supplement.document_status, 'official');
+  assert.strictEqual(supplement.document_completeness, 'partial');
+  assert.match(supplement.document_id, /^AR-\d{6}$/);
+  assert.notStrictEqual(
+    supplement.document_id,
+    photoId.document_number,
+    'the record is a different artefact from the identity document, so it carries its own number',
+  );
+  assert.match(core.enrolment_end, /^\d{4}-\d{2}-\d{2}$/);
+});
+
+test('Transcript - the US supplement is not a kind discriminator', () => {
+  const { record, core } = transcriptMdoc(new IssuerService(), 'SA-US-6');
+
+  assert.strictEqual(
+    kindOfCredentialData(record.credentialData),
+    'transcript',
+    'the transcript namespace still decides the kind',
+  );
+  assert.deepStrictEqual(academicNamespacesOf(record.credentialData), [TRANSCRIPT_NS]);
+  assert.ok(core.student_id, 'the holder is still identified');
+});
+
+test('Qualification - its average is no longer on an unstated scale', () => {
+  const issuer = new IssuerService();
+  const { records } = generateAcademicRecord({
+    institution: 'Smart Academy',
+    studentId: 'SA-US-7',
+    include: 'qualification',
+  });
+  const mdoc = issuer.buildCredentialMdoc(records[0].credentialData);
+  const verified = verifyIssuerSigned(mdoc.base64url);
+  const qualification = elementsOf(verified, 'org.iso.23220.education.qualification.1');
+
+  assert.ok(qualification.gpa > 0 && qualification.gpa <= 4, String(qualification.gpa));
+  assert.strictEqual(
+    qualification.gpa_scale_id,
+    'us-gpa-4',
+    'the number states the scale it is on instead of being read as a mark out of ten',
+  );
+  assert.strictEqual(qualification.gpa_scale_maximum, 4);
 });

@@ -256,12 +256,25 @@ export class PresentationSessionService {
         institution: claims.institution_name || null,
         degreeLevel: claims.degree_level || null,
         graduationDate: claims.graduation_date || null,
-        // A transcript carries the study itself rather than an award, so a registrar reads
-        // these. Reported as null when absent rather than invented: a transcript credential
-        // holds no qualification namespace, and a qualification holds no course list.
+        // A transcript carries the study rather than an award, so a registrar reads these.
+        // Reported as null when absent rather than invented: a transcript credential holds
+        // no qualification namespace, and a qualification holds no course list.
         studentId: claims.student_id || null,
         totalCredits: claims.total_credits ?? null,
+        creditsAttempted: claims.credits_attempted ?? null,
+        creditsEarned: claims.credits_earned ?? null,
         completionStatus: claims.status || null,
+        outcome: claims.outcome || null,
+        // Programme context, each with the scheme that defines it.
+        programmeTitle: claims.programme_title || null,
+        programmeCode: claims.programme_code || null,
+        programmeCodeScheme: claims.programme_code_scheme || null,
+        programmeLevel: claims.programme_level || null,
+        programmeLevelFramework: claims.programme_level_framework || null,
+        awardTitle: claims.award_title || null,
+        // The average and the scale it is on, never one without the other.
+        gpa: claims.overall_mark ?? null,
+        gpaScaleId: claims.overall_mark_scale_id || null,
         courses: claims.courses || null,
       },
       // Full disclosed element values (flattened, keyed by element identifier)

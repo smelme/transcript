@@ -2,9 +2,9 @@
 
 **Priority:** P0 — the academic relying party this feature exists for
 **Status:** In progress — the session, the relying-party page and the verifier's transcript claim
-mapping are done and verified at the API level. Two things remain: **institution and programme**
-cannot be shown yet because the transcript credential does not carry them (that is P0-21 Tier 1's
-programme context), and a real presentation from the Android wallet needs P0-20 on a device
+mapping are done and verified at the API level, and with P0-21's programme context the page now
+shows the institution, programme, award, credits and average. What remains is a real presentation
+from the Android wallet, which needs P0-20 on a device
 **Components:** Verifier frontend (new relying party), verifier service, wallet presentment
 
 ## User story
@@ -80,11 +80,10 @@ review.
 
 ## Blocked on
 
-- **Institution and programme** (acceptance criterion 3): the transcript credential carries
-  neither, because the transcript namespace holds `student_id`, `courses`, `total_credits` and
-  `status` only. This is exactly what P0-21 Tier 1's programme context adds, so the page shows
-  what the credential verifiably holds today and the two fields follow with P0-21.
 - **A device run**: a real presentation from the Android wallet needs P0-20 installed on a phone.
 - The verifier's handling of a non-photoid docType is no longer unproven in the sense this story
   feared: the transcript presentation above is a photo-ID document carrying only the transcript
   namespace, and it verifies and status-checks unchanged.
+- **Institution and programme** were waiting on P0-21's programme context and now arrive: the page
+  renders `institution`, `programmeTitle`, `awardTitle`, `creditsEarned`, `gpa` with `gpaScaleId`,
+  and the module table.

@@ -16,6 +16,12 @@ object AcademicNamespaces {
     const val QUALIFICATION = "org.iso.23220.education.qualification.1"
     const val TRANSCRIPT = "org.iso.23220.education.transcript.1"
 
+    /**
+     * The US-practice supplement to the transcript. It does not decide the kind - it
+     * describes the same study - but a request for it is answered by a transcript.
+     */
+    const val ACADEMIC_RECORD = "org.iso.23220.education.academic-record.1"
+
     const val KIND_QUALIFICATION = "qualification"
     const val KIND_TRANSCRIPT = "transcript"
 
@@ -50,8 +56,10 @@ object AcademicNamespaces {
     /** The academic namespaces a kind holds, for matching a request against it. */
     fun namespacesOf(kind: String): List<String> = when (kind) {
         KIND_QUALIFICATION -> listOf(QUALIFICATION)
-        KIND_TRANSCRIPT -> listOf(TRANSCRIPT)
-        KIND_BOTH -> listOf(QUALIFICATION, TRANSCRIPT)
+        // A transcript also answers a request for the academic-record supplement, which
+        // describes the same study in a credit-hour reader's units.
+        KIND_TRANSCRIPT -> listOf(TRANSCRIPT, ACADEMIC_RECORD)
+        KIND_BOTH -> listOf(QUALIFICATION, TRANSCRIPT, ACADEMIC_RECORD)
         else -> emptyList()
     }
 }
