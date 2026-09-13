@@ -26,6 +26,22 @@ import { PHOTOID_DOCTYPE, kindOfCredentialData, labelOfCredentialData } from './
  *      the sender. Expired shares are deleted.
  */
 
+// Dates reach a share as `YYYY-MM-DD` from our own encoder, as `YYYYMMDD` from the wallet's claim
+// set, or as a Date when a decoder expands CBOR tag 1004. They are the same fact to a reader, so a
+// shared document renders them one way - and leaves every other value exactly as disclosed.
+const MONTH_NAMES = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+
+function formatClaimValue(value) {
+  const iso = value.match(/^(\d{4})-(\d{2})-(\d{2})(?:[T ].*)?$/);
+  const compact = iso ? null : value.match(/^(\d{4})(\d{2})(\d{2})$/);
+  const match = iso || compact;
+  if (!match) { return value; }
+  const month = Number(match[2]) - 1;
+  const day = Number(match[3]);
+  if (month < 0 || month > 11 || day < 1 || day > 31) { return value; }
+  return `${day} ${MONTH_NAMES[month]} ${match[1]}`;
+}
+
 const SHARE_CATEGORIES = {
   personal: {
     label: 'Personal information',
@@ -154,13 +170,13 @@ export class ShareService {
     this.shares = new Map();
     this.load();
     this.sweepTimer = setInterval(() => this.pruneExpired(), 60 * 60 * 1000);
-    if (this.sweepTimer.unref) this.sweepTimer.unref();
+    if (this.sweepTimer.unref) {this.sweepTimer.unref();}
   }
 
   // ── Persistence ──────────────────────────────────────────────────────────
   load() {
     try {
-      if (!fs.existsSync(this.dataFile)) return;
+      if (!fs.existsSync(this.dataFile)) {return;}
       const parsed = JSON.parse(fs.readFileSync(this.dataFile, 'utf8'));
       for (const share of parsed.shares || []) {
         if (Date.now() <= new Date(share.expiresAt).getTime()) {
@@ -197,7 +213,7 @@ export class ShareService {
         changed = true;
       }
     }
-    if (changed) this.persist();
+    if (changed) {this.persist();}
   }
 
   audit(action, share, details = {}) {
@@ -260,9 +276,9 @@ export class ShareService {
    * @returns {{ success, shareId, deviceRequest, encryptionInfo, origin }}
    */
   async create({ accessToken, credentialId, categories = [], recipientName, recipientEmail, message = '' }) {
-    if (!accessToken) throw new Error('accessToken is required');
-    if (!credentialId) throw new Error('credentialId is required');
-    if (!recipientName || !recipientEmail) throw new Error('recipientName and recipientEmail are required');
+    if (!accessToken) {throw new Error('accessToken is required');}
+    if (!credentialId) {throw new Error('credentialId is required');}
+    if (!recipientName || !recipientEmail) {throw new Error('recipientName and recipientEmail are required');}
 
     const payload = await this.walletAccounts.verifyAccessToken(accessToken);
 
@@ -271,7 +287,7 @@ export class ShareService {
     // The verifier additionally rejects revoked/missing credentials during
     // verification (defense in depth).
     const credential = this.issuer.getCredential(credentialId);
-    if (!credential.success) throw new Error(credential.error || 'Credential not found');
+    if (!credential.success) {throw new Error(credential.error || 'Credential not found');}
     if (!this.walletAccounts.hasLink(
       payload.sub,
       credential.credential.institution,
@@ -281,7 +297,7 @@ export class ShareService {
     }
 
     const selected = [...new Set(categories)].filter((c) => SHARE_CATEGORIES[c]);
-    if (selected.length === 0) throw new Error('Select at least one category to share');
+    if (selected.length === 0) {throw new Error('Select at least one category to share');}
 
     // What the credential actually holds, not what its docType implies: every kind shares
     // the photo-ID docType and they are told apart by their academic namespace.
@@ -301,7 +317,7 @@ export class ShareService {
       }
     }
 
-    const nameSpaces = {}
+    const nameSpaces = {};
     for (const cat of selected) {
       for (const [ns, fields] of Object.entries(SHARE_CATEGORIES[cat].nameSpaces)) {
         nameSpaces[ns] = Array.from(new Set([...(nameSpaces[ns] || []), ...fields]));
@@ -367,16 +383,16 @@ export class ShareService {
    */
   async submit({ shareId, accessToken, credential }) {
     const share = this.shares.get(shareId);
-    if (!share) throw new Error('Share not found or expired');
-    if (share.status === 'shared') throw new Error('Share already completed');
+    if (!share) {throw new Error('Share not found or expired');}
+    if (share.status === 'shared') {throw new Error('Share already completed');}
     if (Date.now() > new Date(share.expiresAt).getTime()) {
       this.shares.delete(shareId);
       this.persist();
       throw new Error('Share expired');
     }
-    if (!accessToken) throw new Error('accessToken is required');
+    if (!accessToken) {throw new Error('accessToken is required');}
     const payload = await this.walletAccounts.verifyAccessToken(accessToken);
-    if (payload.sub !== share.senderSub) throw new Error('Only the sender may complete this share');
+    if (payload.sub !== share.senderSub) {throw new Error('Only the sender may complete this share');}
 
     // Forward the DCAPI envelope to the verifier service.
     const verified = await this.verifierVerify(share.verifierSessionId, credential);
@@ -391,7 +407,7 @@ export class ShareService {
   }
 
   async _notifyRecipient(share) {
-    if (!this.emailSender) return;
+    if (!this.emailSender) {return;}
     const link = `${this.siteUrl}/share/${share.shareId}`;
     try {
       await this.emailSender({
@@ -405,7 +421,7 @@ export class ShareService {
   }
 
   async _notifySender(share, event) {
-    if (!this.emailSender || !share.senderEmail) return;
+    if (!this.emailSender || !share.senderEmail) {return;}
     try {
       await this.emailSender({
         to: share.senderEmail,
@@ -423,7 +439,7 @@ export class ShareService {
   /** Recipient requests a one-time code to open the share. */
   async requestOtp({ shareId, email }) {
     const share = this.shares.get(shareId);
-    if (!share) throw new Error('Share not found or expired');
+    if (!share) {throw new Error('Share not found or expired');}
     if (Date.now() > new Date(share.expiresAt).getTime()) {
       this.shares.delete(shareId);
       this.persist();
@@ -460,12 +476,12 @@ export class ShareService {
 
   verifyOtp({ shareId, email, otp }) {
     const share = this.shares.get(shareId);
-    if (!share) throw new Error('Share not found or expired');
+    if (!share) {throw new Error('Share not found or expired');}
     if (String(email || '').trim().toLowerCase() !== share.recipientEmail) {
       throw new Error('This share was sent to a different email address');
     }
-    if (!share.otp || Date.now() > share.otpExpiresAt) throw new Error('No OTP issued or OTP expired');
-    if (String(otp) !== share.otp) throw new Error('Invalid OTP');
+    if (!share.otp || Date.now() > share.otpExpiresAt) {throw new Error('No OTP issued or OTP expired');}
+    if (String(otp) !== share.otp) {throw new Error('Invalid OTP');}
     share.otp = null;
     share.otpExpiresAt = null;
     share.recipientVerified = true;
@@ -486,7 +502,7 @@ export class ShareService {
   /** Recipient views the shared claims. Marks first-view and notifies sender. */
   view({ shareId, recipientToken }) {
     const share = this._requireRecipientAccess(shareId, recipientToken);
-    if (!share.termsAccepted) throw new Error('Terms must be accepted before viewing');
+    if (!share.termsAccepted) {throw new Error('Terms must be accepted before viewing');}
     if (!share.viewedAt) {
       share.viewedAt = new Date().toISOString();
       this.persist();
@@ -513,9 +529,9 @@ export class ShareService {
   /** Recipient downloads a PDF of the shared claims. */
   pdf({ shareId, recipientToken }) {
     const share = this._requireRecipientAccess(shareId, recipientToken);
-    if (!share.termsAccepted) throw new Error('Terms must be accepted before downloading');
+    if (!share.termsAccepted) {throw new Error('Terms must be accepted before downloading');}
     const rows = Object.entries(share.claims || {}).map(([k, v]) => {
-      const value = typeof v === 'object' ? JSON.stringify(v) : String(v);
+      const value = typeof v === 'object' ? JSON.stringify(v) : formatClaimValue(String(v));
       return [k, value];
     });
     const pdf = renderSharePdf({
@@ -538,7 +554,7 @@ export class ShareService {
   /** Revoke (delete) a share. Used by the management portal. */
   revoke({ shareId, reason = null }) {
     const share = this.shares.get(shareId);
-    if (!share) throw new Error('Share not found');
+    if (!share) {throw new Error('Share not found');}
     this.shares.delete(shareId);
     this.persist();
     this.issuer.auditLog.push({
@@ -572,7 +588,7 @@ export class ShareService {
 
   _requireRecipientAccess(shareId, recipientToken) {
     const share = this.shares.get(shareId);
-    if (!share) throw new Error('Share not found or expired');
+    if (!share) {throw new Error('Share not found or expired');}
     if (Date.now() > new Date(share.expiresAt).getTime()) {
       this.shares.delete(shareId);
       this.persist();

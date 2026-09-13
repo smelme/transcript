@@ -5,7 +5,7 @@ import dotenv from 'dotenv';
 import { v4 as uuidv4 } from 'uuid';
 import Ajv from 'ajv';
 import addFormats from 'ajv-formats';
-import { verifyIssuerSigned, parseMdoc } from '../../mdoc-core.js';
+import { verifyIssuerSigned } from '../../mdoc-core.js';
 import { PresentationSessionService } from './presentation-session-service.js';
 import path from 'path';
 import { pathToFileURL, fileURLToPath } from 'url';
@@ -32,7 +32,7 @@ class VerifierService {
       rejectedCount: 0,
       byIssuer: {},
       byType: {},
-      byStatus: {}
+      byStatus: {},
     };
 
     // Validation
@@ -49,8 +49,8 @@ class VerifierService {
         studentId: { type: 'string' },
         name: { type: 'object' },
         issuanceDate: { type: 'string', format: 'date' },
-        expiryDate: { type: 'string', format: 'date' }
-      }
+        expiryDate: { type: 'string', format: 'date' },
+      },
     });
   }
 
@@ -71,7 +71,7 @@ class VerifierService {
       trustScore: issuerData.trustScore || 50, // Default to neutral
       status: 'pending',
       registeredAt: new Date().toISOString(),
-      verificationsCount: 0
+      verificationsCount: 0,
     };
 
     this.trustedIssuers.set(issuerData.issuerId, issuer);
@@ -80,7 +80,7 @@ class VerifierService {
       timestamp: new Date().toISOString(),
       action: 'issuer_registered',
       issuerId: issuerData.issuerId,
-      details: { issuerName: issuerData.issuerName }
+      details: { issuerName: issuerData.issuerName },
     });
 
     return { success: true, issuerId: issuerData.issuerId, status: 'pending' };
@@ -98,7 +98,7 @@ class VerifierService {
       timestamp: new Date().toISOString(),
       action: 'issuer_approved',
       issuerId,
-      details: {}
+      details: {},
     });
 
     return { success: true, issuerId, status: 'approved' };
@@ -118,7 +118,7 @@ class VerifierService {
       timestamp: new Date().toISOString(),
       action: 'issuer_blocked',
       issuerId,
-      details: { reason }
+      details: { reason },
     });
 
     return { success: true, issuerId, status: 'blocked' };
@@ -142,7 +142,7 @@ class VerifierService {
       timestamp: new Date().toISOString(),
       action: 'trust_score_updated',
       issuerId,
-      details: { oldScore, newScore }
+      details: { oldScore, newScore },
     });
 
     return { success: true, issuerId, trustScore: newScore };
@@ -160,7 +160,7 @@ class VerifierService {
       issuerId,
       trustScore: issuer.trustScore,
       status: issuer.status,
-      verificationsCount: issuer.verificationsCount
+      verificationsCount: issuer.verificationsCount,
     };
   }
 
@@ -186,7 +186,7 @@ class VerifierService {
         issuerId: qrPayload.issuerId,
         status: 'rejected',
         reason: 'Issuer is blocked',
-        createdAt: now.toISOString()
+        createdAt: now.toISOString(),
       };
 
       this.verifications.set(verificationId, verification);
@@ -199,7 +199,7 @@ class VerifierService {
         verificationId,
         status: 'rejected',
         reason: 'Issuer is blocked',
-        trustScore: 0
+        trustScore: 0,
       };
     }
 
@@ -212,7 +212,7 @@ class VerifierService {
         issuerId: qrPayload.issuerId,
         status: 'pending_verification',
         reason: 'Issuer not trusted or pending approval',
-        createdAt: now.toISOString()
+        createdAt: now.toISOString(),
       };
 
       this.verifications.set(verificationId, verification);
@@ -224,7 +224,7 @@ class VerifierService {
         verificationId,
         status: 'pending_verification',
         reason: 'Issuer not trusted',
-        trustScore: issuer?.trustScore || 0
+        trustScore: issuer?.trustScore || 0,
       };
     }
 
@@ -237,7 +237,7 @@ class VerifierService {
       studentId: qrPayload.studentId,
       status: 'verified',
       trustScore: issuer.trustScore,
-      createdAt: now.toISOString()
+      createdAt: now.toISOString(),
     };
 
     this.verifications.set(verificationId, verification);
@@ -258,7 +258,7 @@ class VerifierService {
       action: 'credential_verified',
       credentialId: qrPayload.credentialId,
       issuerId: qrPayload.issuerId,
-      details: { studentId: qrPayload.studentId, trustScore: issuer.trustScore }
+      details: { studentId: qrPayload.studentId, trustScore: issuer.trustScore },
     });
 
     return {
@@ -266,7 +266,7 @@ class VerifierService {
       verificationId,
       status: 'verified',
       trustScore: issuer.trustScore,
-      studentId: qrPayload.studentId
+      studentId: qrPayload.studentId,
     };
   }
 
@@ -286,7 +286,7 @@ class VerifierService {
       digestsValid: verification.digestsValid,
       status,
       reason: verification.error || (verification.valid ? null : 'Signature or digest verification failed'),
-      createdAt: now.toISOString()
+      createdAt: now.toISOString(),
     };
 
     this.verifications.set(verificationId, record);
@@ -307,8 +307,8 @@ class VerifierService {
       details: {
         docType: verification.docType,
         signatureValid: verification.signatureValid,
-        digestsValid: verification.digestsValid
-      }
+        digestsValid: verification.digestsValid,
+      },
     });
 
     return {
@@ -320,7 +320,7 @@ class VerifierService {
       issuerCert: verification.issuerCert,
       validityInfo: verification.validityInfo,
       namespaces: verification.namespaces,
-      error: verification.error || undefined
+      error: verification.error || undefined,
     };
   }
 
@@ -346,7 +346,7 @@ class VerifierService {
       timestamp: new Date().toISOString(),
       action: 'verification_rejected',
       verificationId,
-      details: { reason }
+      details: { reason },
     });
 
     return { success: true, verificationId, status: 'rejected' };
@@ -386,7 +386,7 @@ class VerifierService {
       verifications: results.slice(start, end),
       total: results.length,
       page,
-      pageSize
+      pageSize,
     };
   }
 
@@ -399,14 +399,14 @@ class VerifierService {
     }
     if (filters.verificationTypes) {
       results = results.filter(i => 
-        filters.verificationTypes.some(type => i.verificationTypes.includes(type))
+        filters.verificationTypes.some(type => i.verificationTypes.includes(type)),
       );
     }
 
     return {
       success: true,
       issuers: results,
-      total: results.length
+      total: results.length,
     };
   }
 
@@ -417,7 +417,7 @@ class VerifierService {
       verifierName: this.verifierName,
       ...this.statistics,
       trustedIssuersCount: this.trustedIssuers.size,
-      blockedIssuersCount: this.blockedIssuers.size
+      blockedIssuersCount: this.blockedIssuers.size,
     };
   }
 
@@ -450,7 +450,7 @@ class VerifierService {
       rejectedCount: 0,
       byIssuer: {},
       byType: {},
-      byStatus: {}
+      byStatus: {},
     };
     return { success: true };
   }
@@ -459,7 +459,7 @@ class VerifierService {
 // Initialize service
 const verifier = new VerifierService({
   verifierId: process.env.VERIFIER_ID || 'verifier-001',
-  verifierName: process.env.VERIFIER_NAME || 'Smart College Verifier'
+  verifierName: process.env.VERIFIER_NAME || 'Smart College Verifier',
 });
 const presentationSessions = new PresentationSessionService();
 
@@ -552,7 +552,7 @@ app.get('/verify/verifications', (req, res) => {
     issuerId: req.query.issuerId,
     credentialType: req.query.credentialType,
     page: parseInt(req.query.page) || 1,
-    pageSize: parseInt(req.query.pageSize) || 20
+    pageSize: parseInt(req.query.pageSize) || 20,
   };
   const result = verifier.listVerifications(filters);
   res.json(result);
@@ -574,7 +574,7 @@ app.post('/registry/verifiers', (req, res) => {
 app.get('/registry/verifiers', (req, res) => {
   const filters = {
     status: req.query.status,
-    verificationTypes: req.query.verificationTypes?.split(',')
+    verificationTypes: req.query.verificationTypes?.split(','),
   };
   const result = verifier.listIssuers(filters);
   res.json(result);
@@ -609,14 +609,14 @@ app.get('/audit-log', (req, res) => {
   const filters = {
     action: req.query.action,
     issuerId: req.query.issuerId,
-    limit: parseInt(req.query.limit) || 100
+    limit: parseInt(req.query.limit) || 100,
   };
   const result = verifier.getAuditLog(filters);
   res.json(result);
 });
 
 // Error handler
-app.use((err, req, res, next) => {
+app.use((err, req, res, _next) => {
   console.error('Error:', err);
   res.status(500).json({ success: false, error: err.message });
 });

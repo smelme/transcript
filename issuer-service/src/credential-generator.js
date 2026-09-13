@@ -244,8 +244,8 @@ export const DEFAULT_KIND = 'qualification';
  */
 export function requestedKinds(include) {
   const value = String(include ?? '').trim().toLowerCase();
-  if (value === 'transcript') return ['transcript'];
-  if (value === 'both') return ['qualification', 'transcript'];
+  if (value === 'transcript') {return ['transcript'];}
+  if (value === 'both') {return ['qualification', 'transcript'];}
   return [DEFAULT_KIND];
 }
 
@@ -257,16 +257,16 @@ export function requestedKinds(include) {
 export function kindOfCredentialData(credentialData = {}) {
   const hasQualification = Boolean(credentialData.education_qualification);
   const hasTranscript = Boolean(credentialData.education_transcript);
-  if (hasQualification && hasTranscript) return 'academic';
-  if (hasTranscript) return 'transcript';
-  if (hasQualification) return 'qualification';
+  if (hasQualification && hasTranscript) {return 'academic';}
+  if (hasTranscript) {return 'transcript';}
+  if (hasQualification) {return 'qualification';}
   return 'credential';
 }
 
 /** How a credential should be labelled, from the claims it actually holds. */
 export function labelOfCredentialData(credentialData) {
   const kind = kindOfCredentialData(credentialData);
-  if (kind === 'academic') return 'Qualification and transcript';
+  if (kind === 'academic') {return 'Qualification and transcript';}
   return CREDENTIAL_KINDS[kind]?.label || 'Credential';
 }
 
@@ -307,15 +307,15 @@ function usTermsEndingAt(lastAcademicYear, count) {
     terms.unshift(
       isSpring
         ? {
-            title: `Spring ${academicYear + 1}`,
-            start: `${academicYear + 1}-01-16`,
-            end: `${academicYear + 1}-05-10`,
-          }
+          title: `Spring ${academicYear + 1}`,
+          start: `${academicYear + 1}-01-16`,
+          end: `${academicYear + 1}-05-10`,
+        }
         : {
-            title: `Fall ${academicYear}`,
-            start: `${academicYear}-08-28`,
-            end: `${academicYear}-12-15`,
-          },
+          title: `Fall ${academicYear}`,
+          start: `${academicYear}-08-28`,
+          end: `${academicYear}-12-15`,
+        },
     );
   }
   return terms;
@@ -327,7 +327,7 @@ function pickLetterGrade(rng) {
   let roll = rng() * total;
   for (const grade of LETTER_GRADES) {
     roll -= grade.weight;
-    if (roll <= 0) return grade;
+    if (roll <= 0) {return grade;}
   }
   return LETTER_GRADES[0];
 }
@@ -375,7 +375,6 @@ export function generateAcademicRecord({
   // ── The study ──────────────────────────────────────────────────────────
   const pool = COURSE_POOL[programme.code] || COURSE_POOL['BSC-CS'];
   const courseCount = Math.min(pool.length, 5 + Math.floor(rng() * 2));
-  const firstTermYear = graduationYear - (programme.level === 'Master' ? 1 : 2);
   // Graduation falls in June or July, which is the end of the academic year that began the
   // previous August, so the final term is that year's Spring.
   const lastAcademicYear = graduationYear - 1;
@@ -470,15 +469,15 @@ export function generateAcademicRecord({
       gpa_scale_maximum: US_GRADING_SCALE.maximum,
       ...(recognition
         ? {
-            // An employer checking an award needs to recognise the institution, not just read
-            // its name, so the same identifiers travel with the qualification.
-            institution_id: RECOGNITION_SAMPLES.institutionId,
-            institution_id_scheme: RECOGNITION_SAMPLES.institutionIdScheme,
-            institution_ror: RECOGNITION_SAMPLES.institutionRor,
-            institution_name_alt: RECOGNITION_SAMPLES.institutionNameAlt,
-            language_of_instruction: RECOGNITION_SAMPLES.languageOfInstruction,
-            field_of_study_alt: programme.alt,
-          }
+          // An employer checking an award needs to recognise the institution, not just read
+          // its name, so the same identifiers travel with the qualification.
+          institution_id: RECOGNITION_SAMPLES.institutionId,
+          institution_id_scheme: RECOGNITION_SAMPLES.institutionIdScheme,
+          institution_ror: RECOGNITION_SAMPLES.institutionRor,
+          institution_name_alt: RECOGNITION_SAMPLES.institutionNameAlt,
+          language_of_instruction: RECOGNITION_SAMPLES.languageOfInstruction,
+          field_of_study_alt: programme.alt,
+        }
         : {}),
     },
     education_transcript: {
@@ -518,19 +517,19 @@ export function generateAcademicRecord({
       status: 'completed',
       ...(recognition
         ? {
-            // Recognition details: who the institution is beyond its name, what its codes are
-            // codes in, and in which language the study was taught.
-            institution_id: RECOGNITION_SAMPLES.institutionId,
-            institution_id_scheme: RECOGNITION_SAMPLES.institutionIdScheme,
-            institution_ror: RECOGNITION_SAMPLES.institutionRor,
-            institution_erasmus_code: RECOGNITION_SAMPLES.institutionErasmusCode,
-            institution_name_alt: RECOGNITION_SAMPLES.institutionNameAlt,
-            institution_name_alt_language: RECOGNITION_SAMPLES.institutionNameAltLanguage,
-            programme_title_alt: programme.alt,
-            programme_title_alt_language: RECOGNITION_SAMPLES.institutionNameAltLanguage,
-            language_of_instruction: RECOGNITION_SAMPLES.languageOfInstruction,
-            student_id_scheme: RECOGNITION_SAMPLES.learnerIdScheme,
-          }
+          // Recognition details: who the institution is beyond its name, what its codes are
+          // codes in, and in which language the study was taught.
+          institution_id: RECOGNITION_SAMPLES.institutionId,
+          institution_id_scheme: RECOGNITION_SAMPLES.institutionIdScheme,
+          institution_ror: RECOGNITION_SAMPLES.institutionRor,
+          institution_erasmus_code: RECOGNITION_SAMPLES.institutionErasmusCode,
+          institution_name_alt: RECOGNITION_SAMPLES.institutionNameAlt,
+          institution_name_alt_language: RECOGNITION_SAMPLES.institutionNameAltLanguage,
+          programme_title_alt: programme.alt,
+          programme_title_alt_language: RECOGNITION_SAMPLES.institutionNameAltLanguage,
+          language_of_instruction: RECOGNITION_SAMPLES.languageOfInstruction,
+          student_id_scheme: RECOGNITION_SAMPLES.learnerIdScheme,
+        }
         : {}),
     },
     education_academic_record: {
@@ -555,13 +554,13 @@ export function generateAcademicRecord({
       document_completeness: 'partial',
       ...(recognition
         ? {
-            // Which document this is, and who attested it in what capacity: a registrar can
-            // check the attestation against a known office rather than a known person.
-            transcript_type: RECOGNITION_SAMPLES.transcriptType,
-            document_version: RECOGNITION_SAMPLES.documentVersion,
-            attesting_office: RECOGNITION_SAMPLES.attestingOffice,
-            attesting_capacity: RECOGNITION_SAMPLES.attestingCapacity,
-          }
+          // Which document this is, and who attested it in what capacity: a registrar can
+          // check the attestation against a known office rather than a known person.
+          transcript_type: RECOGNITION_SAMPLES.transcriptType,
+          document_version: RECOGNITION_SAMPLES.documentVersion,
+          attesting_office: RECOGNITION_SAMPLES.attestingOffice,
+          attesting_capacity: RECOGNITION_SAMPLES.attestingCapacity,
+        }
         : {}),
     },
   };
@@ -586,7 +585,7 @@ export function generateAcademicRecord({
   const records = requestedKinds(include).map((kind) => {
     const spec = CREDENTIAL_KINDS[kind];
     const credentialData = { docType: spec.docType };
-    for (const field of IDENTITY_FIELDS) credentialData[field] = record[field];
+    for (const field of IDENTITY_FIELDS) {credentialData[field] = record[field];}
     credentialData[spec.academicField] = record[spec.academicField];
     // The US-practice supplement rides with the transcript: it describes the same study and
     // the record's own standing, so a transcript without it would be missing exactly what a

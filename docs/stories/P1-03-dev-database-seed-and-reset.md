@@ -1,8 +1,23 @@
 # P1-03: Development database has no seed or reset path
 
 **Priority:** P1 — testers chase credentials the database believes are already claimed
-**Status:** Open, reproduced during UAT (see `docs/analysis-discovery/uat-transcript-flow.md`, UAT-011)
-**Components:** `data/transcript.db` (better-sqlite3), `issuer-service`, `scripts/`
+**Status:** Resolved — `npm run db:reset` and `npm run db:seed` implement it
+**Components:** `scripts/dev-database.mjs`, `package.json`, `data/transcript.db` (better-sqlite3)
+
+## What was built
+
+`npm run db:reset` deletes the database (and its `-wal`/`-shm` siblings) and recreates an empty
+schema. `npm run db:seed` creates the two demo client organisations and an administrator for each,
+idempotently — a second run reports "Admin already present" rather than duplicating or failing.
+
+Both refuse to run when `NODE_ENV=production`, and when `DATABASE_PATH` points outside the
+repository's `data/` directory, so a developer who aimed the variable at something real cannot lose
+it by running a command from a README. Both guards were exercised, not just written.
+
+**Deliberately not seeded:** credentials and wallet accounts. A credential is only real once the
+issuer has signed it, so seeded credential rows would be metadata pretending to be a credential —
+precisely the confusion this story exists to remove. Wallets enrol themselves, and credentials are
+issued through the academy flow so the mdoc bytes are genuine.
 
 ## Problem
 

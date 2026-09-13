@@ -27,7 +27,7 @@ export class ClientOrgService {
   /** Register an organisation if it is new; returns the normalised institution. */
   ensureOrg(institution, name = null) {
     const trimmed = String(institution || '').trim();
-    if (!trimmed) throw new Error('institution is required');
+    if (!trimmed) {throw new Error('institution is required');}
     this.db
       .prepare(
         `INSERT INTO client_orgs (institution, name, created_at) VALUES (?, ?, ?)
@@ -68,8 +68,8 @@ export class ClientOrgService {
   listApiKeys(institution = null) {
     const rows = institution
       ? this.db
-          .prepare('SELECT * FROM api_keys WHERE institution = ? ORDER BY created_at DESC')
-          .all(institution)
+        .prepare('SELECT * FROM api_keys WHERE institution = ? ORDER BY created_at DESC')
+        .all(institution)
       : this.db.prepare('SELECT * FROM api_keys ORDER BY created_at DESC').all();
 
     return rows.map((row) => ({
@@ -87,11 +87,11 @@ export class ClientOrgService {
   /** Revoke a key. Revoking is idempotent-safe and keeps the row for the audit trail. */
   revokeApiKey(keyId, institution = null) {
     const row = this.db.prepare('SELECT key_id, institution, revoked_at FROM api_keys WHERE key_id = ?').get(keyId);
-    if (!row) return { success: false, error: 'API key not found' };
+    if (!row) {return { success: false, error: 'API key not found' };}
     if (institution && row.institution !== institution) {
       return { success: false, error: 'API key belongs to another organisation' };
     }
-    if (row.revoked_at) return { success: false, error: 'API key already revoked' };
+    if (row.revoked_at) {return { success: false, error: 'API key already revoked' };}
 
     this.db.prepare('UPDATE api_keys SET revoked_at = ? WHERE key_id = ?').run(new Date().toISOString(), keyId);
     return { success: true, keyId };
@@ -100,12 +100,12 @@ export class ClientOrgService {
   /** Resolve a presented API key to its organisation, or null when unusable. */
   authenticate(key) {
     const presented = String(key || '').trim();
-    if (!presented) return null;
+    if (!presented) {return null;}
 
     const row = this.db
       .prepare('SELECT key_id, institution, revoked_at FROM api_keys WHERE key_hash = ?')
       .get(sha256Hex(presented));
-    if (!row || row.revoked_at) return null;
+    if (!row || row.revoked_at) {return null;}
 
     this.db
       .prepare('UPDATE api_keys SET last_used_at = ? WHERE key_id = ?')

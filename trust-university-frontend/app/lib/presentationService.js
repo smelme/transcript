@@ -72,7 +72,7 @@ async function request(path, options = {}) {
 }
 
 function supportsIsoMdocPresentation() {
-  if (typeof navigator === 'undefined' || !navigator.credentials?.get) return false;
+  if (typeof navigator === 'undefined' || !navigator.credentials?.get) {return false;}
   return (
     typeof window.DigitalCredential === 'undefined' ||
     typeof window.DigitalCredential.userAgentAllowsProtocol !== 'function' ||
@@ -139,8 +139,8 @@ export async function submitTranscript(
  * so a registrar still sees the verified totals if the list cannot be read.
  */
 export function parseCourses(value) {
-  if (Array.isArray(value)) return value;
-  if (typeof value !== 'string' || value.trim() === '') return [];
+  if (Array.isArray(value)) {return value;}
+  if (typeof value !== 'string' || value.trim() === '') {return [];}
   try {
     const parsed = JSON.parse(value);
     return Array.isArray(parsed) ? parsed : [];

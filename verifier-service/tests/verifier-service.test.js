@@ -13,7 +13,7 @@ function createQRPayload(overrides = {}) {
     name: { givenName: 'John', familyName: 'Doe' },
     issuanceDate: '2024-01-15',
     expiryDate: '2029-01-15',
-    ...overrides
+    ...overrides,
   };
 }
 
@@ -27,7 +27,7 @@ test('Verifier Service - Create Instance', () => {
 test('Verifier Service - Custom Configuration', () => {
   const verifier = new VerifierService({
     verifierId: 'custom-verifier',
-    verifierName: 'Test Verifier'
+    verifierName: 'Test Verifier',
   });
   assert.strictEqual(verifier.verifierId, 'custom-verifier');
   assert.strictEqual(verifier.verifierName, 'Test Verifier');
@@ -40,7 +40,7 @@ test('Verifier Service - Register Issuer Success', () => {
     issuerId: 'issuer-001',
     issuerName: 'State University',
     verificationTypes: ['academic'],
-    trustScore: 75
+    trustScore: 75,
   });
 
   assert.strictEqual(result.success, true);
@@ -52,7 +52,7 @@ test('Verifier Service - Register Issuer Missing Fields', () => {
   const verifier = new VerifierService();
   
   const result = verifier.registerIssuer({
-    issuerId: 'issuer-001'
+    issuerId: 'issuer-001',
   });
 
   assert.strictEqual(result.success, false);
@@ -64,12 +64,12 @@ test('Verifier Service - Register Duplicate Issuer', () => {
   
   verifier.registerIssuer({
     issuerId: 'issuer-001',
-    issuerName: 'State University'
+    issuerName: 'State University',
   });
 
   const result = verifier.registerIssuer({
     issuerId: 'issuer-001',
-    issuerName: 'Different Name'
+    issuerName: 'Different Name',
   });
 
   assert.strictEqual(result.success, false);
@@ -80,7 +80,7 @@ test('Verifier Service - Approve Issuer', () => {
   
   verifier.registerIssuer({
     issuerId: 'issuer-001',
-    issuerName: 'State University'
+    issuerName: 'State University',
   });
 
   const result = verifier.approveIssuer('issuer-001');
@@ -100,7 +100,7 @@ test('Verifier Service - Block Issuer', () => {
   
   verifier.registerIssuer({
     issuerId: 'issuer-001',
-    issuerName: 'State University'
+    issuerName: 'State University',
   });
 
   const result = verifier.blockIssuer('issuer-001', 'Compromised credentials');
@@ -121,7 +121,7 @@ test('Verifier Service - Update Trust Score Success', () => {
   verifier.registerIssuer({
     issuerId: 'issuer-001',
     issuerName: 'State University',
-    trustScore: 50
+    trustScore: 50,
   });
 
   const result = verifier.updateTrustScore('issuer-001', 85);
@@ -134,7 +134,7 @@ test('Verifier Service - Update Trust Score Invalid Range', () => {
   
   verifier.registerIssuer({
     issuerId: 'issuer-001',
-    issuerName: 'State University'
+    issuerName: 'State University',
   });
 
   const result1 = verifier.updateTrustScore('issuer-001', 101);
@@ -150,7 +150,7 @@ test('Verifier Service - Get Trust Score', () => {
   verifier.registerIssuer({
     issuerId: 'issuer-001',
     issuerName: 'State University',
-    trustScore: 75
+    trustScore: 75,
   });
 
   const result = verifier.getTrustScore('issuer-001');
@@ -171,7 +171,7 @@ test('Verifier Service - Scan Approved Issuer Success', () => {
   verifier.registerIssuer({
     issuerId: 'issuer-001',
     issuerName: 'State University',
-    trustScore: 85
+    trustScore: 85,
   });
   verifier.approveIssuer('issuer-001');
 
@@ -186,7 +186,7 @@ test('Verifier Service - Scan Blocked Issuer Rejected', () => {
   
   verifier.registerIssuer({
     issuerId: 'issuer-001',
-    issuerName: 'State University'
+    issuerName: 'State University',
   });
   verifier.approveIssuer('issuer-001');
   verifier.blockIssuer('issuer-001', 'Security concern');
@@ -202,7 +202,7 @@ test('Verifier Service - Scan Unapproved Issuer Pending', () => {
   
   verifier.registerIssuer({
     issuerId: 'issuer-001',
-    issuerName: 'State University'
+    issuerName: 'State University',
   });
 
   const result = verifier.scanPresentation(createQRPayload());
@@ -243,7 +243,7 @@ test('Verifier Service - Scan Updates Statistics', () => {
   
   verifier.registerIssuer({
     issuerId: 'issuer-001',
-    issuerName: 'State University'
+    issuerName: 'State University',
   });
   verifier.approveIssuer('issuer-001');
 
@@ -260,7 +260,7 @@ test('Verifier Service - Reject Verification', () => {
   
   verifier.registerIssuer({
     issuerId: 'issuer-001',
-    issuerName: 'State University'
+    issuerName: 'State University',
   });
   verifier.approveIssuer('issuer-001');
 
@@ -283,7 +283,7 @@ test('Verifier Service - Cannot Double Reject', () => {
   
   verifier.registerIssuer({
     issuerId: 'issuer-001',
-    issuerName: 'State University'
+    issuerName: 'State University',
   });
   verifier.approveIssuer('issuer-001');
 
@@ -299,7 +299,7 @@ test('Verifier Service - Get Verification', () => {
   
   verifier.registerIssuer({
     issuerId: 'issuer-001',
-    issuerName: 'State University'
+    issuerName: 'State University',
   });
   verifier.approveIssuer('issuer-001');
 
@@ -323,7 +323,7 @@ test('Verifier Service - List Verifications', () => {
   
   verifier.registerIssuer({
     issuerId: 'issuer-001',
-    issuerName: 'State University'
+    issuerName: 'State University',
   });
   verifier.approveIssuer('issuer-001');
 
@@ -340,7 +340,7 @@ test('Verifier Service - List Verifications Filter by Status', () => {
   
   verifier.registerIssuer({
     issuerId: 'issuer-001',
-    issuerName: 'State University'
+    issuerName: 'State University',
   });
   verifier.approveIssuer('issuer-001');
 
@@ -357,11 +357,11 @@ test('Verifier Service - List Verifications Filter by Issuer', () => {
   
   verifier.registerIssuer({
     issuerId: 'issuer-001',
-    issuerName: 'University A'
+    issuerName: 'University A',
   });
   verifier.registerIssuer({
     issuerId: 'issuer-002',
-    issuerName: 'University B'
+    issuerName: 'University B',
   });
   verifier.approveIssuer('issuer-001');
   verifier.approveIssuer('issuer-002');
@@ -369,7 +369,7 @@ test('Verifier Service - List Verifications Filter by Issuer', () => {
   verifier.scanPresentation(createQRPayload({ issuerId: 'issuer-001' }));
   verifier.scanPresentation(createQRPayload({ 
     issuerId: 'issuer-002',
-    credentialId: 'cred-002'
+    credentialId: 'cred-002',
   }));
 
   const result = verifier.listVerifications({ issuerId: 'issuer-001' });
@@ -381,11 +381,11 @@ test('Verifier Service - List Issuers', () => {
   
   verifier.registerIssuer({
     issuerId: 'issuer-001',
-    issuerName: 'University A'
+    issuerName: 'University A',
   });
   verifier.registerIssuer({
     issuerId: 'issuer-002',
-    issuerName: 'University B'
+    issuerName: 'University B',
   });
 
   const result = verifier.listIssuers();
@@ -398,11 +398,11 @@ test('Verifier Service - List Issuers Filter by Status', () => {
   
   verifier.registerIssuer({
     issuerId: 'issuer-001',
-    issuerName: 'University A'
+    issuerName: 'University A',
   });
   verifier.registerIssuer({
     issuerId: 'issuer-002',
-    issuerName: 'University B'
+    issuerName: 'University B',
   });
   verifier.approveIssuer('issuer-001');
 
@@ -417,12 +417,12 @@ test('Verifier Service - List Issuers Filter by Verification Type', () => {
   verifier.registerIssuer({
     issuerId: 'issuer-001',
     issuerName: 'University A',
-    verificationTypes: ['academic']
+    verificationTypes: ['academic'],
   });
   verifier.registerIssuer({
     issuerId: 'issuer-002',
     issuerName: 'Company B',
-    verificationTypes: ['employment']
+    verificationTypes: ['employment'],
   });
 
   const result = verifier.listIssuers({ verificationTypes: ['academic'] });
@@ -435,7 +435,7 @@ test('Verifier Service - Get Statistics', () => {
   
   verifier.registerIssuer({
     issuerId: 'issuer-001',
-    issuerName: 'State University'
+    issuerName: 'State University',
   });
   verifier.approveIssuer('issuer-001');
 
@@ -452,7 +452,7 @@ test('Verifier Service - Statistics After Block', () => {
   
   verifier.registerIssuer({
     issuerId: 'issuer-001',
-    issuerName: 'State University'
+    issuerName: 'State University',
   });
   verifier.blockIssuer('issuer-001');
 
@@ -465,7 +465,7 @@ test('Verifier Service - Audit Log Entry Creation', () => {
   
   verifier.registerIssuer({
     issuerId: 'issuer-001',
-    issuerName: 'State University'
+    issuerName: 'State University',
   });
 
   assert.strictEqual(verifier.auditLog.length, 1);
@@ -477,7 +477,7 @@ test('Verifier Service - Audit Log Multiple Actions', () => {
   
   verifier.registerIssuer({
     issuerId: 'issuer-001',
-    issuerName: 'State University'
+    issuerName: 'State University',
   });
   verifier.approveIssuer('issuer-001');
   verifier.updateTrustScore('issuer-001', 90);
@@ -492,7 +492,7 @@ test('Verifier Service - Get Audit Log', () => {
   
   verifier.registerIssuer({
     issuerId: 'issuer-001',
-    issuerName: 'State University'
+    issuerName: 'State University',
   });
   verifier.approveIssuer('issuer-001');
 
@@ -506,7 +506,7 @@ test('Verifier Service - Clear All Data', () => {
   
   verifier.registerIssuer({
     issuerId: 'issuer-001',
-    issuerName: 'State University'
+    issuerName: 'State University',
   });
   verifier.approveIssuer('issuer-001');
   verifier.scanPresentation(createQRPayload());
@@ -523,7 +523,7 @@ test('Verifier Service - Verification Count Increments Issuer Verification Count
   
   verifier.registerIssuer({
     issuerId: 'issuer-001',
-    issuerName: 'State University'
+    issuerName: 'State University',
   });
   verifier.approveIssuer('issuer-001');
 
@@ -539,14 +539,14 @@ test('Verifier Service - Multiple Verification Types', () => {
   verifier.registerIssuer({
     issuerId: 'issuer-001',
     issuerName: 'Multi-Type Issuer',
-    verificationTypes: ['academic', 'employment', 'government']
+    verificationTypes: ['academic', 'employment', 'government'],
   });
   verifier.approveIssuer('issuer-001');
 
   verifier.scanPresentation(createQRPayload({ credentialType: 'AcademicCredential' }));
   verifier.scanPresentation(createQRPayload({ 
     credentialId: 'cred-002',
-    credentialType: 'EmploymentCredential'
+    credentialType: 'EmploymentCredential',
   }));
 
   const stats = verifier.getStatistics();

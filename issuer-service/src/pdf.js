@@ -21,9 +21,7 @@ function escapePdfText(value) {
 export function renderSharePdf({ title, subtitle, rows, footer }) {
   const content = [];
   const startY = 720;
-  const lineHeight = 18;
   const margin = 72;
-  const maxWidth = 612 - margin * 2; // Letter page 612x792
   const maxCharsPerLine = 95;
 
   const wrap = (text) => {
@@ -37,17 +35,10 @@ export function renderSharePdf({ title, subtitle, rows, footer }) {
           chunks.push(rest.slice(0, maxCharsPerLine));
           rest = rest.slice(maxCharsPerLine);
         }
-        if (rest) chunks.push(rest);
+        if (rest) {chunks.push(rest);}
       }
     }
     return chunks;
-  };
-
-  const textLines = (str, size, gapAfter = 0) => {
-    for (const line of wrap(str)) {
-      content.push(`BT /F1 ${size} Tf ${margin} ${startY - content.length * 0} Td (${escapePdfText(line)}) Tj ET`);
-    }
-    if (gapAfter) content.push(`0 -${gapAfter} TD`);
   };
 
   let y = startY;
@@ -60,7 +51,7 @@ export function renderSharePdf({ title, subtitle, rows, footer }) {
   };
 
   y = emit(title || 'Shared document', 20, 8);
-  if (subtitle) y = emit(subtitle, 11, 14);
+  if (subtitle) {y = emit(subtitle, 11, 14);}
   y -= 6;
 
   for (const [label, value] of rows) {

@@ -22,7 +22,7 @@ async function cleanupTestKeys() {
   }
 }
 
-test('KeyManagementService - Generate Key Pair', async (t) => {
+test('KeyManagementService - Generate Key Pair', async () => {
   await cleanupTestKeys();
 
   const keyManagement = new KeyManagementService({ keysDir: testKeysDir });
@@ -37,7 +37,7 @@ test('KeyManagementService - Generate Key Pair', async (t) => {
   assert(keyData.metadata.status === 'active', 'status should be active');
 });
 
-test('KeyManagementService - Store Key Pair', async (t) => {
+test('KeyManagementService - Store Key Pair', async () => {
   await cleanupTestKeys();
 
   const keyManagement = new KeyManagementService({ keysDir: testKeysDir });
@@ -53,7 +53,7 @@ test('KeyManagementService - Store Key Pair', async (t) => {
   assert(exists, 'key file should exist');
 });
 
-test('KeyManagementService - Load Public Key', async (t) => {
+test('KeyManagementService - Load Public Key', async () => {
   await cleanupTestKeys();
 
   const keyManagement = new KeyManagementService({ keysDir: testKeysDir });
@@ -67,7 +67,7 @@ test('KeyManagementService - Load Public Key', async (t) => {
   assert(loadedKey.publicKey === originalKeyData.publicKey, 'public key should match');
 });
 
-test('KeyManagementService - List Public Keys', async (t) => {
+test('KeyManagementService - List Public Keys', async () => {
   await cleanupTestKeys();
 
   const keyManagement = new KeyManagementService({ keysDir: testKeysDir });
@@ -86,7 +86,7 @@ test('KeyManagementService - List Public Keys', async (t) => {
   assert(keys[0].status, 'each key should have status');
 });
 
-test('KeyManagementService - Hash String', async (t) => {
+test('KeyManagementService - Hash String', async () => {
   const keyManagement = new KeyManagementService({ keysDir: testKeysDir });
 
   const testString = 'test-private-key-content';
@@ -97,7 +97,7 @@ test('KeyManagementService - Hash String', async (t) => {
   assert(hash1.length === 64, 'hash should be SHA256 (64 chars hex)');
 });
 
-test('KeyManagementService - Verify Private Key Hash', async (t) => {
+test('KeyManagementService - Verify Private Key Hash', async () => {
   const keyManagement = new KeyManagementService({ keysDir: testKeysDir });
 
   const privateKeyPem = '-----BEGIN PRIVATE KEY-----\ntest\n-----END PRIVATE KEY-----';
@@ -107,7 +107,7 @@ test('KeyManagementService - Verify Private Key Hash', async (t) => {
   assert(!keyManagement.verifyPrivateKeyHash('different', hash), 'wrong key should not verify');
 });
 
-test('KeyManagementService - Get Key Metadata', async (t) => {
+test('KeyManagementService - Get Key Metadata', async () => {
   await cleanupTestKeys();
 
   const keyManagement = new KeyManagementService({ keysDir: testKeysDir });
@@ -122,7 +122,7 @@ test('KeyManagementService - Get Key Metadata', async (t) => {
   assert(metadata.createdAt, 'metadata should have createdAt');
 });
 
-test('KeyManagementService - Error Handling', async (t) => {
+test('KeyManagementService - Error Handling', async () => {
   const keyManagement = new KeyManagementService({ keysDir: testKeysDir });
 
   try {
@@ -133,7 +133,7 @@ test('KeyManagementService - Error Handling', async (t) => {
   }
 });
 
-test('KeyManagementService - Export Public Key', async (t) => {
+test('KeyManagementService - Export Public Key', async () => {
   const keyManagement = new KeyManagementService({ keysDir: testKeysDir });
   const keyData = await keyManagement.generateKeyPair('export-test');
 
@@ -143,7 +143,7 @@ test('KeyManagementService - Export Public Key', async (t) => {
   assert(keyData.publicKeyJWK.crv === 'Ed25519', 'JWK should have correct crv');
 });
 
-test('KeyManagementService - PEM Format Conversion', async (t) => {
+test('KeyManagementService - PEM Format Conversion', async () => {
   const keyManagement = new KeyManagementService({ keysDir: testKeysDir });
 
   const testBuffer = Buffer.from('test data');

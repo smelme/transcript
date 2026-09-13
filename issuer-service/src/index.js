@@ -7,7 +7,6 @@ import { v4 as uuidv4 } from 'uuid';
 import Ajv from 'ajv';
 import addFormats from 'ajv-formats';
 import QRCode from 'qrcode';
-import nodemailer from 'nodemailer';
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath, pathToFileURL } from 'url';
@@ -67,7 +66,7 @@ class IssuerService {
       totalRevoked: 0,
       totalVerified: 0,
       byStudent: {},
-      byType: {}
+      byType: {},
     };
     this.revokedCredentials = new Set();
 
@@ -101,8 +100,8 @@ class IssuerService {
           required: ['givenName', 'familyName'],
           properties: {
             givenName: { type: 'string' },
-            familyName: { type: 'string' }
-          }
+            familyName: { type: 'string' },
+          },
         },
         institution: { type: 'string' },
         courses: {
@@ -114,9 +113,9 @@ class IssuerService {
             properties: {
               courseCode: { type: 'string' },
               courseName: { type: 'string' },
-              credits: { type: 'number', minimum: 0, maximum: 999 }
-            }
-          }
+              credits: { type: 'number', minimum: 0, maximum: 999 },
+            },
+          },
         },
         dateOfBirth: { type: 'string', format: 'date' },
         degreeLevel: { type: 'string', enum: ['associate', 'bachelor', 'master', 'doctorate'] },
@@ -124,8 +123,8 @@ class IssuerService {
         gpa: { type: 'number', minimum: 0, maximum: 4.0 },
         achievements: { type: 'array', items: { type: 'string' } },
         issuanceDate: { type: 'string', format: 'date' },
-        expiryDate: { type: 'string', format: 'date' }
-      }
+        expiryDate: { type: 'string', format: 'date' },
+      },
     });
 
     // Photo ID Credential Schema (ISO 23220)
@@ -149,8 +148,8 @@ class IssuerService {
             degree_level: { type: 'string' },
             field_of_study: { type: 'string' },
             graduation_date: { type: 'string', format: 'date' },
-            gpa: { type: 'number' }
-          }
+            gpa: { type: 'number' },
+          },
         },
         education_transcript: {
           type: 'object',
@@ -158,8 +157,8 @@ class IssuerService {
             student_id: { type: 'string' },
             courses: { type: 'array' },
             total_credits: { type: 'number' },
-            status: { type: 'string' }
-          }
+            status: { type: 'string' },
+          },
         },
         device_key: {
           type: 'object',
@@ -167,12 +166,12 @@ class IssuerService {
             kty: { type: 'string' },
             crv: { type: 'string' },
             x: { type: 'string' },
-            y: { type: 'string' }
-          }
+            y: { type: 'string' },
+          },
         },
         // Set from the calling client organisation's API key, never from the body.
-        institution: { type: 'string' }
-      }
+        institution: { type: 'string' },
+      },
     });
 
     this.loadPersistedCredentials();
@@ -186,7 +185,7 @@ class IssuerService {
         // Revoked credentials are loaded as well as tracked: the portal lists them
         // (carrying status 'revoked') so an organisation keeps the full history of
         // what it issued rather than watching revoked rows disappear on restart.
-        if (row.status === 'revoked') this.revokedCredentials.add(row.credential_id);
+        if (row.status === 'revoked') {this.revokedCredentials.add(row.credential_id);}
         let credential = null;
         if (row.metadata_json) {
           try { credential = JSON.parse(row.metadata_json); } catch { credential = null; }
@@ -298,7 +297,7 @@ class IssuerService {
    */
   buildCredentialMdoc(credentialData, deviceJwk = null, statusIndex = null) {
     const docType = credentialData.docType || PHOTOID_DOCTYPE;
-    if (docType !== PHOTOID_DOCTYPE) return null;
+    if (docType !== PHOTOID_DOCTYPE) {return null;}
 
     const namespaces = {};
     const fullName = (credentialData.full_name || '').trim();
@@ -307,14 +306,14 @@ class IssuerService {
     const familyName = parts.slice(1).join(' ');
 
     const photoId = [];
-    if (givenName) photoId.push(['given_name', new Cbor().tstr(givenName).encode()]);
-    if (familyName) photoId.push(['family_name', new Cbor().tstr(familyName).encode()]);
-    if (credentialData.date_of_birth) photoId.push(['birth_date', fullDate(credentialData.date_of_birth)]);
-    if (credentialData.document_number) photoId.push(['document_number', new Cbor().tstr(credentialData.document_number).encode()]);
-    if (credentialData.issuing_authority) photoId.push(['issuing_authority', new Cbor().tstr(credentialData.issuing_authority).encode()]);
-    if (credentialData.issuing_country) photoId.push(['issuing_country', new Cbor().tstr(credentialData.issuing_country).encode()]);
-    if (credentialData.issue_date) photoId.push(['issue_date', fullDate(credentialData.issue_date)]);
-    if (credentialData.expiry_date) photoId.push(['expiry_date', fullDate(credentialData.expiry_date)]);
+    if (givenName) {photoId.push(['given_name', new Cbor().tstr(givenName).encode()]);}
+    if (familyName) {photoId.push(['family_name', new Cbor().tstr(familyName).encode()]);}
+    if (credentialData.date_of_birth) {photoId.push(['birth_date', fullDate(credentialData.date_of_birth)]);}
+    if (credentialData.document_number) {photoId.push(['document_number', new Cbor().tstr(credentialData.document_number).encode()]);}
+    if (credentialData.issuing_authority) {photoId.push(['issuing_authority', new Cbor().tstr(credentialData.issuing_authority).encode()]);}
+    if (credentialData.issuing_country) {photoId.push(['issuing_country', new Cbor().tstr(credentialData.issuing_country).encode()]);}
+    if (credentialData.issue_date) {photoId.push(['issue_date', fullDate(credentialData.issue_date)]);}
+    if (credentialData.expiry_date) {photoId.push(['expiry_date', fullDate(credentialData.expiry_date)]);}
     if (credentialData.portrait) {
       try {
         photoId.push(['portrait', new Cbor().bstr(Buffer.from(credentialData.portrait, 'base64')).encode()]);
@@ -426,7 +425,7 @@ class IssuerService {
       namespaces['org.iso.23220.education.academic-record.1'] = academicRecord;
     }
 
-    if (!Object.keys(namespaces).length) return null;
+    if (!Object.keys(namespaces).length) {return null;}
 
     return generateIssuerSigned({
       docType,
@@ -454,7 +453,7 @@ class IssuerService {
   getMdocSession(credentialId) {
     this.pruneExpiredMdocSessions();
     const session = this.mdocSessions.get(credentialId);
-    if (!session) return null;
+    if (!session) {return null;}
     if (Date.now() > session.expiresAt) {
       this.mdocSessions.delete(credentialId);
       return null;
@@ -466,7 +465,7 @@ class IssuerService {
   pruneExpiredMdocSessions() {
     const now = Date.now();
     for (const [id, session] of this.mdocSessions) {
-      if (now > session.expiresAt) this.mdocSessions.delete(id);
+      if (now > session.expiresAt) {this.mdocSessions.delete(id);}
     }
   }
 
@@ -475,7 +474,6 @@ class IssuerService {
     const now = new Date();
     
     // Determine credential type and validate accordingly
-    let isPhotoID = false;
     let credential = null;
     let mdocBase64url = null;
     
@@ -485,7 +483,7 @@ class IssuerService {
       if (!this.validatePhotoIDRequest(credentialData)) {
         return {
           success: false,
-          error: `Credential validation failed: ${JSON.stringify(this.validatePhotoIDRequest.errors)}`
+          error: `Credential validation failed: ${JSON.stringify(this.validatePhotoIDRequest.errors)}`,
         };
       }
 
@@ -497,11 +495,10 @@ class IssuerService {
       if (deviceKeyJwk && !isValidDevicePublicJwk(deviceKeyJwk)) {
         return {
           success: false,
-          error: 'Invalid device_key: expected an EC P-256 public JWK { kty: "EC", crv: "P-256", x, y }'
+          error: 'Invalid device_key: expected an EC P-256 public JWK { kty: "EC", crv: "P-256", x, y }',
         };
       }
-      
-      isPhotoID = true;
+
       credential = {
         credentialId,
         issuerId: this.issuerId,
@@ -531,7 +528,7 @@ class IssuerService {
         signature: `sig_${uuidv4()}`,
         deviceKey: deviceKeyJwk,
         deviceBound: !!deviceKeyJwk,
-        createdAt: now.toISOString()
+        createdAt: now.toISOString(),
       };
 
       // Generate the ISO 18013-5 IssuerSigned mdoc for this credential kind. The mdoc
@@ -574,7 +571,7 @@ class IssuerService {
       if (!this.validateCredentialRequest(credentialData)) {
         return {
           success: false,
-          error: `Validation failed: ${JSON.stringify(this.validateCredentialRequest.errors)}`
+          error: `Validation failed: ${JSON.stringify(this.validateCredentialRequest.errors)}`,
         };
       }
       
@@ -600,7 +597,7 @@ class IssuerService {
         gpa: credentialData.gpa,
         achievements: credentialData.achievements,
         signature: `sig_${uuidv4()}`,
-        createdAt: now.toISOString()
+        createdAt: now.toISOString(),
       };
       
       this.statistics.byStudent[credentialData.studentId] = 
@@ -627,7 +624,7 @@ class IssuerService {
       // without inferring it from a docType every kind shares.
       kind: credential.kind || 'credential',
       kindLabel: labelOfCredentialData(credential),
-      details: { issued: true, docType: credential.docType || credential.credentialType }
+      details: { issued: true, docType: credential.docType || credential.credentialType },
     });
 
     return {
@@ -640,7 +637,7 @@ class IssuerService {
       issuanceDate: credential.issuanceDate || credential.issue_date || now.toISOString(),
       expiryDate: credential.expiryDate || credential.expiry_date,
       mdocBase64url,
-      mdocSessionTtlMs: this.mdocSessionTtlMs
+      mdocSessionTtlMs: this.mdocSessionTtlMs,
     };
   }
 
@@ -781,9 +778,9 @@ class IssuerService {
     }
     const normalizedEmail = email ? String(email).trim().toLowerCase() : null;
     const filterSession = (session) => {
-      if (session.status === 'superseded') return false;
-      if (sub && session.sub === sub) return true;
-      if (normalizedEmail && session.email === normalizedEmail) return true;
+      if (session.status === 'superseded') {return false;}
+      if (sub && session.sub === sub) {return true;}
+      if (normalizedEmail && session.email === normalizedEmail) {return true;}
       return links.some(
         (l) => l.institution === session.institution && l.studentId === session.studentId,
       );
@@ -797,7 +794,7 @@ class IssuerService {
    * credential from an older claim set must not be handed back as if it were current.
    */
   findIssuanceSessionsFor({ studentId, institution, academicNamespace }) {
-    if (!studentId || !academicNamespace) return [];
+    if (!studentId || !academicNamespace) {return [];}
     let rows;
     try {
       rows = this.db
@@ -825,7 +822,7 @@ class IssuerService {
    */
   supersedeIssuanceSession(sessionId) {
     const session = this.getIssuanceSession(sessionId);
-    if (!session || session.status !== 'pending') return undefined;
+    if (!session || session.status !== 'pending') {return undefined;}
     session.status = 'superseded';
     session.supersededAt = new Date().toISOString();
     this._persistIssuanceSession(session);
@@ -835,7 +832,7 @@ class IssuerService {
   /** Attach an account to a session created before the holder signed in. */
   linkIssuanceSession(sessionId, { email = null, sub = null } = {}) {
     const session = this.getIssuanceSession(sessionId);
-    if (!session) return undefined;
+    if (!session) {return undefined;}
     let changed = false;
     if (email && !session.email) {
       session.email = String(email).trim().toLowerCase();
@@ -845,24 +842,24 @@ class IssuerService {
       session.sub = sub;
       changed = true;
     }
-    if (changed) this._persistIssuanceSession(session);
+    if (changed) {this._persistIssuanceSession(session);}
     return session;
   }
 
   acceptTerms(sessionId, version = null) {
     const session = this.getIssuanceSession(sessionId);
-    if (!session) return { success: false, status: 404, error: 'Issuance session not found' };
+    if (!session) {return { success: false, status: 404, error: 'Issuance session not found' };}
     session.termsAcceptedAt = new Date().toISOString();
-    if (version) session.termsVersion = String(version);
+    if (version) {session.termsVersion = String(version);}
     this._persistIssuanceSession(session);
     return { success: true, sessionId, termsAcceptedAt: session.termsAcceptedAt };
   }
 
   createCheckout(sessionId) {
     const session = this.getIssuanceSession(sessionId);
-    if (!session) return { success: false, status: 404, error: 'Issuance session not found' };
-    if (session.feePence <= 0) return { success: false, status: 400, error: 'No fee required' };
-    if (session.paymentStatus === 'paid') return { success: false, status: 409, error: 'Already paid' };
+    if (!session) {return { success: false, status: 404, error: 'Issuance session not found' };}
+    if (session.feePence <= 0) {return { success: false, status: 400, error: 'No fee required' };}
+    if (session.paymentStatus === 'paid') {return { success: false, status: 409, error: 'Already paid' };}
     session.paymentStatus = 'pending';
     return {
       success: true,
@@ -874,7 +871,7 @@ class IssuerService {
 
   confirmPayment(sessionId) {
     const session = this.getIssuanceSession(sessionId);
-    if (!session) return { success: false, status: 404, error: 'Issuance session not found' };
+    if (!session) {return { success: false, status: 404, error: 'Issuance session not found' };}
     session.paymentStatus = 'paid';
     session.paidAt = new Date().toISOString();
     return { success: true, sessionId, paymentStatus: 'paid' };
@@ -882,13 +879,13 @@ class IssuerService {
 
   getIssuanceSession(sessionId) {
     const cached = this.issuanceSessions.get(sessionId);
-    if (cached) return cached;
+    if (cached) {return cached;}
     // Fall back to the database so pending sessions survive a restart.
     try {
       const row = this.db
         .prepare('SELECT * FROM issuance_sessions WHERE session_id = ?')
         .get(sessionId);
-      if (!row) return undefined;
+      if (!row) {return undefined;}
       const session = this._hydrateIssuanceSession(row);
       this.issuanceSessions.set(sessionId, session);
       return session;
@@ -912,7 +909,7 @@ class IssuerService {
     const docType = session.credentialData?.docType || PHOTOID_DOCTYPE;
     const statusIndex = this._allocateStatusIndex();
     const mdoc = this.buildCredentialMdoc(session.credentialData, deviceJwk, statusIndex);
-    if (!mdoc) return { success: false, error: `No claims to issue for ${docType}` };
+    if (!mdoc) {return { success: false, error: `No claims to issue for ${docType}` };}
 
     const credentialId = uuidv4();
     const credential = {
@@ -965,7 +962,7 @@ class IssuerService {
   // session's studentId, and the CWT must be signed by the wallet's device key.
   async claimIssuanceSession(sessionId, { accessToken, cwt }, walletAccounts) {
     const session = this.getIssuanceSession(sessionId);
-    if (!session) return { success: false, status: 404, error: 'Issuance session not found' };
+    if (!session) {return { success: false, status: 404, error: 'Issuance session not found' };}
     if (session.status === 'issued') {
       return { success: false, status: 409, error: 'Issuance session already claimed' };
     }
@@ -1042,7 +1039,7 @@ class IssuerService {
           }
           credential.status = row.status;
           this.credentials.set(credentialId, credential);
-          if (row.status === 'revoked') this.revokedCredentials.add(credentialId);
+          if (row.status === 'revoked') {this.revokedCredentials.add(credentialId);}
         }
       } catch (e) {
         console.error('[issuer] credential lookup failed:', e.message);
@@ -1061,14 +1058,14 @@ class IssuerService {
   listCredentials(filters = {}) {
     const results = Array.from(this.credentials.values()).filter(cred => {
       // Organisation scope: a client org only ever sees its own credentials.
-      if (filters.institution && cred.institution !== filters.institution) return false;
+      if (filters.institution && cred.institution !== filters.institution) {return false;}
       // Holder scope: a wallet sees only credentials linked to its own account.
       if (filters.owners && !filters.owners.some(
         (owner) => owner.institution === cred.institution && owner.studentId === cred.studentId,
-      )) return false;
-      if (filters.studentId && cred.studentId !== filters.studentId) return false;
-      if (filters.type && cred.credentialType !== filters.type) return false;
-      if (filters.status && cred.status !== filters.status) return false;
+      )) {return false;}
+      if (filters.studentId && cred.studentId !== filters.studentId) {return false;}
+      if (filters.type && cred.credentialType !== filters.type) {return false;}
+      if (filters.status && cred.status !== filters.status) {return false;}
       // Revoked credentials stay visible (carrying status 'revoked') so the portal
       // keeps a complete history of what was issued; pass ?status=active to narrow.
       return true;
@@ -1094,7 +1091,7 @@ class IssuerService {
       })),
       total: results.length,
       page,
-      pageSize
+      pageSize,
     };
   }
 
@@ -1121,7 +1118,7 @@ class IssuerService {
       studentId: credential.studentId,
       kind: credential.kind || 'credential',
       kindLabel: labelOfCredentialData(credential),
-      details: { reason }
+      details: { reason },
     });
 
     return { success: true, credentialId, status: 'revoked' };
@@ -1142,14 +1139,14 @@ class IssuerService {
         credentialType: credential.credentialType,
         studentId: credential.studentId,
         issuanceDate: credential.issuanceDate,
-        expiryDate: credential.expiryDate
+        expiryDate: credential.expiryDate,
       };
 
       // Generate QR as data URL
       const qrDataUrl = await QRCode.toDataURL(JSON.stringify(payload), {
         errorCorrectionLevel: 'H',
         type: 'image/png',
-        width: 300
+        width: 300,
       });
 
       return { success: true, qrDataUrl, payload };
@@ -1242,7 +1239,7 @@ class IssuerService {
       totalRevoked: 0,
       totalVerified: 0,
       byStudent: {},
-      byType: {}
+      byType: {},
     };
     return { success: true };
   }
@@ -1252,7 +1249,7 @@ class IssuerService {
 const issuer = new IssuerService({
   issuerId: process.env.ISSUER_ID || 'issuer-001',
   issuerName: process.env.ISSUER_NAME || 'Smart College',
-  issuerDid: process.env.ISSUER_DID || 'did:example:issuer-001'
+  issuerDid: process.env.ISSUER_DID || 'did:example:issuer-001',
 });
 
 // Load the wallet access-token signer key (separate from the mdoc signer key).
@@ -1323,18 +1320,18 @@ function buildCredentialOfferUrl(session) {
 const WALLET_APP_LINK_BASE = process.env.WALLET_APP_LINK_BASE || null;
 
 function buildAppLinkOfferUrl(offerUrl) {
-  if (!WALLET_APP_LINK_BASE) return null;
+  if (!WALLET_APP_LINK_BASE) {return null;}
   const encoded = String(offerUrl || '').split('credential_offer=')[1];
-  if (!encoded) return null;
+  if (!encoded) {return null;}
   return `${WALLET_APP_LINK_BASE}?credential_offer=${encoded}`;
 }
 
 // Extract the issuance session id from an OpenID4VCI credential-offer URL.
 function parseSessionIdFromOffer(offerUrl) {
   let encoded = String(offerUrl || '').trim();
-  if (!encoded) return null;
+  if (!encoded) {return null;}
   const q = encoded.match(/[?&]credential_offer=([^&]+)/);
-  if (q) encoded = q[1];
+  if (q) {encoded = q[1];}
   if (/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(encoded)) {
     return encoded; // already a raw session id
   }
@@ -1365,8 +1362,8 @@ app.use(
   cors({
     origin(origin, callback) {
       // Server-to-server and same-origin requests carry no Origin header.
-      if (!origin) return callback(null, true);
-      if (CORS_ORIGINS.includes('*') || CORS_ORIGINS.includes(origin)) return callback(null, true);
+      if (!origin) {return callback(null, true);}
+      if (CORS_ORIGINS.includes('*') || CORS_ORIGINS.includes(origin)) {return callback(null, true);}
       return callback(null, false);
     },
   }),
@@ -1418,7 +1415,7 @@ app.get('/status-list/:listId', (req, res) => {
 // an API key issued through the management portal; the credential is stamped with
 // that organisation, so it can only ever see and revoke its own credentials.
 app.post('/credentials/issue', async (req, res) => {
-  if (!(await requireApiKey(req, res))) return;
+  if (!(await requireApiKey(req, res))) {return;}
   const result = issuer.issue({ ...req.body, institution: req.clientOrg.institution });
   res.status(result.success ? 201 : 400).json(result);
 });
@@ -1434,14 +1431,14 @@ app.get('/credentials/:id', (req, res) => {
 // organisation's credentials, a signed-in holder sees their own.
 app.get('/credentials', async (req, res) => {
   const scope = await resolveCredentialScope(req, res);
-  if (!scope) return;
+  if (!scope) {return;}
 
   const filters = {
     studentId: req.query.studentId,
     type: req.query.type,
     status: req.query.status,
     page: parseInt(req.query.page) || 1,
-    pageSize: parseInt(req.query.pageSize) || 20
+    pageSize: parseInt(req.query.pageSize) || 20,
   };
   if (scope.kind === 'holder') {
     filters.owners = scope.owners;
@@ -1455,7 +1452,7 @@ app.get('/credentials', async (req, res) => {
 // List by student (scoped the same way: a holder cannot read another's).
 app.get('/credentials/student/:studentId', async (req, res) => {
   const scope = await resolveCredentialScope(req, res);
-  if (!scope) return;
+  if (!scope) {return;}
 
   const filters = { studentId: req.params.studentId };
   if (scope.kind === 'holder') {
@@ -1471,10 +1468,10 @@ app.get('/credentials/student/:studentId', async (req, res) => {
 // administrator - and an organisation-scoped administrator may only revoke the
 // credentials their own organisation issued.
 app.delete('/credentials/:id', async (req, res) => {
-  if (!(await requireAdmin(req, res))) return;
+  if (!(await requireAdmin(req, res))) {return;}
 
   const existing = issuer.getCredential(req.params.id);
-  if (!existing.success) return res.status(404).json(existing);
+  if (!existing.success) {return res.status(404).json(existing);}
   if (req.admin.institution && existing.credential.institution !== req.admin.institution) {
     return res.status(403).json({ success: false, error: 'Credential belongs to another organisation' });
   }
@@ -1498,14 +1495,14 @@ app.get('/credentials/:id/mdoc', (req, res) => {
 // Statistics. A platform administrator sees the whole network; an
 // organisation-scoped administrator sees only its own numbers.
 app.get('/statistics', async (req, res) => {
-  if (!(await requireAdmin(req, res))) return;
+  if (!(await requireAdmin(req, res))) {return;}
   res.json({ success: true, statistics: issuer.getStatistics(req.admin.institution || null) });
 });
 
 // Audit log, scoped the same way: an organisation only ever sees events about the
 // credentials it issued.
 app.get('/audit-log', async (req, res) => {
-  if (!(await requireAdmin(req, res))) return;
+  if (!(await requireAdmin(req, res))) {return;}
   const filters = {
     action: req.query.action,
     studentId: req.query.studentId,
@@ -1576,7 +1573,7 @@ app.post('/admin/auth/login', async (req, res) => {
 });
 
 app.post('/admin/auth/logout', async (req, res) => {
-  if (!(await requireAdmin(req, res))) return;
+  if (!(await requireAdmin(req, res))) {return;}
   try {
     res.json(adminAuth.signOut(req.admin.id));
   } catch (e) {
@@ -1585,12 +1582,12 @@ app.post('/admin/auth/logout', async (req, res) => {
 });
 
 app.get('/admin/auth/me', async (req, res) => {
-  if (!(await requireAdmin(req, res))) return;
+  if (!(await requireAdmin(req, res))) {return;}
   res.json({ success: true, admin: req.admin });
 });
 
 app.post('/admin/auth/password', async (req, res) => {
-  if (!(await requireAdmin(req, res))) return;
+  if (!(await requireAdmin(req, res))) {return;}
   try {
     res.json(await adminAuth.changePassword(req.admin.id, req.body?.newPassword));
   } catch (e) {
@@ -1601,14 +1598,14 @@ app.post('/admin/auth/password', async (req, res) => {
 // Managing administrators is platform administration: an organisation-scoped
 // administrator can neither list nor create them.
 app.get('/admin/users', async (req, res) => {
-  if (!(await requirePlatformAdmin(req, res))) return;
+  if (!(await requirePlatformAdmin(req, res))) {return;}
   res.json({ success: true, users: adminAuth.listAdmins() });
 });
 
 app.post('/admin/users', async (req, res) => {
-  if (!(await requirePlatformAdmin(req, res))) return;
+  if (!(await requirePlatformAdmin(req, res))) {return;}
   const institution = req.body?.institution ? String(req.body.institution).trim() : null;
-  if (institution) clientOrgs.ensureOrg(institution);
+  if (institution) {clientOrgs.ensureOrg(institution);}
   try {
     res.status(201).json({
       success: true,
@@ -1625,7 +1622,7 @@ app.post('/admin/users', async (req, res) => {
 });
 
 app.post('/admin/users/:id/active', async (req, res) => {
-  if (!(await requirePlatformAdmin(req, res))) return;
+  if (!(await requirePlatformAdmin(req, res))) {return;}
   try {
     res.json({ success: true, user: adminAuth.setActive(req.params.id, !!req.body?.active) });
   } catch (e) {
@@ -1638,7 +1635,7 @@ app.post('/admin/users/:id/active', async (req, res) => {
 // sees the credentials issued under it. An organisation-scoped administrator can
 // manage its own keys; a platform administrator can manage any organisation's.
 app.get('/admin/orgs', async (req, res) => {
-  if (!(await requireAdmin(req, res))) return;
+  if (!(await requireAdmin(req, res))) {return;}
   // An organisation-scoped administrator only ever sees its own organisation.
   const orgs = clientOrgs.listOrgs();
   res.json({
@@ -1650,12 +1647,12 @@ app.get('/admin/orgs', async (req, res) => {
 });
 
 app.get('/admin/api-keys', async (req, res) => {
-  if (!(await requireAdmin(req, res))) return;
+  if (!(await requireAdmin(req, res))) {return;}
   res.json({ success: true, keys: clientOrgs.listApiKeys(req.admin.institution || null) });
 });
 
 app.post('/admin/api-keys', async (req, res) => {
-  if (!(await requireAdmin(req, res))) return;
+  if (!(await requireAdmin(req, res))) {return;}
 
   const requested = req.body?.institution ? String(req.body.institution).trim() : null;
   const institution = req.admin.institution || requested;
@@ -1675,7 +1672,7 @@ app.post('/admin/api-keys', async (req, res) => {
 });
 
 app.delete('/admin/api-keys/:keyId', async (req, res) => {
-  if (!(await requireAdmin(req, res))) return;
+  if (!(await requireAdmin(req, res))) {return;}
   const result = clientOrgs.revokeApiKey(req.params.keyId, req.admin.institution || null);
   res.status(result.success ? 200 : 404).json(result);
 });
@@ -1718,7 +1715,7 @@ async function resolveCredentialScope(req, res) {
     // A client organisation's API key may read its own credentials, which is how a
     // client's own systems reconcile what has been issued to their students.
     const organisation = clientOrgs.authenticate(token);
-    if (organisation) return { kind: 'org', institution: organisation.institution };
+    if (organisation) {return { kind: 'org', institution: organisation.institution };}
 
     try {
       const admin = await adminAuth.verifyAdminToken(token);
@@ -1770,7 +1767,7 @@ async function requireAdmin(req, res) {
  * organisations and administrator records — is only ever visible to them.
  */
 async function requirePlatformAdmin(req, res) {
-  if (!(await requireAdmin(req, res))) return false;
+  if (!(await requireAdmin(req, res))) {return false;}
   if (req.admin.institution) {
     res.status(403).json({
       success: false,
@@ -1782,7 +1779,7 @@ async function requirePlatformAdmin(req, res) {
 }
 
 app.post('/admin/accounts/:sub/deactivate', async (req, res) => {
-  if (!(await requirePlatformAdmin(req, res))) return;
+  if (!(await requirePlatformAdmin(req, res))) {return;}
   try {
     res.json(walletAccounts.deactivateAccount(req.params.sub));
   } catch (e) {
@@ -1791,7 +1788,7 @@ app.post('/admin/accounts/:sub/deactivate', async (req, res) => {
 });
 
 app.post('/admin/accounts/:sub/activate', async (req, res) => {
-  if (!(await requirePlatformAdmin(req, res))) return;
+  if (!(await requirePlatformAdmin(req, res))) {return;}
   try {
     res.json(walletAccounts.activateAccount(req.params.sub));
   } catch (e) {
@@ -1800,7 +1797,7 @@ app.post('/admin/accounts/:sub/activate', async (req, res) => {
 });
 
 app.post('/admin/accounts/:sub/delete', async (req, res) => {
-  if (!(await requirePlatformAdmin(req, res))) return;
+  if (!(await requirePlatformAdmin(req, res))) {return;}
   try {
     res.json(walletAccounts.deleteAccount(req.params.sub));
   } catch (e) {
@@ -1810,7 +1807,7 @@ app.post('/admin/accounts/:sub/delete', async (req, res) => {
 
 // ── Management portal: accounts + shares ─────────────────────────────────
 app.get('/admin/accounts', async (req, res) => {
-  if (!(await requirePlatformAdmin(req, res))) return;
+  if (!(await requirePlatformAdmin(req, res))) {return;}
   try {
     res.json({ success: true, accounts: walletAccounts.listAccounts() });
   } catch (e) {
@@ -1821,7 +1818,7 @@ app.get('/admin/accounts', async (req, res) => {
 // A share is a holder disclosing their own credential; client organisations do not
 // administer sharing, so this is platform-only.
 app.delete('/shares/:id', async (req, res) => {
-  if (!(await requirePlatformAdmin(req, res))) return;
+  if (!(await requirePlatformAdmin(req, res))) {return;}
   try {
     res.json(shareService.revoke({ shareId: req.params.id, reason: req.body?.reason || null }));
   } catch (e) {
@@ -1850,17 +1847,17 @@ const numberOrNull = (value) => (typeof value === 'number' && Number.isFinite(va
  * student ends up presenting marks on a scale the issuer stopped using.
  */
 function sameClaimSet(a, b) {  const stable = (value) => {
-    if (Array.isArray(value)) return value.map(stable);
-    if (value && typeof value === 'object') {
-      return Object.fromEntries(
-        Object.keys(value)
-          .sort()
-          .map((key) => [key, stable(value[key])]),
-      );
-    }
-    return value;
-  };
-  return JSON.stringify(stable(a)) === JSON.stringify(stable(b));
+  if (Array.isArray(value)) {return value.map(stable);}
+  if (value && typeof value === 'object') {
+    return Object.fromEntries(
+      Object.keys(value)
+        .sort()
+        .map((key) => [key, stable(value[key])]),
+    );
+  }
+  return value;
+};
+return JSON.stringify(stable(a)) === JSON.stringify(stable(b));
 }
 
 export { sameClaimSet };
@@ -1886,7 +1883,7 @@ const ELEMENT_ENCODERS = {
  */
 function pushElements(target, rows) {
   for (const [identifier, value, encoder] of rows) {
-    if (value === null || value === undefined || value === '') continue;
+    if (value === null || value === undefined || value === '') {continue;}
     target.push([identifier, ELEMENT_ENCODERS[encoder || 'text'](value)]);
   }
 }
@@ -1966,7 +1963,7 @@ app.post('/academy/requests', async (req, res) => {
       }
 
       const stale = candidates.filter((session) => session.status === 'pending');
-      for (const session of stale) issuer.supersedeIssuanceSession(session.sessionId);
+      for (const session of stale) {issuer.supersedeIssuanceSession(session.sessionId);}
 
       return {
         record,
@@ -1987,25 +1984,25 @@ app.post('/academy/requests', async (req, res) => {
     // The link carries what was asked for, so the claiming page shows that rather than every
     // credential the account happens to hold from earlier requests.
     const claimParams = new URLSearchParams({ email });
-    if (req.body?.include) claimParams.set('include', String(req.body.include));
-    if (!recognition) claimParams.set('recognition', 'false');
+    if (req.body?.include) {claimParams.set('include', String(req.body.include));}
+    if (!recognition) {claimParams.set('recognition', 'false');}
     const claimUrl = `${ACADEMY_SITE_URL}/claim?${claimParams.toString()}`;
     // Only mail a link when something is still claimable: repeating a request the student
     // has already acted on must not send them a second "your credentials are ready".
     const claimable = issued.some(({ session }) => session.status !== 'issued');
     const sent = claimable
       ? await emailService.sendCredentialsReadyEmail({
-          email,
-          institution: ACADEMY_NAME,
-          claimUrl,
-          credentials: records.map((record) => ({
-            title: record.display.title,
-            subtitle:
+        email,
+        institution: ACADEMY_NAME,
+        claimUrl,
+        credentials: records.map((record) => ({
+          title: record.display.title,
+          subtitle:
               record.kind === 'transcript'
                 ? `${record.display.totalCredits} credits · ${record.display.courseCount} courses`
                 : `${record.display.degreeLevel} · Graduated ${record.display.graduationDate}`,
-          })),
-        })
+        })),
+      })
       : { success: false, skipped: 'already-issued' };
 
     const primary = issued[0];
@@ -2059,7 +2056,7 @@ app.post('/academy/requests', async (req, res) => {
 app.get('/academy/credentials', async (req, res) => {
   try {
     const token = bearerToken(req);
-    if (!token) return res.status(401).json({ success: false, error: 'Sign in required' });
+    if (!token) {return res.status(401).json({ success: false, error: 'Sign in required' });}
 
     const payload = await walletAccounts.verifyAccessToken(token);
     const links = walletAccounts.getLinks(payload.sub);
@@ -2103,11 +2100,11 @@ app.get('/academy/credentials', async (req, res) => {
 app.post('/academy/credentials/:sessionId/offer', async (req, res) => {
   try {
     const token = bearerToken(req);
-    if (!token) return res.status(401).json({ success: false, error: 'Sign in required' });
+    if (!token) {return res.status(401).json({ success: false, error: 'Sign in required' });}
 
     const payload = await walletAccounts.verifyAccessToken(token);
     const session = issuer.getIssuanceSession(req.params.sessionId);
-    if (!session) return res.status(404).json({ success: false, error: 'Credential not found' });
+    if (!session) {return res.status(404).json({ success: false, error: 'Credential not found' });}
 
     const links = walletAccounts.getLinks(payload.sub);
     const owns =
@@ -2115,7 +2112,7 @@ app.post('/academy/credentials/:sessionId/offer', async (req, res) => {
       links.some(
         (l) => l.institution === session.institution && l.studentId === session.studentId,
       );
-    if (!owns) return res.status(403).json({ success: false, error: 'This credential belongs to another account' });
+    if (!owns) {return res.status(403).json({ success: false, error: 'This credential belongs to another account' });}
 
     if (session.status === 'issued') {
       return res.json({ success: true, alreadyInWallet: true, sessionId: session.sessionId });
@@ -2195,7 +2192,7 @@ app.post('/issuance-sessions/:id/payment/confirm', (req, res) => {
 // Offer QR code (PNG data URL) for the wallet to scan.
 app.get('/issuance-sessions/:id/offer-qr', async (req, res) => {
   const session = issuer.getIssuanceSession(req.params.id);
-  if (!session) return res.status(404).json({ success: false, error: 'Issuance session not found' });
+  if (!session) {return res.status(404).json({ success: false, error: 'Issuance session not found' });}
   try {
     const qrDataUrl = await QRCode.toDataURL(buildCredentialOfferUrl(session), {
       errorCorrectionLevel: 'M',
@@ -2213,7 +2210,7 @@ app.post('/issuance-sessions/:id/claim', async (req, res) => {
   const result = await issuer.claimIssuanceSession(
     req.params.id,
     { accessToken, cwt },
-    walletAccounts
+    walletAccounts,
   );
   res.status(result.status || (result.success ? 200 : 400)).json(result);
 });
@@ -2230,7 +2227,7 @@ app.post('/wallet/issuance', async (req, res) => {
   const result = await issuer.claimIssuanceSession(
     resolved,
     { accessToken, cwt },
-    walletAccounts
+    walletAccounts,
   );
   if (!result.success) {
     return res.status(result.status || 400).json(result);
@@ -2335,12 +2332,12 @@ app.get('/shares/:id/pdf', (req, res) => {
 // platform operator. Recipients still reach their own share through the tokenised
 // routes below.
 app.get('/shares', async (req, res) => {
-  if (!(await requirePlatformAdmin(req, res))) return;
+  if (!(await requirePlatformAdmin(req, res))) {return;}
   res.json({ success: true, shares: shareService.list() });
 });
 
 // Error handler
-app.use((err, req, res, next) => {
+app.use((err, req, res, _next) => {
   console.error('Error:', err);
   res.status(500).json({ success: false, error: err.message });
 });
@@ -2352,32 +2349,31 @@ export { IssuerService, app, issuer };
 const PORT = process.env.PORT || 3000;
 const isMain = process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href;
 
+// Optional: an administrator scoped to the example academy, so that organisation can sign in on
+// its own to see its credentials and manage its API keys. Created only when ACADEMY_ADMIN_EMAIL
+// and ACADEMY_ADMIN_PASSWORD are configured, and only once.
+async function seedAcademyAdmin() {
+  const email = String(process.env.ACADEMY_ADMIN_EMAIL || '').trim().toLowerCase();
+  const password = process.env.ACADEMY_ADMIN_PASSWORD || '';
+  if (!email || !password) {return null;}
+  if (adminAuth.listAdmins().some((admin) => admin.email === email)) {return null;}
+
+  const institution = process.env.ACADEMY_NAME || 'Smart Academy';
+  try {
+    clientOrgs.ensureOrg(institution);
+    await adminAuth.createAdmin({ email, password, role: 'admin', institution });
+    console.log(`[issuer] Created administrator ${email} for ${institution}.`);
+  } catch (e) {
+    console.error('[issuer] could not create the academy administrator:', e.message);
+  }
+  return null;
+}
+
 if (isMain) {
   // Make sure the portal has at least one administrator to sign in with.
   adminAuth.ensureSeedAdmin().catch((e) => {
     console.error('[admin-auth] failed to seed administrator:', e.message);
   });
-
-  // Optional: an administrator scoped to the example academy, so that organisation
-  // can sign in on its own to see its credentials and manage its API keys. Created
-  // only when ACADEMY_ADMIN_EMAIL and ACADEMY_ADMIN_PASSWORD are configured, and
-  // only once.
-  async function seedAcademyAdmin() {
-    const email = String(process.env.ACADEMY_ADMIN_EMAIL || '').trim().toLowerCase();
-    const password = process.env.ACADEMY_ADMIN_PASSWORD || '';
-    if (!email || !password) return null;
-    if (adminAuth.listAdmins().some((admin) => admin.email === email)) return null;
-
-    const institution = process.env.ACADEMY_NAME || 'Smart Academy';
-    try {
-      clientOrgs.ensureOrg(institution);
-      await adminAuth.createAdmin({ email, password, role: 'admin', institution });
-      console.log(`[issuer] Created administrator ${email} for ${institution}.`);
-    } catch (e) {
-      console.error('[issuer] could not create the academy administrator:', e.message);
-    }
-    return null;
-  }
 
   seedAcademyAdmin().catch((e) => {
     console.error('[issuer] failed to seed the academy administrator:', e.message);

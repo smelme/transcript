@@ -1,8 +1,29 @@
 # P1-06: Demo sites are indexable, and dates are shown in two shapes
 
 **Priority:** P1 — small, visible, and both are read as bugs by reviewers
-**Status:** Open, reproduced during UAT (see `docs/analysis-discovery/uat-transcript-flow.md`, UAT-013 and UAT-014)
+**Status:** Resolved — noindex on all four apps, and one date shape where a person reads one
 **Components:** `issuer-frontend`, `verifier-frontend`, `quals-portal`, `trust-university-frontend`
+
+## What was done
+
+**Indexing.** `X-Robots-Tag: noindex, nofollow` joined the shared header policy in
+`shared-web/security-headers.mjs`, so there is one place to change, and each app serves a `robots.txt`
+through a metadata route. The academy allows `/.well-known/` so Android's App Links association file
+stays reachable. Verified by fetching all four hosts: every page and every `robots.txt` returns the
+header, and the academy's file allows `/.well-known/` before disallowing the rest.
+
+**Dates.** The portal was already consistent — every timestamp goes through one helper. The mixed
+shapes were elsewhere: a shared document printed `2022-08-29`, `20220829` or a JavaScript `Date`
+according to which decoder produced it, and the two verification screens printed full timestamps with
+seconds in the browser's own locale, so the same fact looked different on two machines. Date-shaped
+claim values are now rendered the same way wherever a person reads them — the share view, the shared
+PDF, and the verification result — while every other value is passed through untouched, because a
+matriculation number must not be reformatted.
+
+Related, and also fixed: the verifier's date claims are normalised to `YYYY-MM-DD` at the API
+boundary (`toDateString` in `presentation-session-service.js`). A dependency refresh showed that the
+decoder can hand back a `Date` for CBOR tag 1004, which leaked into the API as a full timestamp and
+is not a contract anyone should depend on.
 
 ## Problem 1 — demo sites can be crawled
 

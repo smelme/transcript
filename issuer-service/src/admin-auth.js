@@ -31,7 +31,7 @@ async function hashPassword(password) {
 
 async function verifyPassword(password, stored) {
   const [scheme, saltB64, hashB64] = String(stored || '').split('$');
-  if (scheme !== 'scrypt' || !saltB64 || !hashB64) return false;
+  if (scheme !== 'scrypt' || !saltB64 || !hashB64) {return false;}
   const salt = Buffer.from(saltB64, 'base64');
   const expected = Buffer.from(hashB64, 'base64');
   const derived = await scrypt(password, salt, expected.length);
@@ -75,7 +75,7 @@ export class AdminAuthService {
    * production nothing is created unless both variables are supplied.
    */
   async ensureSeedAdmin() {
-    if (this.count() > 0) return null;
+    if (this.count() > 0) {return null;}
 
     let email = process.env.ADMIN_EMAIL;
     let password = process.env.ADMIN_PASSWORD;
@@ -111,7 +111,7 @@ export class AdminAuthService {
     if (String(password || '').length < MIN_PASSWORD_LENGTH) {
       throw new Error(`Password must be at least ${MIN_PASSWORD_LENGTH} characters`);
     }
-    if (this._row(normalized)) throw new Error('An administrator with that email already exists');
+    if (this._row(normalized)) {throw new Error('An administrator with that email already exists');}
 
     const id = uuidv4();
     const passwordHash = await hashPassword(String(password));
@@ -131,7 +131,7 @@ export class AdminAuthService {
   }
 
   _public(row) {
-    if (!row) return null;
+    if (!row) {return null;}
     return {
       id: row.id,
       email: row.email,
@@ -155,7 +155,7 @@ export class AdminAuthService {
     const result = this.db
       .prepare('UPDATE admin_users SET active = ?, session_version = session_version + 1 WHERE id = ?')
       .run(active ? 1 : 0, id);
-    if (result.changes === 0) throw new Error('Administrator not found');
+    if (result.changes === 0) {throw new Error('Administrator not found');}
     return this._public(this._byId(id));
   }
 
@@ -179,9 +179,9 @@ export class AdminAuthService {
     const ok = row
       ? await verifyPassword(String(password || ''), row.password_hash)
       : await verifyPassword(String(password || ''), 'scrypt$AAAA$AAAA');
-    if (!row || !ok) throw new Error('Incorrect email or password');
-    if (!row.active) throw new Error('This administrator account is disabled');
-    if (!this.signerKeyPem) throw new Error('Signer key not configured');
+    if (!row || !ok) {throw new Error('Incorrect email or password');}
+    if (!row.active) {throw new Error('This administrator account is disabled');}
+    if (!this.signerKeyPem) {throw new Error('Signer key not configured');}
 
     const token = await this._signToken(row);
     return { success: true, token, admin: this._public(row) };
@@ -192,16 +192,16 @@ export class AdminAuthService {
    * session has not been invalidated.
    */
   async verifyAdminToken(token) {
-    if (!this.publicSpkiPem) throw new Error('Signer key not configured');
+    if (!this.publicSpkiPem) {throw new Error('Signer key not configured');}
     const publicKey = await importSPKI(this.publicSpkiPem, 'ES256');
     const { payload } = await jwtVerify(String(token || ''), publicKey, {
       issuer: this.issuerId,
       audience: this.audience,
     });
-    if (payload.scope !== 'admin') throw new Error('Not an administrator token');
+    if (payload.scope !== 'admin') {throw new Error('Not an administrator token');}
 
     const row = this._byId(payload.sub);
-    if (!row || !row.active) throw new Error('Administrator account is not active');
+    if (!row || !row.active) {throw new Error('Administrator account is not active');}
     if (Number(payload.sv) !== Number(row.session_version)) {
       throw new Error('This session has been signed out');
     }
@@ -211,7 +211,7 @@ export class AdminAuthService {
   /** Sign out: bump the session version so every existing token is rejected. */
   signOut(id) {
     const row = this._byId(id);
-    if (!row) throw new Error('Administrator not found');
+    if (!row) {throw new Error('Administrator not found');}
     this.db
       .prepare('UPDATE admin_users SET session_version = session_version + 1 WHERE id = ?')
       .run(id);
@@ -228,7 +228,7 @@ export class AdminAuthService {
         'UPDATE admin_users SET password_hash = ?, session_version = session_version + 1 WHERE id = ?',
       )
       .run(hash, id);
-    if (result.changes === 0) throw new Error('Administrator not found');
+    if (result.changes === 0) {throw new Error('Administrator not found');}
     return { success: true };
   }
 }

@@ -1,59 +1,55 @@
-name: CI - Test & Lint
+name: CI
+
+# One pipeline, and it reflects the repository as it is: an npm workspaces monorepo, installed once
+# from a committed lockfile.
+#
+# The previous pair of workflows (ci.yml and ci-cd.yml) disagreed with each other and with the
+# repository: one was not valid YAML (a duplicated `run:` key and a mis-indented line in a block
+# scalar), both installed each workspace separately with `npm ci` while every lockfile was
+# gitignored, and both named directories that do not exist (`mobile-wallet-native`). Nothing here
+# ran successfully. See docs/stories/P1-02-ci-cannot-install-lockfile-ignored.md.
 
 on:
   push:
     branches: ['**']
   pull_request:
-    branches: [main, develop]
+    branches: [master]
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
-  test:
+  verify:
+    name: Lint, unit tests and production builds
     runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        node-version: [18.x, 20.x]
     steps:
-      - uses: actions/checkout@v3
-      - uses: actions/setup-node@v3
-        with:
-          node-version: ${{ matrix.node-version }}
-          cache: 'npm'
-      
-      - name: Install dependencies
-        run: npm install
+      - uses: actions/checkout@v4
 
-      - name: Run unit tests
-        run: npm run test --workspaces --if-present
-
-      - name: Run lint
-        run: npm run lint --workspaces --if-present
-
-      - name: Upload coverage
-        uses: codecov/codecov-action@v3
-        if: success()
-
-  build:
-    runs-on: ubuntu-latest
-    needs: test
-    steps:
-      - uses: actions/checkout@v3
-      - uses: actions/setup-node@v3
+      - uses: actions/setup-node@v4
         with:
           node-version: 20.x
-          cache: 'npm'
-      
-      - name: Install dependencies
-        run: npm install
+          cache: npm
 
-      - name: Build all packages
-        run: npm run build --workspaces
+      # One install for every workspace, from the committed root lockfile.
+      - name: Install
+        run: npm ci
 
-  # The scenario scripts are what actually exercise the credential lifecycle
-  # (issuance, sharing, verification, tokens). They need live services, so CI
-  # starts them against a throwaway database and runs every scenario.
-  e2e:
+      - name: Lint
+        run: npm run lint --workspaces --if-present
+
+      - name: Unit tests
+        run: npm run test --workspaces --if-present
+
+      # The academy, the portal, My Jobs and Trust University must be buildable, not only runnable
+      # in development. Two copies of React made this fail once (see P1-01).
+      - name: Production builds
+        run: npm run build --workspaces --if-present
+
+  scenarios:
+    name: End-to-end scenarios
     runs-on: ubuntu-latest
-    needs: test
+    needs: verify
     env:
       BREVO_API_KEY: ''
       ALLOW_DEV_OTP: 'true'
@@ -61,15 +57,19 @@ jobs:
       ADMIN_PASSWORD: quals-admin-2026
       DATABASE_PATH: ${{ github.workspace }}/data/ci.db
     steps:
-      - uses: actions/checkout@v3
-      - uses: actions/setup-node@v3
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
         with:
           node-version: 20.x
-          cache: 'npm'
+          cache: npm
 
-      - name: Install dependencies
-        run: npm install
+      - name: Install
+        run: npm ci
 
+      # The scenario scripts exercise the credential lifecycle end to end (issuance, sharing,
+      # verification, tokens), which unit tests cannot. They need live services, so CI starts them
+      # against a throwaway database.
       - name: Start services
         run: |
           set -e
@@ -95,8 +95,9 @@ jobs:
           done
           echo "All services healthy."
 
-      - name: End-to-end scenarios
+      - name: Run scenarios
         run: |
+          set -e
           node verifier-service/scripts/test-reader-auth.mjs
           node issuer-service/scripts/test-client-orgs.mjs
           node issuer-service/scripts/test-academy-flow.mjs
@@ -105,7 +106,7 @@ jobs:
           node issuer-service/scripts/test-security-hardening.mjs
           node issuer-service/scripts/test-revoked-share.mjs
           node issuer-service/scripts/smoke-share.mjs
-        node issuer-service/scripts/smoke-share-transcript.mjs
+          node issuer-service/scripts/smoke-share-transcript.mjs
 
       - name: Service logs
         if: always()
@@ -114,3 +115,23 @@ jobs:
             echo "──── $file ────"
             tail -n 60 "$file" 2>/dev/null || echo "(no log)"
           done
+
+  tooling:
+    name: Deployment and integration test projects
+    runs-on: ubuntu-latest
+    needs: verify
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20.x
+          cache: npm
+
+      # These two are standalone npm projects rather than workspaces, and each has its own
+      # committed lockfile.
+      - name: DevOps checks
+        run: cd devops && npm ci && npm test
+
+      - name: Integration tests
+        run: cd e2e-integration-tests && npm ci && npm test

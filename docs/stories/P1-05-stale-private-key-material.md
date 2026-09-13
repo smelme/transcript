@@ -1,8 +1,19 @@
 # P1-05: Stale private key material in the working tree
 
 **Priority:** P1 — an unused private key on disk is a liability and an ambiguity
-**Status:** Open, reproduced during UAT (see `docs/analysis-discovery/uat-transcript-flow.md`, UAT-004)
+**Status:** Resolved — the pair was confirmed unused and deleted
 **Components:** `archive/keys/signer-key.pem`, `archive/keys/signer-cert.pem`
+
+## The check that was made first
+
+The archived certificate (`sha256 FAC18A22…`) is **not** the live certificate
+(`sha256 8FBC1F3D…`), so it is a superseded key from an earlier layout. Nothing in the repository
+referenced it: a search across every tracked source, config, script and document found only the two
+files that report the finding itself. The live signing key is `key-management/keys/mdoc-signer.private.pem`
+and remains gitignored, and every tracked file under `key-management/keys/` is public or metadata.
+
+The archived pair was therefore deleted. If a very old demo credential one day fails to verify, this
+is why — and `npm run db:reset` makes that a non-event.
 
 ## Problem
 

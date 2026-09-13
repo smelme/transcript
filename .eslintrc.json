@@ -1,6 +1,7 @@
 {
   "env": {
     "node": true,
+    "browser": true,
     "es2021": true
   },
   "extends": [
@@ -8,7 +9,10 @@
   ],
   "parserOptions": {
     "ecmaVersion": "latest",
-    "sourceType": "module"
+    "sourceType": "module",
+    "ecmaFeatures": {
+      "jsx": true
+    }
   },
   "rules": {
     "no-console": [
@@ -30,7 +34,10 @@
     "no-var": "error",
     "eqeqeq": [
       "error",
-      "always"
+      "always",
+      {
+        "null": "ignore"
+      }
     ],
     "curly": [
       "error",
@@ -51,10 +58,7 @@
       "error",
       2
     ],
-    "linebreak-style": [
-      "error",
-      "unix"
-    ],
+    "linebreak-style": "off",
     "comma-dangle": [
       "error",
       "always-multiline"

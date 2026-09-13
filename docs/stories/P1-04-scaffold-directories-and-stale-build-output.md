@@ -1,8 +1,26 @@
 # P1-04: Scaffold directories and stale build output in the tree
 
 **Priority:** P1 — CI names a workspace that does not exist (see P1-02), and onboarding is confusing
-**Status:** Open, reproduced during UAT (see `docs/analysis-discovery/uat-transcript-flow.md`, UAT-012)
+**Status:** Resolved — the directories held nothing but dependency residue and are gone
 **Components:** repository root, `verifier-frontend/dist/`
+
+## What was actually there
+
+Before deleting anything, each directory was inspected. All seven contained **only** `node_modules/`
+and a stray `package-lock.json` — no source file of any kind:
+
+| Directory | Reclaimed |
+| --- | --- |
+| `mobile-wallet-native` | 199.4 MB |
+| `wallet-qr-receiver` | 2.0 MB |
+| `signature-validator` | 0.5 MB |
+| `verifier-qr-scanner` | 0.3 MB |
+| `generator`, `schema`, `verifier-registry` | empty installs |
+
+All seven were removed, along with the stale Vite-era `verifier-frontend/dist/`. `dist/` was already
+ignored, so no ignore rule needed changing. The root `package.json` also listed `mobile-wallet` as a
+workspace, but that directory is a Gradle project with no `package.json`; it has been removed from
+the list. Every workspace name in the new CI workflow was checked against the repository.
 
 ## Problem
 

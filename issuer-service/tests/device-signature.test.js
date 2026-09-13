@@ -12,10 +12,10 @@ import {
 
 const signerKeyPem = fs.readFileSync(
   new URL('../../key-management/keys/mdoc-signer.private.pem', import.meta.url),
-  'utf8'
+  'utf8',
 );
 const certDer = fs.readFileSync(
-  new URL('../../key-management/keys/mdoc-signer.cert.der', import.meta.url)
+  new URL('../../key-management/keys/mdoc-signer.cert.der', import.meta.url),
 );
 
 test('device signature proves possession of the device private key', () => {

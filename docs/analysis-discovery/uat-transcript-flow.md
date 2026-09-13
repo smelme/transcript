@@ -283,3 +283,76 @@ that touches untracked files in the working tree (UAT-004), and the demo-grade p
 P1-03, P1-04 and P1-06. Nothing recorded here is a release blocker for showing the flow to an
 institution; UAT-002 and UAT-004 are the two that should be closed before anyone else joins the
 project.
+
+---
+
+# Iteration 2 — the deferred items, worked through
+
+Every finding above except the two that need a product decision has now been closed, and closing
+them turned up more than the findings themselves listed. The work is on `refactor`; the stories in
+`docs/stories/` carry the detail.
+
+| Finding | Outcome |
+| --- | --- |
+| UAT-002 / P1-02 | Lockfiles committed; the two workflows replaced by one that runs. See below — it was much worse than "cannot install". |
+| UAT-004 / P1-05 | Archived key pair confirmed unused (`sha256 FAC18A22…` ≠ the live certificate) and deleted. |
+| UAT-011 / P1-03 | `npm run db:reset` and `npm run db:seed`, both guarded against production and against a database outside the repository. |
+| UAT-012 / P1-04 | Seven directories holding nothing but `node_modules` and a stray lockfile removed (203 MB reclaimed), stale `dist/` removed. |
+| UAT-013 / P1-06 | `X-Robots-Tag: noindex, nofollow` on all four apps plus a `robots.txt` each; `/.well-known/` allowed so App Links verification still works. |
+| UAT-014 / P1-06 | One date shape wherever a person reads one — the share view, the shared PDF and the verification result — and date claims normalised to `YYYY-MM-DD` at the verifier's API boundary. |
+| UAT-001, 003, 005–010 | Closed in iteration 1. |
+
+## What the "cannot install" finding actually hid
+
+`ci.yml` was **not valid YAML** — a line in a block scalar was indented short, closing the scalar
+early, and `ci-cd.yml` had two `run:` keys in one step. Nothing in either workflow could ever have
+executed, so no other failure had ever been reported. Behind that: three workspaces installed
+separately with `npm ci` in an npm-workspaces monorepo, one of them a directory that does not exist,
+branch filters pointing at `main` while the default branch is `master`, and a `cd.yml` that this
+finding referenced but which was never in the repository.
+
+Three further breakages then had to be fixed before a pipeline could mean anything:
+
+- **The production build** (P1-01) — the real cause was two React majors in the tree: React 18.3.1
+  hoisted to the root for Next's peer requirement, with React 19.2.8/19.3.0 nested per app. Only a
+  clean install from a committed lockfile resolves it, which is why it was untestable before.
+- **`lint` failed in every workspace** — `linebreak-style: unix` against a working tree rewritten to
+  CRLF by `core.autocrlf=true`. A `.gitattributes` now states the convention, the rule is off, and
+  the genuine remainder (dead code, unused imports, `==`, a function declared inside a block, two
+  Express error handlers whose required fourth parameter was flagged) is fixed.
+- **`next lint` no longer exists in Next 16**, so three apps failed with "Invalid project directory
+  provided". The JSX apps now run `eslint app`; the two TypeScript apps run `tsc --noEmit`, because
+  ESLint here has no TypeScript parser — a real check rather than a placeholder.
+
+`START_LOCAL_SERVICES.ps1` also claimed "150/150 tests, 100% SUCCESS" without running a single test,
+and named ports 5173/5174 and a deleted directory. It is replaced by a launcher that starts the six
+real services and reports which came up.
+
+## Verification (iteration 2)
+
+Run in the order CI runs them, on a clean install from the committed lockfile:
+
+| Check | Result |
+| --- | --- |
+| `npm ci` at the root, and in `devops` and `e2e-integration-tests` | Succeeds |
+| Lint, all seven workspaces | Exit 0 |
+| Unit tests | 10 + 76 + 61 pass, 0 fail |
+| Production builds, four Next apps | All succeed; `robots.txt` route present in each |
+| End-to-end scenarios, nine scripts, throwaway database | All nine exit 0 |
+| Security headers and `robots.txt` on the running sites | Present on all four |
+| `db:reset` / `db:seed`, including both refusal guards | Behave as specified |
+
+## Notes for the next pass
+
+- A local `issuer-service/.env` (gitignored, holding a real Brevo key) changes whether the demo can
+  sign anyone in, because the one-time code is only returned when the send *fails*. This cost real
+  time here: the whole scenario suite failed on a freshly reset database and looked like a
+  regression. Recorded as P1-08; the launcher now forces the development path and says so.
+- `docs/DEVELOPMENT.md`, `LOCAL_DEPLOYMENT.md`, `SETUP.md`, `QUICKSTART.md` and `CONTRIBUTING.md`
+  still describe PostgreSQL and Keycloak, which this system does not use, and the container images
+  cannot build against the workspace layout. P1-07. The `README.md` front door now describes the
+  system that exists, with an explicit "Not built yet" section.
+- The scenario scripts and the two extra issuer instances (3005, 3006) still need a published
+  convention for environment variables: `PORT`, `NODE_ENV` and `DATABASE_PATH` leaking from a shell
+  silently redirect a child process, which is how one earlier failure looked like a port collision.
+

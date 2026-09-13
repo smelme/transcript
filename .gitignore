@@ -1,6 +1,7 @@
 # Dependencies
+# Lockfiles are committed on purpose: CI installs with `npm ci`, which refuses to run without
+# one, and a reproducible install is the whole point of a workspace-based project.
 node_modules/
-package-lock.json
 yarn.lock
 pnpm-lock.yaml
 
@@ -80,3 +81,6 @@ secrets/
 
 # TypeScript incremental build state
 *.tsbuildinfo
+
+# Test output: the key-management tests generate keys here on every run, including a private one.
+/key-management/test-keys/

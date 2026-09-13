@@ -11,20 +11,21 @@
     "quals-portal",
     "verifier-service",
     "verifier-frontend",
-    "trust-university-frontend",
-    "mobile-wallet"
+    "trust-university-frontend"
   ],
   "scripts": {
     "install-all": "npm install",
-    "dev": "npm run dev --workspaces",
-    "build": "npm run build --workspaces",
-    "test": "npm run test --workspaces",
-    "lint": "npm run lint --workspaces",
-    "format": "npm run format --workspaces"
+    "dev": "npm run dev --workspaces --if-present",
+    "build": "npm run build --workspaces --if-present",
+    "test": "npm run test --workspaces --if-present",
+    "lint": "npm run lint --workspaces --if-present",
+    "format": "npm run format --workspaces --if-present",
+    "db:reset": "node scripts/dev-database.mjs reset",
+    "db:seed": "node scripts/dev-database.mjs seed"
   },
   "engines": {
-    "node": ">=18.17.0",
-    "npm": ">=9.0.0"
+    "node": ">=20.9.0",
+    "npm": ">=10.0.0"
   },
   "keywords": [
     "mdoc",

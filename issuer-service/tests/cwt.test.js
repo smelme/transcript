@@ -54,7 +54,7 @@ test('CWT rejects a tampered payload', () => {
 });
 
 test('CWT rejects when signed by a different key than the cnf key', () => {
-  const { publicJwk, privateJwk } = generateDeviceKeyPair();
+  const { privateJwk } = generateDeviceKeyPair();
   const other = generateDeviceKeyPair();
 
   // Sign with privateJwk but embed other.publicJwk in cnf.

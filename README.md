@@ -1,273 +1,118 @@
-# ISO mDoc Academic Transcript & Qualification System
+# Academic credentials as ISO mDoc
 
-**Status**: Phase 1 MVP — issuer, verifier, wallet, and shared mdoc library implemented
-**Created**: 2026-08-27
+Issue a university qualification or transcript as a verifiable credential, hold it in a mobile
+wallet, and let a third party check it — including its revocation status — without calling the
+issuing institution.
 
-## Overview
+The credential is an ISO/IEC 18013-5 mDoc, the same signed document format a driving licence uses
+in a mobile wallet. It is signed by the issuer, bound to the device, and selectively disclosable:
+a verifier receives only the values it asks for and the holder approves.
 
-A complete end-to-end system for issuing, storing, and verifying academic transcripts and qualifications using the ISO mDoc standard (ISO/IEC 18013-5:2021).
+## What is here
 
-## Repository Structure
+| Path | What it is | Runs on |
+| --- | --- | --- |
+| `issuer-service/` | Issues credentials, manages their lifecycle, serves every API the apps use | :3000 |
+| `verifier-service/` | Requests and verifies presentations, checks revocation fail-closed | :3001 |
+| `issuer-frontend/` | **Smart Academy** — the student-facing app: choose, claim, hold, share | :3002 |
+| `verifier-frontend/` | **My Jobs** — verification for an employer or background-check use case | :3003 |
+| `quals-portal/` | **Quals** — the management portal: credentials, shares, audit, API keys | :3004 |
+| `trust-university-frontend/` | **Trust University** — postgraduate admissions as a relying party | :3007 |
+| `mobile-wallet/` | Kotlin/Android wallet (multipaz) that holds and presents credentials | Android |
+| `key-management/` | Key generation, storage and rotation for the signing keys | CLI |
+| `mdoc-core.js`, `db.js`, `status-list-core.js` | Shared libraries: mDoc encoding and verification, SQLite persistence, status lists | — |
+| `devops/`, `e2e-integration-tests/` | Container definitions and cross-service integration tests | — |
+| `shared-web/` | Security headers applied by all four web apps | — |
 
-This is a monorepo containing all components:
+`docs/` holds the analysis and architecture notes; `docs/stories/` holds the work, one file per
+story, with the acceptance criteria each one was built against.
 
-```
-Transcript/
-├── mdoc-core.js             # Shared ISO 18013-5 mdoc library (generate/verify IssuerSigned)
-├── issuer-service/          # Backend: Credential issuance & management (Node.js/Express)
-├── issuer-frontend/         # Web UI: Admin portal for issuing credentials
-├── verifier-service/        # Backend: Credential verification (Node.js/Express)
-├── verifier-frontend/       # Web UI: Employer/verifier verification interface
-├── mobile-wallet-native/    # Mobile App: Student wallet (React Native prototype)
-├── mobile-wallet/           # Mobile App: Kotlin Multiplatform (multipaz base)
-├── key-management/          # Key generation, storage, and rotation service
-├── docs/                    # Documentation & planning
-├── .github/                 # GitHub workflows, issue templates
-├── package.json             # Monorepo root (npm workspaces)
-└── README.md                # This file
-```
+## The credential
 
-## System Components
+Every credential is issued under the docType `org.iso.23220.photoid.1`, which carries the holder's
+identity. What makes it a qualification, a transcript or an academic record is the **namespace**:
 
-### 1. **Issuer Service** (`issuer-service/`)
-Node.js/Express backend for credential issuance.
+| Namespace | Holds |
+| --- | --- |
+| `org.iso.23220.education.qualification.1` | The award: programme, level, field, graduation date, overall mark and its scale |
+| `org.iso.23220.education.transcript.1` | The study: programme context, courses and marks, credits, aggregates, outcome |
+| `org.iso.23220.education.academic-record.1` | The record as a document: credit hours, averages and quality points, document identity and status |
 
-**Responsibilities:**
-- Define credential schemas (transcripts, qualifications)
-- Generate mDoc credentials with ES256 (ECDSA P-256) signatures
-- Store credential metadata & status in database (mdoc payloads are ephemeral and never persisted)
-- Manage credential revocation
-- Provide credential distribution APIs
-- Audit logging for compliance
+A student may hold any combination. A verifier asks for the namespace it needs and the wallet offers
+credentials that can satisfy it, which is why a registrar asking for a transcript does not receive a
+bare qualification certificate.
 
-**Tech Stack:** Node.js, Express, PostgreSQL, ES256 (ECDSA P-256) mdoc signing
+Values follow **US conventions for now** — a 0–4 GPA, credit hours, CIP programme codes, IPEDS award
+levels, Fall/Spring terms. These are defaults, not a design commitment: the model facts that would
+replace them are collected in `docs/analysis-discovery/transcript-model-facts.md`.
 
----
+## Running it
 
-### 2. **Issuer Frontend** (`issuer-frontend/`)
-Web UI for university admins to issue credentials.
-
-**Responsibilities:**
-- Keycloak-protected admin portal
-- Single credential issuance form
-- Bulk upload (CSV with student data)
-- Credential preview before issuance
-- QR code generation & download
-- Credential distribution tracking
-
-**Tech Stack:** React/Vue, Keycloak OIDC integration
-
----
-
-### 3. **Verifier Service** (`verifier-service/`)
-Node.js/Express backend for credential verification.
-
-**Responsibilities:**
-- Validate mDoc signatures (ES256 / ECDSA P-256)
-- Check revocation status
-- Verify credential expiry
-- Enforce verification policies
-- Store verification audit logs (GDPR-compliant)
-- Manage verifier registry
-
-**Tech Stack:** Node.js, Express, PostgreSQL
-
----
-
-### 4. **Verifier Frontend** (`verifier-frontend/`)
-Web UI for employers/institutions to verify credentials.
-
-**Responsibilities:**
-- QR code scanner (wallet presentation)
-- Verification result display
-- Verification history & policy configuration
-- Audit log review
-- Verifier registration & profile management
-
-**Tech Stack:** React/Vue, Keycloak OIDC integration
-
----
-
-### 5. **Mobile Wallet** (`mobile-wallet/`)
-Native mobile app for students to store and share credentials.
-
-**Responsibilities:**
-- QR code scanner for credential reception (issuer delivery)
-- Encrypted local storage of credentials (device-bound)
-- Biometric/PIN authentication
-- Credential display & management
-- QR presentation mode for sharing with verifiers
-- Selective disclosure (choose which fields to share)
-- Audit log of credential shares
-
-**Tech Stack:** Kotlin Multiplatform Mobile (Android & iOS), encrypted device storage
-
----
-
-## Technology Stack
-
-### Backend
-- **Runtime:** Node.js ≥18.17.0
-- **Framework:** Express.js
-- **Database:** PostgreSQL
-- **Storage model:** credential metadata/status in PostgreSQL; mdoc payloads are held in-memory only with a configurable session timeout (default 10 minutes, `MDOC_SESSION_TTL_SECONDS`)
-- **Authentication:** Keycloak (OAuth2/OIDC)
-- **Signing:** ES256 (ECDSA P-256) for mdoc issuerAuth; EdDSA (Ed25519) supported via key-management
-- **Standards:** ISO/IEC 18013-5:2021 (mDoc), OpenID4VC (Phase 2)
-
-### Frontend
-- **Admin/Verifier UI:** React or Vue.js (TBD)
-- **Authentication:** Keycloak OIDC
-- **QR Scanning:** qr-scanner or jsQR library
-
-### Mobile
-- **Language:** Kotlin Multiplatform Mobile
-- **Platforms:** iOS (via Swift) & Android
-- **Storage:** Encrypted (Keystore/Keychain)
-- **Camera:** Native QR scanner
-
-### DevOps
-- **Deployment:** Railway (existing infrastructure)
-- **CI/CD:** GitHub Actions (TBD)
-- **Version Control:** Git (GitHub)
-
----
-
-## Getting Started
-
-### Prerequisites
-- Node.js ≥18.17.0
-- npm ≥9.0.0
-- PostgreSQL ≥13
-- Keycloak instance (for local dev: docker-compose setup)
-- Git
-
-### Quick Start
+Requires Node.js 20 and npm 10.
 
 ```bash
-# Clone repo and install all dependencies
-git clone <repo-url>
-cd Transcript
-npm install
-
-# Start development servers (all workspaces)
-npm run dev
-
-# Build all packages
-npm run build
-
-# Run tests
-npm run test
-
-# Lint & format
-npm run lint && npm run format
+npm ci                 # install every workspace from the committed lockfile
+npm run db:reset       # start from an empty database
+npm run db:seed        # create the demo organisations and an administrator
+./START_LOCAL_SERVICES.ps1
 ```
 
-### Environment Setup
+`START_LOCAL_SERVICES.ps1` starts the two APIs and the four web apps, then prints the URLs. It
+writes logs to `data/`, and `-Stop` shuts everything down.
 
-Each service requires environment variables. See individual `README.md` files in each workspace for configuration details.
+| Check | Command |
+| --- | --- |
+| Unit tests | `npm run test --workspaces --if-present` |
+| Lint (and type-check for the TypeScript apps) | `npm run lint --workspaces --if-present` |
+| Production builds | `npm run build --workspaces --if-present` |
+| End-to-end scenarios (needs the services running) | `node issuer-service/scripts/test-academy-flow.mjs` |
 
----
+The Android wallet is a Gradle project: `cd mobile-wallet && ./gradlew assembleDebug`.
 
-## Development Phases
+### Environment
 
-### Phase 1: Core MVP (P0)
-13 features across all components (~10-12 weeks)
+Everything needed for a local demo is a default, so no `.env` is required to run the flow:
+`BREVO_API_KEY=dev-disabled` skips the email provider and prints the one-time code, and
+`ALLOW_DEV_OTP=true` accepts the development code. Set the real values to send real email.
 
-**Key deliverables:**
-- ✅ Credential schema definition
-- ✅ Admin issuance portal
-- ✅ mDoc generation & signing
-- ✅ Wallet credential reception & storage
-- ✅ Verifier QR scanning & validation
-- ✅ Full end-to-end workflow
+| Variable | Used by | Purpose |
+| --- | --- | --- |
+| `DATABASE_PATH` | both services | SQLite file; defaults to `data/transcript.db` |
+| `PORT` | both services | Defaults to 3000 (issuer) and 3001 (verifier) |
+| `ADMIN_EMAIL`, `ADMIN_PASSWORD` | issuer | First platform administrator |
+| `ACADEMY_ADMIN_EMAIL`, `ACADEMY_ADMIN_PASSWORD`, `ACADEMY_NAME` | issuer | Optional administrator scoped to the example academy |
+| `BREVO_API_KEY`, `BREVO_SENDER_EMAIL` | issuer | Transactional email |
+| `ALLOW_DEV_OTP` | issuer | Prints the one-time code instead of emailing it |
+| `MDOC_SESSION_TTL_SECONDS` | issuer | How long an unsigned credential waits to be collected |
 
-### Phase 2: Production-Ready (P1)
-8 features (~4-6 weeks)
+### Signing keys
 
-**Key deliverables:**
-- ✅ Credential distribution channels
-- ✅ Revocation system
-- ✅ Selective disclosure
-- ✅ Verification policies
-- ✅ GDPR-compliant audit logging
+`key-management/keys/mdoc-signer.private.pem` is the live signing key and is **gitignored**. Every
+file under that directory that git tracks is public material or metadata. Rotating the key invalidates
+credentials already issued, so treat it as a deliberate operation, not a cleanup.
 
-### Phase 3: Advanced (P2)
-Future enhancements (multi-issuer, SIS integration, etc.)
+## Data, and what is not stored
 
----
+SQLite (`better-sqlite3`, WAL) holds wallet accounts, account links, credential metadata, issuance
+sessions, shares, portal administrators, client organisations, API keys and the status-list index.
+The **mdoc bytes themselves are never persisted**: a credential exists in the wallet, and the issuer's
+ephemeral session for it expires. The portal shows metadata and lifecycle only.
 
-## Documentation
+Revocation lives in the signed MSO as a status-list index, so a verifier resolves it from the
+credential and the published list — it does not have to trust, or contact, the issuer.
 
-- **[System Plan](docs/ISO_MDOC_TRANSCRIPT_SYSTEM_PLAN.md)** - Complete architecture, features, roadmap
-- **[GitHub Issues](docs/GITHUB_ISSUES_TEMPLATE.md)** - Issue templates for all stories (Phase 1 & 2)
-- **[Architecture Decision Records](docs/adr/)** - Technical decisions & rationale (TBD)
+## Not built yet
 
----
+These are tracked as stories rather than implied by this document:
 
-## Contributing
+- **Container images** (`devops/Dockerfile.*`) predate the npm-workspaces layout and cannot build as
+  written — they expect a per-workspace lockfile. See P1-07.
+- **A hosted deployment** for this repository; the demo runs locally.
+- **Values an institution owns** — real calendars, grading scales and identifiers: P0-21.
+- **Older documents** (`DEVELOPMENT.md`, `LOCAL_DEPLOYMENT.md`, `SETUP.md`, `QUICKSTART.md`) still
+  describe PostgreSQL and Keycloak, which this system does not use. P1-07 covers bringing them in
+  line or removing them.
 
-### Git Workflow
-- Always create feature branches (never commit to `main`)
-- Feature branch naming: `feature/story-id-short-description` or `fix/issue-id`
-- All changes go through Pull Requests with review/approval
-- See `.github/workflows/` for CI/CD requirements
+## Licence
 
-### Story-Gated Development
-Development is organized by GitHub stories/issues. Before starting work:
-1. Ensure a story exists in GitHub Projects
-2. Link your branch to the story
-3. Complete one story at a time (don't multitask across stories)
-4. Mark complete when all acceptance criteria are met
-
-### Code Quality
-- [ ] Tests written for new features (minimum 70% coverage)
-- [ ] Lint passes (`npm run lint`)
-- [ ] Code formatted (`npm run format`)
-- [ ] No console.log or debug statements left in code
-- [ ] Security audit passed (dependencies up to date)
-
----
-
-## Security Considerations
-
-### Key Management
-- Issuer private keys stored securely (environment variables, HSM-ready)
-- Public keys distributed to verifiers for signature validation
-- Regular key rotation policy documented
-
-### Credential Signing
-- ED25519 signature scheme (EDDSA)
-- Signatures immutable and tamper-evident
-- Revocation checks performed during verification
-
-### Data Protection
-- Wallet credentials encrypted on device (AES-256)
-- TLS 1.3 for all API communication
-- Selective disclosure prevents unnecessary data exposure
-- GDPR-compliant audit logging (minimal retention)
-
-### Compliance
-- FERPA (Family Educational Rights and Privacy Act)
-- GDPR (General Data Protection Regulation)
-- Regular security audits & penetration testing
-
----
-
-## Support & Issues
-
-- **Bug Reports:** GitHub Issues
-- **Discussions:** GitHub Discussions
-- **Documentation:** See `docs/` folder
-
----
-
-## License
-
-ISC (see LICENSE file)
-
----
-
-**Last Updated:** 2026-08-27  
-**Maintainers:** Smart College team  
-**Status:** Planning phase — ready for Phase 1 kickoff
+ISC. See `LICENSE`.

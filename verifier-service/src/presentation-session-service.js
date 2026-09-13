@@ -22,6 +22,22 @@ import { STATUS_VALID } from '../../status-list-core.js';
 
 const ACADEMIC_DOC_TYPE = 'org.iso.23220.photoid.1';
 
+/**
+ * A date claim as `YYYY-MM-DD`, whichever shape the decoder produced.
+ *
+ * ISO 18013-5 full-dates (CBOR tag 1004) arrive from a decoded credential as a `Date`, a plain
+ * string, or our own decoder's `{ type: 'date', tag, value }` wrapper, depending on the library
+ * and its version. The API's contract is a date string, so normalise at this boundary instead of
+ * letting a `Date` reach consumers that would serialise it as a full timestamp.
+ */
+function toDateString(value) {
+  if (value == null) {return null;}
+  if (typeof value === 'string') {return value;}
+  if (value instanceof Date) {return value.toISOString().slice(0, 10);}
+  if (typeof value === 'object' && value.value != null) {return toDateString(value.value);}
+  return String(value);
+}
+
 // Requested namespaces → data-element identifiers. The wallet MUST filter the
 // returned IssuerSigned fields to exactly these identifiers.
 const ACADEMIC_NAME_SPACES = {
@@ -55,7 +71,7 @@ const bufferToBase64Url = (input) => {
 
 const hexToUint8Array = (hex) => {
   const bytes = new Uint8Array(hex.length / 2);
-  for (let i = 0; i < hex.length; i += 2) bytes[i / 2] = parseInt(hex.slice(i, i + 2), 16);
+  for (let i = 0; i < hex.length; i += 2) {bytes[i / 2] = parseInt(hex.slice(i, i + 2), 16);}
   return bytes;
 };
 
@@ -87,7 +103,7 @@ function buildItemsRequestBytes(requestedNameSpaces, docType) {
   const nameSpaces = {};
   for (const [namespace, fields] of Object.entries(source)) {
     nameSpaces[namespace] = {};
-    for (const field of fields) nameSpaces[namespace][field] = true;
+    for (const field of fields) {nameSpaces[namespace][field] = true;}
   }
   return cbor2.encode({ docType: docType || ACADEMIC_DOC_TYPE, nameSpaces });
 }
@@ -148,10 +164,10 @@ export class PresentationSessionService {
   }
 
   async create({ relyingPartyId, origin, nameSpaces, docType, credentialId }) {
-    if (!relyingPartyId || !origin) throw new Error('relyingPartyId and origin are required');
+    if (!relyingPartyId || !origin) {throw new Error('relyingPartyId and origin are required');}
     let parsedOrigin;
     try { parsedOrigin = new URL(origin); } catch { throw new Error('origin must be an absolute URL'); }
-    if (!['https:', 'http:'].includes(parsedOrigin.protocol)) throw new Error('origin must use HTTP or HTTPS');
+    if (!['https:', 'http:'].includes(parsedOrigin.protocol)) {throw new Error('origin must use HTTP or HTTPS');}
 
     this.pruneExpired();
     const nonce = generateNonce(); // 128-bit entropy, hex string
@@ -200,7 +216,7 @@ export class PresentationSessionService {
   consume(sessionId, { relyingPartyId, origin }) {
     this.pruneExpired();
     const session = this.sessions.get(sessionId);
-    if (!session) throw new Error('Presentation session is invalid, expired, or already used');
+    if (!session) {throw new Error('Presentation session is invalid, expired, or already used');}
     this.sessions.delete(sessionId);
     if (session.relyingPartyId !== relyingPartyId || session.origin !== origin) {
       throw new Error('Presentation session does not belong to this relying party');
@@ -255,7 +271,7 @@ export class PresentationSessionService {
         name: [givenName, familyName].filter(Boolean).join(' '),
         institution: claims.institution_name || null,
         degreeLevel: claims.degree_level || null,
-        graduationDate: claims.graduation_date || null,
+        graduationDate: toDateString(claims.graduation_date),
         // A transcript carries the study rather than an award, so a registrar reads these.
         // Reported as null when absent rather than invented: a transcript credential holds
         // no qualification namespace, and a qualification holds no course list.
@@ -273,8 +289,8 @@ export class PresentationSessionService {
         programmeLevelFramework: claims.programme_level_framework || null,
         awardTitle: claims.award_title || null,
         // When the study happened: a registrar places a record by its period as much as by its marks.
-        enrolmentStart: claims.enrolment_start || null,
-        enrolmentEnd: claims.enrolment_end || null,
+        enrolmentStart: toDateString(claims.enrolment_start),
+        enrolmentEnd: toDateString(claims.enrolment_end),
         // The average and the scale it is on, never one without the other.
         gpa: claims.overall_mark ?? null,
         gpaScaleId: claims.overall_mark_scale_id || null,
@@ -318,17 +334,17 @@ export class PresentationSessionService {
     const noReference = new Error(
       'Credential does not reference a status list, so its revocation status cannot be checked',
     );
-    if (!documents.length) throw noReference;
+    if (!documents.length) {throw noReference;}
 
     for (const document of documents) {
       const status = extractMsoStatus(document);
-      if (!status) throw noReference;
+      if (!status) {throw noReference;}
       const bit = await this.statusList.statusAt(
         status.uri,
         status.idx,
         issuerPublicKeyFrom(document),
       );
-      if (bit !== STATUS_VALID) throw new Error('Credential is revoked');
+      if (bit !== STATUS_VALID) {throw new Error('Credential is revoked');}
     }
   }
 
@@ -353,6 +369,6 @@ export class PresentationSessionService {
   }
 
   pruneExpired() {
-    for (const [id, session] of this.sessions) if (session.expiresAtMs <= this.now()) this.sessions.delete(id);
+    for (const [id, session] of this.sessions) {if (session.expiresAtMs <= this.now()) {this.sessions.delete(id);}}
   }
 }

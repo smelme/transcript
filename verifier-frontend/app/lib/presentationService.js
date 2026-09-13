@@ -35,7 +35,7 @@ export async function createPresentationSession() {
 }
 
 function supportsIsoMdocPresentation() {
-  if (!navigator.credentials?.get) return false;
+  if (!navigator.credentials?.get) {return false;}
   return (
     typeof window.DigitalCredential === 'undefined' ||
     typeof window.DigitalCredential.userAgentAllowsProtocol !== 'function' ||

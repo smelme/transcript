@@ -26,7 +26,7 @@ const { buildCwt, generateDeviceKeyPair } = await import('../../mdoc-core.js');
 // from the mdoc document-signer key).
 const signerKeyPem = fs.readFileSync(
   new URL('../../key-management/keys/wallet-token-signer.private.pem', import.meta.url),
-  'utf8'
+  'utf8',
 );
 
 const baseCredential = {
@@ -128,7 +128,7 @@ test('claim issues a device-bound mdoc when the wallet is linked', async () => {
   const claim = await issuer.claimIssuanceSession(
     session.sessionId,
     { accessToken, cwt: makeCwt(issuer, session, publicJwk, privateJwk, inv.sub) },
-    accounts
+    accounts,
   );
   assert.strictEqual(claim.success, true, claim.error);
   assert.strictEqual(claim.deviceBound, true);

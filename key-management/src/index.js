@@ -15,14 +15,14 @@ export class KeyManagementService {
     this.config = {
       keysDir: config.keysDir || './keys',
       algorithm: 'EdDSA',
-      ...config
+      ...config,
     };
   }
 
   /**
    * Generate ED25519 Key Pair
    */
-  async generateKeyPair(keyName, options = {}) {
+  async generateKeyPair(keyName, _options = {}) {
     try {
       // Generate ED25519 key pair using jose
       const { publicKey, privateKey } = await generateKeyPair(this.config.algorithm);
@@ -38,7 +38,7 @@ export class KeyManagementService {
         algorithm: this.config.algorithm,
         createdAt: new Date().toISOString(),
         status: 'active',
-        version: 1
+        version: 1,
       };
 
       return {
@@ -47,7 +47,7 @@ export class KeyManagementService {
         publicKey: publicKeyPem,
         privateKey: privateKeyPem,
         publicKeyJWK: await exportJWK(publicKey),
-        metadata: keyMetadata
+        metadata: keyMetadata,
       };
     } catch (error) {
       throw new Error(`Failed to generate key pair: ${error.message}`);
@@ -93,7 +93,7 @@ export class KeyManagementService {
         publicKey: keyData.publicKey,
         publicKeyJWK: keyData.publicKeyJWK,
         metadata: keyData.metadata,
-        privateKeyHash: this.hashString(keyData.privateKey)
+        privateKeyHash: this.hashString(keyData.privateKey),
       };
 
       await fs.writeFile(keyFile, JSON.stringify(keyPackage, null, 2), 'utf8');
@@ -107,7 +107,7 @@ export class KeyManagementService {
       return {
         success: true,
         keyId: keyData.keyId,
-        message: `Key pair stored successfully`
+        message: 'Key pair stored successfully',
       };
     } catch (error) {
       throw new Error(`Failed to store key pair: ${error.message}`);
@@ -128,7 +128,7 @@ export class KeyManagementService {
         keyName: keyPackage.keyName,
         publicKey: keyPackage.publicKey,
         publicKeyJWK: keyPackage.publicKeyJWK,
-        metadata: keyPackage.metadata
+        metadata: keyPackage.metadata,
       };
     } catch (error) {
       throw new Error(`Failed to load public key: ${error.message}`);
@@ -177,7 +177,7 @@ export class KeyManagementService {
         try {
           const content = await fs.readFile(
             path.join(this.config.keysDir, file),
-            'utf8'
+            'utf8',
           );
           const keyPackage = JSON.parse(content);
           keys.push({
@@ -186,7 +186,7 @@ export class KeyManagementService {
             algorithm: keyPackage.metadata.algorithm,
             status: keyPackage.metadata.status,
             version: keyPackage.metadata.version,
-            createdAt: keyPackage.metadata.createdAt
+            createdAt: keyPackage.metadata.createdAt,
           });
         } catch (error) {
           // Skip malformed files
@@ -241,7 +241,7 @@ export class KeyManagementService {
       return {
         success: true,
         oldKeyId: oldKey.keyId,
-        newKeyId: newKeyData.keyId
+        newKeyId: newKeyData.keyId,
       };
     } catch (error) {
       throw new Error(`Failed to rotate key: ${error.message}`);

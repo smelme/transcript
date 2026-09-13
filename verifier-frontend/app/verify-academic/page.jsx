@@ -3,6 +3,21 @@
 import { useState } from 'react';
 import { requestAcademicCredential } from '@/app/lib/presentationService';
 
+// One shape for the moment of verification, matching the portal's date style rather than the
+// browser's default, which varies by locale and by machine.
+function formatTimestamp(value) {
+  if (!value) return '—';
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return String(value);
+  return date.toLocaleString(undefined, {
+    year: 'numeric',
+    month: 'short',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+  });
+}
+
 export default function MyJobVerification() {
   const [state, setState] = useState('idle');
   const [message, setMessage] = useState(null);
@@ -63,7 +78,7 @@ export default function MyJobVerification() {
             <dt>Status</dt>
             <dd>{result.status}</dd>
             <dt>Verified</dt>
-            <dd>{new Date(result.verifiedAt).toLocaleString()}</dd>
+              <dd>{formatTimestamp(result.verifiedAt)}</dd>
           </dl>
         </section>
       )}

@@ -18,6 +18,22 @@ type ShareView = {
   error?: string;
 };
 
+// Dates reach a shared view as `YYYY-MM-DD` from our own encoder, as `YYYYMMDD` from the wallet's
+// claim set, or as a Date when a decoder expands CBOR tag 1004. A reader wants the same shape for
+// all three, and every other value stays exactly as it was disclosed.
+const MONTH_NAMES = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+
+function formatClaimDate(value: string): string {
+  const iso = value.match(/^(\d{4})-(\d{2})-(\d{2})(?:[T ].*)?$/);
+  const compact = iso ? null : value.match(/^(\d{4})(\d{2})(\d{2})$/);
+  const match = iso || compact;
+  if (!match) return value;
+  const month = Number(match[2]) - 1;
+  const day = Number(match[3]);
+  if (month < 0 || month > 11 || day < 1 || day > 31) return value;
+  return `${day} ${MONTH_NAMES[month]} ${match[1]}`;
+}
+
 export default function SharePage() {
   const params = useParams<{ shareId: string }>();
   const shareId = params?.shareId || '';
@@ -123,8 +139,9 @@ export default function SharePage() {
 
   function formatValue(value: unknown): string {
     if (value === null || value === undefined) return '—';
+    if (value instanceof Date) return formatClaimDate(value.toISOString().slice(0, 10));
     if (typeof value === 'object') return JSON.stringify(value);
-    return String(value);
+    return typeof value === 'string' ? formatClaimDate(value) : String(value);
   }
 
   function displayLabel(key: string): string {

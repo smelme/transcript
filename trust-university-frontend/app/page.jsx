@@ -3,6 +3,21 @@
 import { useState } from 'react';
 import { parseCourses, requestTranscript } from '@/app/lib/presentationService';
 
+// One shape for the moment of verification, matching the portal's date style rather than the
+// browser's default, which varies by locale and by machine.
+function formatTimestamp(value) {
+  if (!value) return '—';
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return String(value);
+  return date.toLocaleString(undefined, {
+    year: 'numeric',
+    month: 'short',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+  });
+}
+
 /**
  * Trust University's postgraduate registration. A registrar asks for the transcript namespace,
  * so the holder's wallet offers their transcript rather than their qualification - and only the
@@ -64,7 +79,7 @@ export default function ApplyPage() {
         <section className="card" aria-label="Verified transcript">
           <h2>Verified transcript</h2>
           <p className="muted">
-            Signature and revocation status checked · {new Date(result.verifiedAt).toLocaleString()}
+            Signature and revocation status checked · {formatTimestamp(result.verifiedAt)}
           </p>
 
           <dl>

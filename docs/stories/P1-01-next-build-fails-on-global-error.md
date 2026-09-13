@@ -1,8 +1,23 @@
 # P1-01: The academy app does not build
 
 **Priority:** P1 — the app runs in development but cannot be built for release
-**Status:** Open, reproduced on unmodified code in two apps
-**Components:** `issuer-frontend` and `quals-portal` (Next.js 16.3.3, Turbopack)
+**Status:** Resolved — cause identified and fixed; all four apps build
+**Components:** `issuer-frontend` and `quals-portal` (Next.js 16, Turbopack)
+
+## Resolution
+
+The suspected cause was right, and the workspace layout was hiding it. `npm ls react` showed **two
+React majors in the tree**: React 18.3.1 hoisted to the root satisfying Next's peer requirement, and
+React 19.2.8 or 19.3.0 nested inside each app, with the two apps not even agreeing on a patch
+version. Prerendering Next's own error boundary is where that surfaces, which is why the failure
+looked like framework code.
+
+It was also untestable from a clean checkout, because no lockfile was committed (P1-02) and the
+working trees had been installed at different times. With the lockfile committed and `node_modules`
+removed, one install resolves a **single React 19.3.0** (plus Next 16.3.5) and all four apps build:
+`issuer-frontend`, `quals-portal`, `verifier-frontend` and `trust-university-frontend` each complete
+`next build` with no prerender error. CI now runs the production build for every workspace, so a
+regression here fails the pipeline rather than being discovered by hand.
 
 ## Problem
 

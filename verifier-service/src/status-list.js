@@ -20,11 +20,11 @@ const DEFAULT_TTL_MS = 60 * 1000;
 
 /** Unwrap a CBOR byte string, whose façade differs between decoder versions. */
 function bytesOf(value, depth = 0) {
-  if (!value || depth > 4) return null;
-  if (Buffer.isBuffer(value)) return new Uint8Array(value);
-  if (value instanceof Uint8Array) return value;
-  if (Array.isArray(value)) return null;
-  if (typeof value === 'object' && 'contents' in value) return bytesOf(value.contents, depth + 1);
+  if (!value || depth > 4) {return null;}
+  if (Buffer.isBuffer(value)) {return new Uint8Array(value);}
+  if (value instanceof Uint8Array) {return value;}
+  if (Array.isArray(value)) {return null;}
+  if (typeof value === 'object' && 'contents' in value) {return bytesOf(value.contents, depth + 1);}
   return null;
 }
 
@@ -45,14 +45,14 @@ const decodeOrNull = (bytes) => {
  */
 export function extractMobileSecurityObject(document) {
   const payloadBytes = bytesOf(document?.issuerSigned?.issuerAuth?.[2]);
-  if (!payloadBytes) return null;
+  if (!payloadBytes) {return null;}
 
   let node = decodeOrNull(payloadBytes);
   for (let depth = 0; depth < 3 && node; depth++) {
-    if (node instanceof Map) return node.has('version') ? node : null;
-    if (typeof node === 'object' && !Array.isArray(node) && 'version' in node) return node;
+    if (node instanceof Map) {return node.has('version') ? node : null;}
+    if (typeof node === 'object' && !Array.isArray(node) && 'version' in node) {return node;}
     const inner = bytesOf(node);
-    if (!inner) return null;
+    if (!inner) {return null;}
     node = decodeOrNull(inner);
   }
   return null;
@@ -66,17 +66,17 @@ export function extractMsoStatus(document) {
   const mso = extractMobileSecurityObject(document);
   const status = mso?.status;
   const list = status?.status_list ?? status?.statusList;
-  if (!list) return null;
+  if (!list) {return null;}
   const idx = Number(list.idx);
   const uri = typeof list.uri === 'string' ? list.uri : null;
-  if (!Number.isInteger(idx) || !uri) return null;
+  if (!Number.isInteger(idx) || !uri) {return null;}
   return { idx, uri };
 }
 
 /** The public key of the certificate that signed the presented credential. */
 export function issuerPublicKeyFrom(document) {
   const der = extractLeafCertificateDer(document);
-  if (!der) return null;
+  if (!der) {return null;}
   try {
     return new crypto.X509Certificate(der).publicKey;
   } catch {
@@ -88,7 +88,7 @@ export function issuerPublicKeyFrom(document) {
 export function extractLeafCertificateDer(document) {
   try {
     const issuerAuth = document?.issuerSigned?.issuerAuth;
-    if (!Array.isArray(issuerAuth)) return null;
+    if (!Array.isArray(issuerAuth)) {return null;}
     const unprotectedHeaders = issuerAuth[1];
     const x5chain = unprotectedHeaders instanceof Map
       ? unprotectedHeaders.get(33)
@@ -120,12 +120,12 @@ export class StatusListClient {
   }
 
   async _bitsFor(uri, publicKey) {
-    if (typeof this.fetchImpl !== 'function') throw new Error('No fetch implementation available for status lists');
-    if (!publicKey) throw new Error('Cannot verify the status list without the issuer public key');
+    if (typeof this.fetchImpl !== 'function') {throw new Error('No fetch implementation available for status lists');}
+    if (!publicKey) {throw new Error('Cannot verify the status list without the issuer public key');}
 
     const cacheKey = `${uri}|${crypto.createHash('sha256').update(publicKey.export({ type: 'spki', format: 'der' })).digest('base64url')}`;
     const cached = this.cache.get(cacheKey);
-    if (cached && cached.expiresAt > this.now()) return cached.bits;
+    if (cached && cached.expiresAt > this.now()) {return cached.bits;}
 
     const response = await this.fetchImpl(uri);
     if (!response?.ok) {

@@ -183,7 +183,7 @@ test('Issuer Service - Custom Configuration', () => {
   const issuer = new IssuerService({
     issuerId: 'custom-issuer',
     issuerName: 'Test University',
-    issuerDid: 'did:example:custom'
+    issuerDid: 'did:example:custom',
   });
   assert.strictEqual(issuer.issuerId, 'custom-issuer');
   assert.strictEqual(issuer.issuerName, 'Test University');
@@ -198,10 +198,10 @@ test('Issuer Service - Issue Credential Success', () => {
     institution: 'State University',
     courses: [
       { courseCode: 'CS101', courseName: 'Intro to CS', credits: 3 },
-      { courseCode: 'MATH101', courseName: 'Calculus I', credits: 4 }
+      { courseCode: 'MATH101', courseName: 'Calculus I', credits: 4 },
     ],
     gpa: 3.8,
-    degreeLevel: 'bachelor'
+    degreeLevel: 'bachelor',
   };
 
   const result = issuer.issue(credentialData);
@@ -215,7 +215,7 @@ test('Issuer Service - Issue Credential Validation - Missing Student ID', () => 
   const credentialData = {
     name: { givenName: 'John', familyName: 'Doe' },
     institution: 'State University',
-    courses: [{ courseCode: 'CS101', courseName: 'Intro to CS', credits: 3 }]
+    courses: [{ courseCode: 'CS101', courseName: 'Intro to CS', credits: 3 }],
   };
 
   const result = issuer.issue(credentialData);
@@ -230,7 +230,7 @@ test('Issuer Service - Issue Credential Validation - Invalid GPA', () => {
     name: { givenName: 'John', familyName: 'Doe' },
     institution: 'State University',
     courses: [{ courseCode: 'CS101', courseName: 'Intro to CS', credits: 3 }],
-    gpa: 5.0 // Invalid: > 4.0
+    gpa: 5.0, // Invalid: > 4.0
   };
 
   const result = issuer.issue(credentialData);
@@ -243,7 +243,7 @@ test('Issuer Service - Issue Credential Validation - No Courses', () => {
     studentId: 'STU-001',
     name: { givenName: 'John', familyName: 'Doe' },
     institution: 'State University',
-    courses: [] // Invalid: must have at least 1
+    courses: [], // Invalid: must have at least 1
   };
 
   const result = issuer.issue(credentialData);
@@ -256,7 +256,7 @@ test('Issuer Service - Issue Credential Validation - Invalid Credits', () => {
     studentId: 'STU-001',
     name: { givenName: 'John', familyName: 'Doe' },
     institution: 'State University',
-    courses: [{ courseCode: 'CS101', courseName: 'Intro to CS', credits: 1000 }] // Invalid: > 999
+    courses: [{ courseCode: 'CS101', courseName: 'Intro to CS', credits: 1000 }], // Invalid: > 999
   };
 
   const result = issuer.issue(credentialData);
@@ -269,7 +269,7 @@ test('Issuer Service - Update Statistics After Issuance', () => {
     studentId: 'STU-001',
     name: { givenName: 'John', familyName: 'Doe' },
     institution: 'State University',
-    courses: [{ courseCode: 'CS101', courseName: 'Intro to CS', credits: 3 }]
+    courses: [{ courseCode: 'CS101', courseName: 'Intro to CS', credits: 3 }],
   };
 
   issuer.issue(credentialData);
@@ -284,7 +284,7 @@ test('Issuer Service - Get Credential Success', () => {
     studentId: 'STU-001',
     name: { givenName: 'John', familyName: 'Doe' },
     institution: 'State University',
-    courses: [{ courseCode: 'CS101', courseName: 'Intro to CS', credits: 3 }]
+    courses: [{ courseCode: 'CS101', courseName: 'Intro to CS', credits: 3 }],
   };
 
   const issued = issuer.issue(credentialData);
@@ -310,14 +310,14 @@ test('Issuer Service - List Credentials All', () => {
     studentId: 'STU-001',
     name: { givenName: 'John', familyName: 'Doe' },
     institution: 'University A',
-    courses: [{ courseCode: 'CS101', courseName: 'Intro to CS', credits: 3 }]
+    courses: [{ courseCode: 'CS101', courseName: 'Intro to CS', credits: 3 }],
   });
 
   issuer.issue({
     studentId: 'STU-002',
     name: { givenName: 'Jane', familyName: 'Smith' },
     institution: 'University B',
-    courses: [{ courseCode: 'MATH101', courseName: 'Calculus', credits: 4 }]
+    courses: [{ courseCode: 'MATH101', courseName: 'Calculus', credits: 4 }],
   });
 
   const result = issuer.listCredentials();
@@ -333,14 +333,14 @@ test('Issuer Service - List Credentials Filter by Student', () => {
     studentId: 'STU-001',
     name: { givenName: 'John', familyName: 'Doe' },
     institution: 'University A',
-    courses: [{ courseCode: 'CS101', courseName: 'Intro to CS', credits: 3 }]
+    courses: [{ courseCode: 'CS101', courseName: 'Intro to CS', credits: 3 }],
   });
 
   issuer.issue({
     studentId: 'STU-002',
     name: { givenName: 'Jane', familyName: 'Smith' },
     institution: 'University B',
-    courses: [{ courseCode: 'MATH101', courseName: 'Calculus', credits: 4 }]
+    courses: [{ courseCode: 'MATH101', courseName: 'Calculus', credits: 4 }],
   });
 
   const result = issuer.listCredentials({ studentId: 'STU-001' });
@@ -357,7 +357,7 @@ test('Issuer Service - List Credentials Pagination', () => {
       studentId: `STU-${i}`,
       name: { givenName: 'Test', familyName: `Student${i}` },
       institution: 'University',
-      courses: [{ courseCode: 'CS101', courseName: 'Intro to CS', credits: 3 }]
+      courses: [{ courseCode: 'CS101', courseName: 'Intro to CS', credits: 3 }],
     });
   }
 
@@ -378,7 +378,7 @@ test('Issuer Service - Revoke Credential Success', () => {
     studentId: 'STU-001',
     name: { givenName: 'John', familyName: 'Doe' },
     institution: 'University',
-    courses: [{ courseCode: 'CS101', courseName: 'Intro to CS', credits: 3 }]
+    courses: [{ courseCode: 'CS101', courseName: 'Intro to CS', credits: 3 }],
   });
 
   const revoked = issuer.revokeCredential(issued.credentialId, 'Degree revoked');
@@ -402,7 +402,7 @@ test('Issuer Service - Revoke Already Revoked Credential', () => {
     studentId: 'STU-001',
     name: { givenName: 'John', familyName: 'Doe' },
     institution: 'University',
-    courses: [{ courseCode: 'CS101', courseName: 'Intro to CS', credits: 3 }]
+    courses: [{ courseCode: 'CS101', courseName: 'Intro to CS', credits: 3 }],
   });
 
   issuer.revokeCredential(issued.credentialId, 'First revocation');
@@ -419,7 +419,7 @@ test('Issuer Service - Cannot Get Revoked Credential', () => {
     studentId: 'STU-001',
     name: { givenName: 'John', familyName: 'Doe' },
     institution: 'University',
-    courses: [{ courseCode: 'CS101', courseName: 'Intro to CS', credits: 3 }]
+    courses: [{ courseCode: 'CS101', courseName: 'Intro to CS', credits: 3 }],
   });
 
   issuer.revokeCredential(issued.credentialId);
@@ -436,7 +436,7 @@ test('Issuer Service - Generate QR Code', async () => {
     studentId: 'STU-001',
     name: { givenName: 'John', familyName: 'Doe' },
     institution: 'University',
-    courses: [{ courseCode: 'CS101', courseName: 'Intro to CS', credits: 3 }]
+    courses: [{ courseCode: 'CS101', courseName: 'Intro to CS', credits: 3 }],
   });
 
   const qrResult = await issuer.generateQR(issued.credentialId);
@@ -462,14 +462,14 @@ test('Issuer Service - Get Statistics', () => {
     studentId: 'STU-001',
     name: { givenName: 'John', familyName: 'Doe' },
     institution: 'University',
-    courses: [{ courseCode: 'CS101', courseName: 'Intro to CS', credits: 3 }]
+    courses: [{ courseCode: 'CS101', courseName: 'Intro to CS', credits: 3 }],
   });
 
   issuer.issue({
     studentId: 'STU-002',
     name: { givenName: 'Jane', familyName: 'Smith' },
     institution: 'University',
-    courses: [{ courseCode: 'MATH101', courseName: 'Calculus', credits: 4 }]
+    courses: [{ courseCode: 'MATH101', courseName: 'Calculus', credits: 4 }],
   });
 
   const stats = issuer.getStatistics();
@@ -486,7 +486,7 @@ test('Issuer Service - Statistics After Revocation', () => {
     studentId: 'STU-001',
     name: { givenName: 'John', familyName: 'Doe' },
     institution: 'University',
-    courses: [{ courseCode: 'CS101', courseName: 'Intro to CS', credits: 3 }]
+    courses: [{ courseCode: 'CS101', courseName: 'Intro to CS', credits: 3 }],
   });
 
   issuer.revokeCredential(issued.credentialId);
@@ -504,7 +504,7 @@ test('Issuer Service - Audit Log Entry Creation', () => {
     studentId: 'STU-001',
     name: { givenName: 'John', familyName: 'Doe' },
     institution: 'University',
-    courses: [{ courseCode: 'CS101', courseName: 'Intro to CS', credits: 3 }]
+    courses: [{ courseCode: 'CS101', courseName: 'Intro to CS', credits: 3 }],
   });
 
   assert.strictEqual(issuer.auditLog.length, 1);
@@ -520,7 +520,7 @@ test('Issuer Service - Audit Log Multiple Actions', () => {
     studentId: 'STU-001',
     name: { givenName: 'John', familyName: 'Doe' },
     institution: 'University',
-    courses: [{ courseCode: 'CS101', courseName: 'Intro to CS', credits: 3 }]
+    courses: [{ courseCode: 'CS101', courseName: 'Intro to CS', credits: 3 }],
   });
 
   issuer.revokeCredential(issued.credentialId, 'Test revocation');
@@ -538,14 +538,14 @@ test('Issuer Service - Get Audit Log', () => {
     studentId: 'STU-001',
     name: { givenName: 'John', familyName: 'Doe' },
     institution: 'University',
-    courses: [{ courseCode: 'CS101', courseName: 'Intro to CS', credits: 3 }]
+    courses: [{ courseCode: 'CS101', courseName: 'Intro to CS', credits: 3 }],
   });
 
   issuer.issue({
     studentId: 'STU-002',
     name: { givenName: 'Jane', familyName: 'Smith' },
     institution: 'University',
-    courses: [{ courseCode: 'MATH101', courseName: 'Calculus', credits: 4 }]
+    courses: [{ courseCode: 'MATH101', courseName: 'Calculus', credits: 4 }],
   });
 
   const result = issuer.getAuditLog({ action: 'credential_issued' });
@@ -561,14 +561,14 @@ test('Issuer Service - Get Audit Log Filter by Student', () => {
     studentId: 'STU-001',
     name: { givenName: 'John', familyName: 'Doe' },
     institution: 'University',
-    courses: [{ courseCode: 'CS101', courseName: 'Intro to CS', credits: 3 }]
+    courses: [{ courseCode: 'CS101', courseName: 'Intro to CS', credits: 3 }],
   });
 
   issuer.issue({
     studentId: 'STU-002',
     name: { givenName: 'Jane', familyName: 'Smith' },
     institution: 'University',
-    courses: [{ courseCode: 'MATH101', courseName: 'Calculus', credits: 4 }]
+    courses: [{ courseCode: 'MATH101', courseName: 'Calculus', credits: 4 }],
   });
 
   const result = issuer.getAuditLog({ studentId: 'STU-001' });
@@ -583,7 +583,7 @@ test('Issuer Service - Clear Issuer Data', () => {
     studentId: 'STU-001',
     name: { givenName: 'John', familyName: 'Doe' },
     institution: 'University',
-    courses: [{ courseCode: 'CS101', courseName: 'Intro to CS', credits: 3 }]
+    courses: [{ courseCode: 'CS101', courseName: 'Intro to CS', credits: 3 }],
   });
 
   const clearResult = issuer.clear();
@@ -602,7 +602,7 @@ test('Issuer Service - Issue with All Optional Fields', () => {
     institution: 'State University',
     courses: [
       { courseCode: 'CS101', courseName: 'Intro to CS', credits: 3 },
-      { courseCode: 'MATH101', courseName: 'Calculus I', credits: 4 }
+      { courseCode: 'MATH101', courseName: 'Calculus I', credits: 4 },
     ],
     credentialType: 'DegreeCredential',
     dateOfBirth: '2000-01-15',
@@ -611,7 +611,7 @@ test('Issuer Service - Issue with All Optional Fields', () => {
     gpa: 3.85,
     achievements: ['Dean\'s List', 'Honors Scholar'],
     issuanceDate: '2024-05-15',
-    expiryDate: '2029-05-15'
+    expiryDate: '2029-05-15',
   };
 
   const result = issuer.issue(credentialData);
@@ -632,14 +632,14 @@ test('Issuer Service - Multiple Students Multiple Credentials', () => {
     studentId: 'STU-001',
     name: { givenName: 'John', familyName: 'Doe' },
     institution: 'University A',
-    courses: [{ courseCode: 'CS101', courseName: 'Intro to CS', credits: 3 }]
+    courses: [{ courseCode: 'CS101', courseName: 'Intro to CS', credits: 3 }],
   });
 
   issuer.issue({
     studentId: 'STU-001',
     name: { givenName: 'John', familyName: 'Doe' },
     institution: 'University A',
-    courses: [{ courseCode: 'CS201', courseName: 'Advanced CS', credits: 4 }]
+    courses: [{ courseCode: 'CS201', courseName: 'Advanced CS', credits: 4 }],
   });
 
   // Student 2 - 1 credential
@@ -647,7 +647,7 @@ test('Issuer Service - Multiple Students Multiple Credentials', () => {
     studentId: 'STU-002',
     name: { givenName: 'Jane', familyName: 'Smith' },
     institution: 'University B',
-    courses: [{ courseCode: 'MATH101', courseName: 'Calculus', credits: 4 }]
+    courses: [{ courseCode: 'MATH101', courseName: 'Calculus', credits: 4 }],
   });
 
   assert.strictEqual(issuer.statistics.totalIssued, 3);
@@ -662,7 +662,7 @@ test('Issuer Service - Credential Status After Issue', () => {
     studentId: 'STU-001',
     name: { givenName: 'John', familyName: 'Doe' },
     institution: 'University',
-    courses: [{ courseCode: 'CS101', courseName: 'Intro to CS', credits: 3 }]
+    courses: [{ courseCode: 'CS101', courseName: 'Intro to CS', credits: 3 }],
   });
 
   const credential = issuer.getCredential(issued.credentialId).credential;
@@ -679,7 +679,7 @@ test('Issuer Service - Revocation Adds Reason to Credential', () => {
     studentId: 'STU-001',
     name: { givenName: 'John', familyName: 'Doe' },
     institution: 'University',
-    courses: [{ courseCode: 'CS101', courseName: 'Intro to CS', credits: 3 }]
+    courses: [{ courseCode: 'CS101', courseName: 'Intro to CS', credits: 3 }],
   });
 
   issuer.revokeCredential(issued.credentialId, 'Degree revoked due to misconduct');
@@ -704,7 +704,7 @@ test('Issuer Service - Non-Existent Filter Returns Empty', () => {
     studentId: 'STU-001',
     name: { givenName: 'John', familyName: 'Doe' },
     institution: 'University',
-    courses: [{ courseCode: 'CS101', courseName: 'Intro to CS', credits: 3 }]
+    courses: [{ courseCode: 'CS101', courseName: 'Intro to CS', credits: 3 }],
   });
 
   const result = issuer.listCredentials({ studentId: 'NONEXISTENT' });

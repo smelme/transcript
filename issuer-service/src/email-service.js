@@ -30,8 +30,8 @@ export function isEmailConfigured() {
  * handing the code back to the caller. Override explicitly with ALLOW_DEV_OTP.
  */
 export function devOtpAllowed() {
-  if (process.env.ALLOW_DEV_OTP === 'true') return true;
-  if (process.env.ALLOW_DEV_OTP === 'false') return false;
+  if (process.env.ALLOW_DEV_OTP === 'true') {return true;}
+  if (process.env.ALLOW_DEV_OTP === 'false') {return false;}
   return process.env.NODE_ENV !== 'production';
 }
 
@@ -158,8 +158,8 @@ export async function sendCredentialsReadyEmail({ email, institution, claimUrl, 
   const institute = institution || 'Your institution';
   const list = credentials.length
     ? `<ul style="margin:10px 0 0;padding-left:20px">${credentials
-        .map((c) => `<li><strong>${c.title || 'Credential'}</strong>${c.subtitle ? ` — ${c.subtitle}` : ''}</li>`)
-        .join('')}</ul>`
+      .map((c) => `<li><strong>${c.title || 'Credential'}</strong>${c.subtitle ? ` — ${c.subtitle}` : ''}</li>`)
+      .join('')}</ul>`
     : '';
   const subject = `Your ${institute} credentials are ready to add to your wallet`;
   const html = `

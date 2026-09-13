@@ -66,7 +66,7 @@ export class WalletAccountService {
 
   _normalize(email) {
     const normalized = String(email || '').trim().toLowerCase();
-    if (!normalized) throw new Error('email is required');
+    if (!normalized) {throw new Error('email is required');}
     return normalized;
   }
 
@@ -150,12 +150,12 @@ export class WalletAccountService {
     const { account, created } = this._findOrCreateAccount(email);
     const inst = String(institution || this.issuerId);
     const sid = String(studentId || '').trim();
-    if (!sid) throw new Error('studentId is required');
+    if (!sid) {throw new Error('studentId is required');}
 
     const linkExists = this._linksFor(account.sub).some(
-      (l) => l.institution === inst && l.studentId === sid
+      (l) => l.institution === inst && l.studentId === sid,
     );
-    if (!linkExists) this._addLink(account.sub, inst, sid);
+    if (!linkExists) {this._addLink(account.sub, inst, sid);}
 
     const otp = this._issueOtp(account.email);
     // For an invitation the recipient-facing institute name is what they should
@@ -188,11 +188,11 @@ export class WalletAccountService {
     const { account, created } = this._findOrCreateAccount(email);
     const inst = String(institution || this.issuerId);
     const sid = String(studentId || '').trim();
-    if (!sid) throw new Error('studentId is required');
+    if (!sid) {throw new Error('studentId is required');}
     const linkExists = this._linksFor(account.sub).some(
-      (l) => l.institution === inst && l.studentId === sid
+      (l) => l.institution === inst && l.studentId === sid,
     );
-    if (!linkExists) this._addLink(account.sub, inst, sid);
+    if (!linkExists) {this._addLink(account.sub, inst, sid);}
     return {
       sub: account.sub,
       email: account.email,
@@ -269,7 +269,7 @@ export class WalletAccountService {
   // Best-effort email delivery. When no emailSender is configured (or delivery
   // fails), the OTP is returned in the response so the flow stays usable in dev.
   async _sendOtpEmail(email, otp, purpose, extra = {}) {
-    if (!this.emailSender) return { success: false, reason: 'no email sender configured' };
+    if (!this.emailSender) {return { success: false, reason: 'no email sender configured' };}
     try {
       return await this.emailSender({ email, otp, purpose, ...extra });
     } catch (e) {
@@ -282,9 +282,9 @@ export class WalletAccountService {
   verifyOtp({ email, otp }) {
     const normalized = this._normalize(email);
     const locked = this._lockoutMessage(normalized);
-    if (locked) return { success: false, error: locked };
+    if (locked) {return { success: false, error: locked };}
     const record = this.otps.get(normalized);
-    if (!record) return { success: false, error: 'No OTP issued for this email' };
+    if (!record) {return { success: false, error: 'No OTP issued for this email' };}
     if (Date.now() > record.expiresAt) {
       this.otps.delete(normalized);
       return { success: false, error: 'OTP expired' };
@@ -292,7 +292,7 @@ export class WalletAccountService {
     if (record.code !== String(otp || '')) {
       this._registerOtpFailure(normalized);
       const nowLocked = this._lockoutMessage(normalized);
-      if (nowLocked) return { success: false, error: nowLocked };
+      if (nowLocked) {return { success: false, error: nowLocked };}
       const left = OTP_MAX_ATTEMPTS - (this.otpFailures.get(normalized)?.count || 0);
       return { success: false, error: `Incorrect code. ${left} attempt(s) remaining.` };
     }
@@ -321,11 +321,11 @@ export class WalletAccountService {
   /** Wallet sign-in step 2: exchange OTP for an access + refresh token pair. */
   async exchangeToken({ email, otp }) {
     const verified = this.verifyOtp({ email, otp });
-    if (!verified.success) throw new Error(verified.error);
+    if (!verified.success) {throw new Error(verified.error);}
     const account = this._accountByEmail(verified.email);
-    if (!account) throw new Error('No wallet account for this email');
-    if (!account.active || account.deleted_at) throw new Error('Account is not active');
-    if (!this.signerKeyPem) throw new Error('Signer key not configured');
+    if (!account) {throw new Error('No wallet account for this email');}
+    if (!account.active || account.deleted_at) {throw new Error('Account is not active');}
+    if (!this.signerKeyPem) {throw new Error('Signer key not configured');}
 
     const accessToken = await this._signAccessToken(account);
     const refreshToken = this._issueRefreshToken(account.sub);
@@ -342,18 +342,18 @@ export class WalletAccountService {
 
   /** Exchange a valid refresh token for a fresh access + refresh token pair. */
   async refresh({ refreshToken }) {
-    if (!refreshToken) throw new Error('refreshToken is required');
+    if (!refreshToken) {throw new Error('refreshToken is required');}
     const hash = sha256Hex(refreshToken);
     const row = this.db.prepare('SELECT * FROM refresh_tokens WHERE token_hash = ?').get(hash);
-    if (!row || row.revoked_at) throw new Error('Refresh token is invalid');
-    if (Date.now() > new Date(row.expires_at).getTime()) throw new Error('Refresh token expired');
+    if (!row || row.revoked_at) {throw new Error('Refresh token is invalid');}
+    if (Date.now() > new Date(row.expires_at).getTime()) {throw new Error('Refresh token expired');}
 
     const account = this._accountBySub(row.sub);
     if (!account || !account.active || account.deleted_at) {
       this._revokeAllRefreshTokens(row.sub);
       throw new Error('Account is not active');
     }
-    if (!this.signerKeyPem) throw new Error('Signer key not configured');
+    if (!this.signerKeyPem) {throw new Error('Signer key not configured');}
 
     // Rotate: revoke the presented refresh token and issue a fresh pair.
     this.db
@@ -375,7 +375,7 @@ export class WalletAccountService {
 
   /** Sign out: invalidate the presented refresh token. */
   signOut({ refreshToken }) {
-    if (!refreshToken) throw new Error('refreshToken is required');
+    if (!refreshToken) {throw new Error('refreshToken is required');}
     const hash = sha256Hex(refreshToken);
     this.db
       .prepare('UPDATE refresh_tokens SET revoked_at = ? WHERE token_hash = ?')
@@ -385,7 +385,7 @@ export class WalletAccountService {
 
   /** Verify an access token and return its claims ({ sub, email, scope, ... }). */
   async verifyAccessToken(token) {
-    if (!this.publicSpkiPem) throw new Error('Signer key not configured');
+    if (!this.publicSpkiPem) {throw new Error('Signer key not configured');}
     const publicKey = await importSPKI(this.publicSpkiPem, 'ES256');
     const { payload } = await jwtVerify(String(token || ''), publicKey, {
       issuer: this.issuerId,
@@ -402,7 +402,7 @@ export class WalletAccountService {
   /** True if this wallet subject is linked to (institution, studentId). */
   hasLink(sub, institution, studentId) {
     return this.getLinks(sub).some(
-      (l) => l.institution === String(institution) && l.studentId === String(studentId)
+      (l) => l.institution === String(institution) && l.studentId === String(studentId),
     );
   }
 
@@ -410,7 +410,7 @@ export class WalletAccountService {
   /** Remotely deactivate an account and invalidate every refresh token. */
   deactivateAccount(sub) {
     const result = this.db.prepare('UPDATE wallet_accounts SET active = 0 WHERE sub = ?').run(sub);
-    if (result.changes === 0) throw new Error('Account not found');
+    if (result.changes === 0) {throw new Error('Account not found');}
     this._revokeAllRefreshTokens(sub);
     return { success: true, sub, active: false };
   }
@@ -418,7 +418,7 @@ export class WalletAccountService {
   /** Reactivate an account (does not restore previously revoked refresh tokens). */
   activateAccount(sub) {
     const result = this.db.prepare('UPDATE wallet_accounts SET active = 1 WHERE sub = ?').run(sub);
-    if (result.changes === 0) throw new Error('Account not found');
+    if (result.changes === 0) {throw new Error('Account not found');}
     return { success: true, sub, active: true };
   }
 
@@ -427,7 +427,7 @@ export class WalletAccountService {
     const result = this.db
       .prepare('UPDATE wallet_accounts SET active = 0, deleted_at = ? WHERE sub = ?')
       .run(new Date().toISOString(), sub);
-    if (result.changes === 0) throw new Error('Account not found');
+    if (result.changes === 0) {throw new Error('Account not found');}
     this._revokeAllRefreshTokens(sub);
     return { success: true, sub, deleted: true };
   }
