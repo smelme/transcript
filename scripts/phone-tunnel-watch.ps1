@@ -8,7 +8,7 @@
 #   pwsh -File scripts/phone-tunnel-watch.ps1
 
 param(
-    [int[]]$Ports = @(3000, 3001, 3002, 3003, 3004),
+    [int[]]$Ports = @(3000, 3001, 3002, 3003, 3004, 3007),
     [int]$IntervalSeconds = 5
 )
 

@@ -88,6 +88,20 @@ foreach ($service in $services) {
   Write-Host ("  {0,-6} {1,-28} {2}" -f $service.Port, $service.Dir, $state)
 }
 
+# If a phone is attached, restore its USB tunnels now. `adb reverse` mappings are cleared whenever
+# the adb server restarts or the cable is reconnected, and the wallet is built against
+# http://127.0.0.1:3000 — so without this the wallet reports "failed to connect to /127.0.0.1:3000"
+# even though every service is running.
+$adb = Join-Path $env:LOCALAPPDATA 'Android\Sdk\platform-tools\adb.exe'
+if (Test-Path $adb) {
+  $deviceState = (& $adb get-state 2>$null) -join ''
+  if ($deviceState -eq 'device') {
+    $phonePorts = @(3000, 3001, 3002, 3003, 3004, 3007)
+    foreach ($port in $phonePorts) { & $adb reverse "tcp:$port" "tcp:$port" | Out-Null }
+    Write-Host "`nPhone detected: USB tunnels restored for $($phonePorts -join ', ')." -ForegroundColor Green
+  }
+}
+
 Write-Host @"
 
 Demo URLs
