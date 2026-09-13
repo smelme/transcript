@@ -61,6 +61,11 @@ data class CredentialSummary(
      */
     val programmeTitle: String = "",
     val awardTitle: String = "",
+    /**
+     * The day the issuer signed the credential, which is not the day the study ended. Until this
+     * existed, the card dated the credential by the graduation date and labelled it "Issued".
+     */
+    val issueDate: String = "",
     /** From the transcript namespace, which a qualification credential does not carry. */
     val courseCount: Int = 0,
     val totalCredits: Int = 0,

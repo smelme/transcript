@@ -193,6 +193,19 @@ function isoDate(year, month, day) {
 }
 
 /**
+ * Today, as `YYYY-MM-DD`.
+ *
+ * A credential's issue date is the day it is issued, not a date derived from the study: an
+ * academy that issues a 2023 graduate a credential today issues a document dated today. This is
+ * what the issue date and the academic record's `document_issued_at` are set from, so every path
+ * that generates a record - the academy app, a client organisation calling the API, a script -
+ * dates its credentials to the day the request was made.
+ */
+function todayIso() {
+  return new Date().toISOString().slice(0, 10);
+}
+
+/**
  * The document type both credential kinds are issued under: a photo-ID document carrying
  * the holder's personal components.
  */
@@ -342,7 +355,7 @@ function pickLetterGrade(rng) {
  * what a presentation can disclose.
  *
  * @param {{ institution: string, studentId: string, fullName?: string, include?: string,
- *   recognition?: boolean }} input
+ *   recognition?: boolean, issueDate?: string }} input
  * @returns {{ records: Array<{ kind: string, label: string, docType: string,
  *   academicNamespace: string, recognition: boolean, credentialData: object, display: object }> }}
  */
@@ -352,6 +365,9 @@ export function generateAcademicRecord({
   fullName,
   include = DEFAULT_KIND,
   recognition = true,
+  // Defaults to the day the record is generated. Only a caller that is generating a record on
+  // behalf of another date - a test fixture, or a back-dated record - should pass one.
+  issueDate = todayIso(),
 }) {
   const rng = makeRng(seedFrom(institution, studentId));
 
@@ -368,7 +384,8 @@ export function generateAcademicRecord({
   const graduationMonth = 6 + Math.floor(rng() * 2); // Jun/Jul
   const graduationDate = isoDate(graduationYear, graduationMonth, 30);
 
-  const issueDate = isoDate(graduationYear, Math.min(12, graduationMonth + 1), 15);
+  // The identity document expires ten years after the study ended, which is a property of the
+  // document rather than of the day it was issued.
   const expiryYear = graduationYear + 10;
   const expiryDate = isoDate(expiryYear, graduationMonth, 30);
 

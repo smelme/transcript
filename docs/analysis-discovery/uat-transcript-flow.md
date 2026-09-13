@@ -301,6 +301,7 @@ them turned up more than the findings themselves listed. The work is on `refacto
 | UAT-013 / P1-06 | `X-Robots-Tag: noindex, nofollow` on all four apps plus a `robots.txt` each; `/.well-known/` allowed so App Links verification still works. |
 | UAT-014 / P1-06 | One date shape wherever a person reads one — the share view, the shared PDF and the verification result — and date claims normalised to `YYYY-MM-DD` at the verifier's API boundary. |
 | UAT-001, 003, 005–010 | Closed in iteration 1. |
+| UAT-015 | The wallet card carried a line reading "Issued &lt;date&gt;" built from the **graduation** date, and the issuer derived `issue_date` from the graduation too rather than dating a credential to the day it was issued. Both are wrong in the same way: a credential is issued when it is issued. `issue_date` and the academic record's `document_issued_at` are now the day the record is generated, and the card shows the credential's own issue date, with the graduation date left as its own fact. |
 
 ## What the "cannot install" finding actually hid
 
@@ -343,7 +344,6 @@ Run in the order CI runs them, on a clean install from the committed lockfile:
 | `db:reset` / `db:seed`, including both refusal guards | Behave as specified |
 
 ## Notes for the next pass
-
 - A local `issuer-service/.env` (gitignored, holding a real Brevo key) changes whether the demo can
   sign anyone in, because the one-time code is only returned when the send *fails*. This cost real
   time here: the whole scenario suite failed on a freshly reset database and looked like a

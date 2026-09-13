@@ -41,6 +41,9 @@ class MdocParserTest {
         item("given_name", CborCodec.encode("Tessa")),
         item("family_name", CborCodec.encode("Novak")),
         item("issuing_authority", CborCodec.encode("Smart Academy")),
+        // The identity document carries the day the credential was signed, which is what the
+        // card means by "Issued" - it is not the day the study ended.
+        item("issue_date", CborCodec.encode("2026-09-13")),
     )
 
     @Test
@@ -78,6 +81,11 @@ class MdocParserTest {
             summary?.programmeTitle,
         )
         assertEquals("Bachelor of Arts", summary?.awardTitle)
+        assertEquals(
+            "the issue date comes from the document, not from the graduation",
+            "2026-09-13",
+            summary?.issueDate,
+        )
         assertEquals("a transcript carries no award fields", "", summary?.degreeLevel)
     }
 

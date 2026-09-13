@@ -208,6 +208,7 @@ class SecureStore(context: Context) {
                 .put("fieldOfStudy", summary.fieldOfStudy)
                 .put("programmeTitle", summary.programmeTitle)
                 .put("awardTitle", summary.awardTitle)
+                .put("issueDate", summary.issueDate)
                 .put("courseCount", summary.courseCount)
                 .put("totalCredits", summary.totalCredits)
                 .put("completionStatus", summary.completionStatus)
@@ -232,6 +233,7 @@ class SecureStore(context: Context) {
                 // healed by the registry the next time the credential is parsed.
                 programmeTitle = value.optString("programmeTitle"),
                 awardTitle = value.optString("awardTitle"),
+                issueDate = value.optString("issueDate"),
                 courseCount = value.optInt("courseCount"),
                 totalCredits = value.optInt("totalCredits"),
                 completionStatus = value.optString("completionStatus"),

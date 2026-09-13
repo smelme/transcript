@@ -58,6 +58,46 @@ test('Credential kinds - a transcript is its own credential', () => {
   assert.ok(records[0].credentialData.full_name, 'the personal components travel with it');
 });
 
+test('Credential dates - a credential is issued on the day it is generated', () => {
+  const today = new Date().toISOString().slice(0, 10);
+  const { records } = generateAcademicRecord({
+    institution: 'Smart Academy',
+    studentId: 'SA-DATE1',
+    include: 'transcript',
+  });
+
+  assert.strictEqual(
+    records[0].credentialData.issue_date,
+    today,
+    'the issue date is the day the credential was generated, not a date derived from the study',
+  );
+  assert.notStrictEqual(
+    records[0].credentialData.issue_date,
+    records[0].credentialData.education_transcript.enrolment_end,
+    'the issue date and the graduation date are different facts',
+  );
+  assert.strictEqual(
+    records[0].credentialData.education_academic_record?.document_issued_at,
+    today,
+    'the record dates its own document to the same day',
+  );
+});
+
+test('Credential dates - a caller may state the issue date it is issuing for', () => {
+  const { records } = generateAcademicRecord({
+    institution: 'Smart Academy',
+    studentId: 'SA-DATE2',
+    include: 'transcript',
+    issueDate: '2025-03-24',
+  });
+
+  assert.strictEqual(records[0].credentialData.issue_date, '2025-03-24');
+  assert.strictEqual(
+    records[0].credentialData.education_academic_record?.document_issued_at,
+    '2025-03-24',
+  );
+});
+
 test('Credential kinds - both means two credentials, one per kind', () => {
   const { records } = generateAcademicRecord({
     institution: 'Smart Academy',

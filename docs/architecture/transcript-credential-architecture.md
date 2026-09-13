@@ -192,6 +192,16 @@ The aggregates are computed rather than asserted: `quality_points` is the sum of
 credit hours), the average is that sum over the credits counted, and `average_weighting` says
 credit-weighted. A reader can check the arithmetic instead of trusting the number.
 
+**The issue date is the day of issuance, not a date derived from the study.** `issue_date` (photo-ID
+namespace) and `document_issued_at` (academic record) are set to the day the record is generated,
+so every path that issues - the academy app, a client organisation calling the API, a script - dates
+its credentials to the day the request was made; an academy issuing a 2023 graduate a credential
+today issues a document dated today. `generateAcademicRecord` accepts an explicit `issueDate` for
+the cases that genuinely need one (a test fixture, a back-dated record) and nothing else may set it,
+because the issuance date is the issuer's fact rather than the caller's. The credential's expiry is
+a property of the document and is left derived from the study's end, which is a separate question
+still to be settled with the academy.
+
 What the academy still owns, and supplies later: its real scale, pass mark and result words; its
 credit scheme; its programme titles, award titles and CIP mappings; its institution identifier; its
 term calendar; and the student id scheme (a national identifier would change the namespace

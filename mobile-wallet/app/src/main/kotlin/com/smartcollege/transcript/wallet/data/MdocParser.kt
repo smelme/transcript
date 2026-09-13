@@ -40,6 +40,9 @@ object MdocParser {
             fieldOfStudy = qualification["field_of_study"] as? String ?: "",
             programmeTitle = programmeTitle,
             awardTitle = awardTitle,
+            // The identity document's own issue date: when this credential was signed, which is
+            // what "issued" means on the card.
+            issueDate = photoId["issue_date"] as? String ?: "",
             courseCount = countCourses(transcript["courses"]),
             totalCredits = wholeNumber(transcript["total_credits"]),
             completionStatus = transcript["status"] as? String ?: "",

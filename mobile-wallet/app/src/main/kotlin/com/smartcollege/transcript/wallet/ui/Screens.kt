@@ -325,7 +325,9 @@ private fun CredentialCard(
             summary?.fieldOfStudy?.takeIf { it.isNotBlank() },
         ).joinToString(" · ")
     }
-    val issuedDate = formatDate(summary?.graduationDate)
+    // When the credential was signed, which is what "Issued" means. The graduation date is a
+    // different fact and is shown as its own row.
+    val issuedDate = formatDate(summary?.issueDate)
     val cardColor = institutionColor(institution)
 
     Card(
@@ -444,7 +446,7 @@ fun CredentialDetailScreen(
             summary?.fieldOfStudy?.takeIf { it.isNotBlank() },
         ).joinToString(" · ")
     }
-    val issuedDate = formatDate(summary?.graduationDate)
+    val issuedDate = formatDate(summary?.issueDate)
     val cardColor = institutionColor(institution)
 
     Scaffold(
@@ -541,6 +543,7 @@ fun CredentialDetailScreen(
                     // holder can tell two transcripts apart without opening either.
                     DetailRow("Programme", summary?.programmeTitle)
                     DetailRow("Award", summary?.awardTitle)
+                    DetailRow("Issued", issuedDate)
                     if (isTranscript) {
                         // A transcript credential carries no qualification namespace, so these
                         // are the figures it actually holds rather than blank award fields.
