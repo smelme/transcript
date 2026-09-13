@@ -206,6 +206,8 @@ class SecureStore(context: Context) {
                 .put("graduationDate", summary.graduationDate)
                 .put("kind", summary.kind)
                 .put("fieldOfStudy", summary.fieldOfStudy)
+                .put("programmeTitle", summary.programmeTitle)
+                .put("awardTitle", summary.awardTitle)
                 .put("courseCount", summary.courseCount)
                 .put("totalCredits", summary.totalCredits)
                 .put("completionStatus", summary.completionStatus)
@@ -226,6 +228,10 @@ class SecureStore(context: Context) {
                 // read as unknown rather than assumed to be the qualification it was not.
                 kind = value.optString("kind").ifBlank { AcademicNamespaces.KIND_UNKNOWN },
                 fieldOfStudy = value.optString("fieldOfStudy"),
+                // A summary written before the programme was read has neither field, and is
+                // healed by the registry the next time the credential is parsed.
+                programmeTitle = value.optString("programmeTitle"),
+                awardTitle = value.optString("awardTitle"),
                 courseCount = value.optInt("courseCount"),
                 totalCredits = value.optInt("totalCredits"),
                 completionStatus = value.optString("completionStatus"),

@@ -144,6 +144,45 @@ class CredentialRegistryTest {
     }
 
     @Test
+    fun `names the qualification a transcript belongs to`() {
+        val entry = CredentialRegistry.buildCredentialEntry(
+            credentialId = "8af0f2b1-0000-4000-8000-000000000003",
+            mdocBase64Url = academicMdoc(),
+            summary = CredentialSummary(
+                fullName = "Tessa Novak",
+                institution = "Smart Academy",
+                kind = AcademicNamespaces.KIND_TRANSCRIPT,
+                programmeTitle = "Bachelor of Psychology",
+                awardTitle = "Bachelor of Arts",
+                courseCount = 3,
+                totalCredits = 24,
+            ),
+        )
+
+        // Without this, two transcripts look identical in the wallet and the holder cannot tell
+        // which qualification either one is for.
+        assertEquals(
+            "Smart Academy · Bachelor of Psychology · 3 courses · 24 credits",
+            entry["subtitle"],
+        )
+    }
+
+    @Test
+    fun `falls back to the award when a transcript states no programme title`() {
+        val entry = CredentialRegistry.buildCredentialEntry(
+            credentialId = "8af0f2b1-0000-4000-8000-000000000004",
+            mdocBase64Url = academicMdoc(),
+            summary = CredentialSummary(
+                institution = "Smart Academy",
+                kind = AcademicNamespaces.KIND_TRANSCRIPT,
+                awardTitle = "Bachelor of Arts",
+            ),
+        )
+
+        assertEquals("Smart Academy · Bachelor of Arts", entry["subtitle"])
+    }
+
+    @Test
     fun `an unlabelled credential is shown as an academic credential`() {
         val entry = CredentialRegistry.buildCredentialEntry(
             credentialId = "8af0f2b1-0000-4000-8000-000000000002",

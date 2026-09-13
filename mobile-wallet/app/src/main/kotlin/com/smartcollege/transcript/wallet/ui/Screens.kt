@@ -311,8 +311,11 @@ private fun CredentialCard(
     val kind = summary?.kind ?: AcademicNamespaces.KIND_UNKNOWN
     val title = AcademicNamespaces.labelOf(kind)
     val isTranscript = kind == AcademicNamespaces.KIND_TRANSCRIPT
+    // A transcript is named by the qualification it belongs to, then the figures it holds.
     val detail = if (isTranscript) {
         listOfNotNull(
+            summary?.programmeTitle?.takeIf { it.isNotBlank() }
+                ?: summary?.awardTitle?.takeIf { it.isNotBlank() },
             summary?.courseCount?.takeIf { it > 0 }?.let { "$it courses" },
             summary?.totalCredits?.takeIf { it > 0 }?.let { "$it credits" },
         ).joinToString(" · ")
@@ -430,6 +433,8 @@ fun CredentialDetailScreen(
     val isTranscript = kind == AcademicNamespaces.KIND_TRANSCRIPT
     val title = if (isTranscript) {
         listOfNotNull(
+            summary?.programmeTitle?.takeIf { it.isNotBlank() }
+                ?: summary?.awardTitle?.takeIf { it.isNotBlank() },
             summary?.courseCount?.takeIf { it > 0 }?.let { "$it courses" },
             summary?.totalCredits?.takeIf { it > 0 }?.let { "$it credits" },
         ).joinToString(" · ")
@@ -532,6 +537,10 @@ fun CredentialDetailScreen(
                     DetailRow("Kind", AcademicNamespaces.labelOf(kind))
                     DetailRow("Name", summary?.fullName)
                     DetailRow("Institution", summary?.institution)
+                    // Which qualification the study was for. A transcript states this itself, so a
+                    // holder can tell two transcripts apart without opening either.
+                    DetailRow("Programme", summary?.programmeTitle)
+                    DetailRow("Award", summary?.awardTitle)
                     if (isTranscript) {
                         // A transcript credential carries no qualification namespace, so these
                         // are the figures it actually holds rather than blank award fields.

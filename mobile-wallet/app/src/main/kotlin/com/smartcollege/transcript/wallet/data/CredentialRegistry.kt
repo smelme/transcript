@@ -102,7 +102,15 @@ object CredentialRegistry {
      */
     private fun summaryOf(store: SecureStore, credentialId: String, mdocBase64Url: String): CredentialSummary? {
         val stored = store.credentialSummary(credentialId)
-        if (stored != null && stored.kind != AcademicNamespaces.KIND_UNKNOWN) return stored
+        // A stored summary is reused only when it already answers what the card shows. A record
+        // written before the kinds existed has no kind, and one written before the programme was
+        // read cannot name the qualification a transcript belongs to - both are re-read from the
+        // mdoc once and saved back. A credential with no academic namespace has no programme to
+        // find, so it is simply re-read on each build, as it always was.
+        val answersEverything = stored != null &&
+            stored.kind != AcademicNamespaces.KIND_UNKNOWN &&
+            stored.programmeTitle.isNotBlank()
+        if (answersEverything) return stored
         val parsed = MdocParser.readCredentialSummary(mdocBase64Url)
         if (parsed != null) store.saveCredentialSummary(credentialId, parsed)
         return parsed ?: stored
@@ -128,6 +136,12 @@ object CredentialRegistry {
         val parts = mutableListOf<String>()
         summary.institution.takeIf { it.isNotBlank() }?.let { parts += it }
         if (summary.kind == AcademicNamespaces.KIND_TRANSCRIPT) {
+            // Which qualification the transcript is for, first: a holder with a transcript for a
+            // degree and one for a diploma can otherwise not tell them apart.
+            summary.programmeTitle
+                .ifBlank { summary.awardTitle }
+                .takeIf { it.isNotBlank() }
+                ?.let { parts += it }
             if (summary.courseCount > 0) parts += "${summary.courseCount} courses"
             if (summary.totalCredits > 0) parts += "${summary.totalCredits} credits"
         } else {

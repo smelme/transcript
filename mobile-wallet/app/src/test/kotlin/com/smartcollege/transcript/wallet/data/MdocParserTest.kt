@@ -57,6 +57,10 @@ class MdocParserTest {
                             CborCodec.encode("""[{"courseCode":"CS101"},{"courseCode":"CS210"},{"courseCode":"MA110"}]"""),
                         ),
                         item("status", CborCodec.encode("completed")),
+                        // A transcript is issued on its own, so it states which qualification the
+                        // study was for rather than leaving the holder to guess.
+                        item("programme_title", CborCodec.encode("Bachelor of Psychology")),
+                        item("award_title", CborCodec.encode("Bachelor of Arts")),
                     ),
                 )
             )
@@ -68,6 +72,12 @@ class MdocParserTest {
         assertEquals(3, summary?.courseCount ?: -1)
         assertEquals(27, summary?.totalCredits ?: -1)
         assertEquals("completed", summary?.completionStatus)
+        assertEquals(
+            "the transcript names the qualification it belongs to",
+            "Bachelor of Psychology",
+            summary?.programmeTitle,
+        )
+        assertEquals("Bachelor of Arts", summary?.awardTitle)
         assertEquals("a transcript carries no award fields", "", summary?.degreeLevel)
     }
 
@@ -82,6 +92,8 @@ class MdocParserTest {
                         item("degree_level", CborCodec.encode("Master")),
                         item("field_of_study", CborCodec.encode("Data Science")),
                         item("graduation_date", CborCodec.encode("2025-06-30")),
+                        item("programme_title", CborCodec.encode("Master of Data Science")),
+                        item("award_title", CborCodec.encode("Master of Science")),
                     ),
                 )
             )
@@ -91,6 +103,8 @@ class MdocParserTest {
         assertEquals("Master", summary?.degreeLevel)
         assertEquals("Data Science", summary?.fieldOfStudy)
         assertEquals("2025-06-30", summary?.graduationDate)
+        assertEquals("Master of Data Science", summary?.programmeTitle)
+        assertEquals("Master of Science", summary?.awardTitle)
         assertEquals("a qualification carries no course list", 0, summary?.courseCount ?: -1)
         assertEquals(0, summary?.totalCredits ?: -1)
     }

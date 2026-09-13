@@ -147,9 +147,10 @@ Decided before implementing, because it changes where every new element goes:
 
 1. **Done** — Tier 1 claim set in the generator and the mdoc builder, with unit tests asserting the
    scheme accompanies every mark and that the aggregates are separately disclosable.
-2. **Partly** — the share categories request the new elements and Trust University renders them; the
-   wallet and the portal still show only the kind, module count and credits, which is outstanding UI
-   work in P0-17 and P0-20.
+2. **Partly** — the share categories request the new elements and Trust University renders them. The
+   wallet now names the qualification a transcript belongs to, on the tile and in the detail view
+   (2026-09-13, below). The portal still shows only the kind: its credentials table has no programme
+   column, and the list it reads does not carry one yet.
 3. Tier 2 claim set — **implemented behind the `recognition` option with demo samples**; the
    academy's own values replace `RECOGNITION_SAMPLES` when it supplies them.
 4. Trust University renders the richer transcript (_P0-19_) — done with this story.
@@ -179,12 +180,18 @@ Acceptance criteria, as implemented:
    `overall_mark_scale_id` and `outcome` are elements beside `courses`, not inside it, so a holder
    can disclose the summary without the module list.
 5. **Met** — `status` is still emitted, and a credential without the new elements still verifies.
-6. **Partly** — the wallet shows the kind, module count and credits and the portal shows the kind;
-   showing the programme and the outcome beside them is outstanding UI work in P0-17 and P0-20.
+6. **Partly** — the wallet names the qualification a transcript belongs to, and the outcome remains
+   outstanding there; the portal shows the kind only, so a programme column is still to come. A
+   transcript tile previously read "Academic transcript - Tessa Novak · Smart Academy · 5 courses ·
+   14 credits", which does not say which qualification the transcript is for - the one thing a
+   holder with two of them needs in order to choose. It now reads "Academic transcript - Tessa
+   Novak · Smart Academy · Bachelor of Psychology · 5 courses · 14 credits", and the detail view
+   carries Programme and Award rows. A summary stored before this change is re-read from the mdoc
+   once and saved back, so credentials already in a wallet gain it without being claimed again.
 7. **Met** — Trust University renders the institution, programme, award, credits earned, the average
    with its scale, and the module table, all from verified claims.
 8. **Met** — revocation, status-list and selective-disclosure behaviour are untouched: 73 issuer,
-   61 verifier and 27 wallet tests pass, with both share smoke tests and the academy flow.
+   61 verifier and 29 wallet tests pass, with both share smoke tests and the academy flow.
 9. **Met** — every value states its scheme and each total is per scheme: the core names
    `credit_scheme`, the supplement names `credit_hours_scheme`, and neither converts.
 10. **Met** — the core is requestable on its own, and the supplement is a separate namespace a

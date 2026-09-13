@@ -24,6 +24,13 @@ object MdocParser {
 
         val givenName = photoId["given_name"] as? String
         val familyName = photoId["family_name"] as? String
+        // The programme and its award are read from whichever namespace carries them. A
+        // qualification states them, and so does a transcript - which is issued on its own, so
+        // without this the holder cannot tell which qualification a transcript belongs to.
+        val programmeTitle =
+            (qualification["programme_title"] ?: transcript["programme_title"]) as? String ?: ""
+        val awardTitle =
+            (qualification["award_title"] ?: transcript["award_title"]) as? String ?: ""
         CredentialSummary(
             fullName = listOfNotNull(givenName, familyName).joinToString(" "),
             institution = (qualification["institution_name"] ?: photoId["issuing_authority"]) as? String ?: "",
@@ -31,6 +38,8 @@ object MdocParser {
             graduationDate = qualification["graduation_date"] as? String ?: "",
             kind = AcademicNamespaces.kindOf(present),
             fieldOfStudy = qualification["field_of_study"] as? String ?: "",
+            programmeTitle = programmeTitle,
+            awardTitle = awardTitle,
             courseCount = countCourses(transcript["courses"]),
             totalCredits = wholeNumber(transcript["total_credits"]),
             completionStatus = transcript["status"] as? String ?: "",

@@ -54,6 +54,13 @@ data class CredentialSummary(
      */
     val kind: String = AcademicNamespaces.KIND_UNKNOWN,
     val fieldOfStudy: String = "",
+    /**
+     * Which programme the study was for, and the award it leads to. A transcript states both in
+     * its own namespace, because a transcript can be issued on its own - and "Academic transcript
+     * - Tessa Novak" does not tell a holder with two of them which qualification either belongs to.
+     */
+    val programmeTitle: String = "",
+    val awardTitle: String = "",
     /** From the transcript namespace, which a qualification credential does not carry. */
     val courseCount: Int = 0,
     val totalCredits: Int = 0,
