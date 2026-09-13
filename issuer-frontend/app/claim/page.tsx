@@ -36,7 +36,15 @@ function ClaimFlow() {
   const [devOtp, setDevOtp] = useState<string | null>(null);
   const [token, setToken] = useState<string | null>(null);
   const [credentials, setCredentials] = useState<AcademyCredential[] | null>(null);
-  const [selected, setSelected] = useState<string | null>(null);
+  /** Everything ticked on step 2. Both is the usual answer, so this is a list, not a choice. */
+  const [selectedIds, setSelectedIds] = useState<string[]>([]);
+  /** Still to hand over, in order. The wallet claims one offer per scan, so they are walked
+   *  through one at a time rather than pretending a single action adds them all. */
+  const [queue, setQueue] = useState<string[]>([]);
+  /** The credential whose offer is currently on screen. */
+  const [current, setCurrent] = useState<string | null>(null);
+  /** Handed over in this visit, including any the wallet already held. */
+  const [added, setAdded] = useState<string[]>([]);
   const [offer, setOffer] = useState<{ qrDataUrl?: string; offerUrl?: string; appLinkUrl?: string | null } | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -56,8 +64,14 @@ function ClaimFlow() {
     const list = await listAcademyCredentials(accessToken);
     if (!list.success) throw new Error(list.error || 'Could not load your credentials');
     setCredentials(list.credentials || []);
-    const available = (list.credentials || []).filter((c) => !c.inWallet);
-    setSelected(available[0]?.sessionId || null);
+    // Tick everything not already in the wallet: a holder asking for a transcript usually asked
+    // for the qualification too, and the previous behaviour of adding one per visit meant
+    // starting over for the second.
+    const available = (list.credentials || []).filter((c) => !c.inWallet).map((c) => c.sessionId);
+    setSelectedIds((currentSelection) => {
+      const kept = currentSelection.filter((id) => available.includes(id));
+      return kept.length ? kept : available;
+    });
   }, []);
 
   /** What the holder is being shown: what they asked for, unless they asked to see everything. */
@@ -65,15 +79,31 @@ function ClaimFlow() {
     (credential) => showAll || !requestedKinds || requestedKinds.includes(credential.kind),
   );
 
-  // Keep the selection on something visible: after filtering, the previously selected credential
-  // may no longer be on screen.
+  // Keep the selection on what is on screen: after filtering, a previously ticked credential may
+  // no longer be shown. The state is only replaced when something actually changed, so this cannot
+  // loop.
   useEffect(() => {
     if (!credentials) return;
-    if (visibleCredentials.some((credential) => credential.sessionId === selected)) return;
-    setSelected(
-      visibleCredentials.find((credential) => !credential.inWallet)?.sessionId || null,
+    const selectable = new Set(
+      visibleCredentials.filter((credential) => !credential.inWallet).map((c) => c.sessionId),
     );
-  }, [credentials, showAll, selected]);
+    setSelectedIds((currentSelection) => {
+      const kept = currentSelection.filter((id) => selectable.has(id));
+      return kept.length === currentSelection.length ? currentSelection : kept;
+    });
+  }, [credentials, showAll]);
+
+  /** Tick or untick one credential. */
+  function toggle(sessionId: string) {
+    setSelectedIds((currentSelection) =>
+      currentSelection.includes(sessionId)
+        ? currentSelection.filter((id) => id !== sessionId)
+        : [...currentSelection, sessionId],
+    );
+  }
+
+  /** The credentials that can still be ticked right now. */
+  const selectableCredentials = visibleCredentials.filter((credential) => !credential.inWallet);
 
   /** How a credential is named in messages: its kind, not its session id. */
   function labelFor(sessionId: string | null) {
@@ -112,33 +142,95 @@ function ClaimFlow() {
     }
   }
 
-  async function handleStartIssuance() {
-    if (!token || !selected) return;
+  /**
+   * Ask the issuer for the next credential's offer.
+   *
+   * One at a time by necessity: a wallet claims a single offer per scan, so the holder is walked
+   * through their selection instead of the page pretending one action adds them all. A credential
+   * the wallet already holds is recorded and skipped rather than stopping the run, and a failure
+   * keeps the rest of the queue so nothing has to be reselected.
+   */
+  async function startNext(remaining: string[], alreadyAdded: string[]) {
+    if (!token || !remaining.length) return;
     setBusy(true);
     setError(null);
-    setOffer(null);
+    const done = [...alreadyAdded];
+    let rest = remaining;
     try {
-      const r = await createAcademyOffer(selected, token);
-      if (!r.success) throw new Error(r.error || 'Could not start the issuance');
-      if (r.alreadyInWallet) {
-        // Idempotent by design: the wallet holds it already, so nothing is issued again.
-        await loadCredentials(token);
-        setError(`Your ${labelFor(selected)} is already in your wallet.`);
+      while (rest.length) {
+        const [next, ...tail] = rest;
+        setCurrent(next);
+        const r = await createAcademyOffer(next, token);
+        if (!r.success) throw new Error(r.error || 'Could not start the issuance');
+        if (r.alreadyInWallet) {
+          // Idempotent by design: the wallet holds it already, so nothing is issued again.
+          setError(`Your ${labelFor(next)} is already in your wallet.`);
+          done.push(next);
+          rest = tail;
+          continue;
+        }
+        setAdded(done);
+        setQueue(tail);
+        setOffer({ qrDataUrl: r.qrDataUrl, offerUrl: r.offerUrl, appLinkUrl: r.appLinkUrl });
         return;
       }
-      setOffer({ qrDataUrl: r.qrDataUrl, offerUrl: r.offerUrl, appLinkUrl: r.appLinkUrl });
+      // Everything selected was already held: nothing left to hand over.
+      setAdded(done);
+      setQueue([]);
+      setCurrent(null);
+      setOffer(null);
     } catch (err) {
       setError((err as Error).message);
-      // A failure for one credential must not stop the other: refresh the list so the
-      // student can see what is still available and try again.
+      setQueue(rest);
+      // A failure for one credential must not lose the others: keep them queued and refresh the
+      // list so the holder can see what is still available.
       await loadCredentials(token).catch(() => undefined);
     } finally {
       setBusy(false);
     }
   }
 
-  const selectedCredential = (credentials || []).find((c) => c.sessionId === selected) || null;
-  const step = offer ? 3 : credentials ? 2 : codeSent ? 2 : 1;
+  /** Start handing over everything ticked on step 2. */
+  async function handleStartAdding() {
+    if (!token || !selectedIds.length) return;
+    setAdded([]);
+    setError(null);
+    await startNext(selectedIds, []);
+  }
+
+  /** The holder has added the credential on screen: move to the next one, or finish. */
+  async function handleAddedCurrent() {
+    if (!token || busy) return;
+    setBusy(true);
+    const done = current ? [...added, current] : added;
+    setAdded(done);
+    setOffer(null);
+    setCurrent(null);
+    try {
+      await loadCredentials(token).catch(() => undefined);
+      if (queue.length) {
+        await startNext(queue, done);
+      } else {
+        setQueue([]);
+      }
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  /** Go back to the list without losing the rest of the queue. */
+  function handleBackToSelection() {
+    if (current) setQueue((pending) => [current, ...pending]);
+    setOffer(null);
+    setCurrent(null);
+    if (token) loadCredentials(token).catch(() => undefined);
+  }
+
+  /** How many credentials this visit covers, and where the holder is in that list. */
+  const totalThisVisit = added.length + (current ? 1 : 0) + queue.length;
+  const positionThisVisit = current ? added.length + 1 : added.length;
+  const finished = added.length > 0 && !offer && !queue.length && !current;
+  const step = offer || finished ? 3 : credentials ? 2 : codeSent ? 2 : 1;
 
   return (
     <section className="section" style={{ minHeight: '62vh' }}>
@@ -234,15 +326,15 @@ function ClaimFlow() {
           </>
         )}
 
-        {credentials && !offer && (
+        {credentials && !offer && !finished && (
           <>
             <h1 style={{ fontSize: 30, letterSpacing: '-0.02em', margin: '14px 0 12px' }}>
               Your credentials
             </h1>
             <p style={{ fontSize: 16, lineHeight: 1.65, color: 'var(--muted)', marginBottom: 28 }}>
               {requestedKinds && !showAll
-                ? `You asked for ${requestedKinds.map((kind) => (kind === 'transcript' ? 'an academic transcript' : 'your qualification certificate')).join(' and ')}. Add it to your wallet whenever you are ready.`
-                : 'Select a credential to add to your wallet. You can add the rest later.'}
+                ? `You asked for ${requestedKinds.map((kind) => (kind === 'transcript' ? 'an academic transcript' : 'your qualification certificate')).join(' and ')}. Tick what you want and add it — both can be added in one visit.`
+                : 'Tick what you want to add. Both is fine: you will be taken through them one at a time.'}
             </p>
 
             {credentials.length === 0 ? (
@@ -270,12 +362,31 @@ function ClaimFlow() {
               </div>
             ) : (
               <div
-                role="radiogroup"
-                aria-label="Choose a credential to add to your wallet"
+                role="group"
+                aria-label="Choose the credentials to add to your wallet"
                 style={{ display: 'grid', gap: 14, marginBottom: 26 }}
               >
+                {selectableCredentials.length > 1 && (
+                  <p style={{ margin: 0 }}>
+                    <button
+                      type="button"
+                      className="btn btn-outline"
+                      onClick={() =>
+                        setSelectedIds(
+                          selectedIds.length === selectableCredentials.length
+                            ? []
+                            : selectableCredentials.map((credential) => credential.sessionId),
+                        )
+                      }
+                    >
+                      {selectedIds.length === selectableCredentials.length
+                        ? 'Clear selection'
+                        : `Select all ${selectableCredentials.length}`}
+                    </button>
+                  </p>
+                )}
                 {visibleCredentials.map((c) => {
-                  const isSelected = selected === c.sessionId;
+                  const isSelected = selectedIds.includes(c.sessionId);
                   return (
                     <label
                       key={c.sessionId}
@@ -284,12 +395,11 @@ function ClaimFlow() {
                     >
                       <input
                         className="checkbox"
-                        type="radio"
-                        name="credential"
+                        type="checkbox"
                         value={c.sessionId}
                         checked={isSelected}
                         disabled={c.inWallet}
-                        onChange={() => !c.inWallet && setSelected(c.sessionId)}
+                        onChange={() => !c.inWallet && toggle(c.sessionId)}
                       />
                       <div style={{ flex: 1 }}>
                         <h3>
@@ -323,16 +433,22 @@ function ClaimFlow() {
               <button
                 type="button"
                 className="btn btn-dark"
-                onClick={handleStartIssuance}
-                disabled={busy || !selected}
+                onClick={handleStartAdding}
+                disabled={busy || selectedIds.length === 0}
               >
                 {busy
                   ? 'Preparing…'
-                  : selectedCredential
-                    ? `Add ${selectedCredential.label} to wallet`
-                    : 'Add to wallet'}
+                  : selectedIds.length > 1
+                    ? `Add ${selectedIds.length} credentials to wallet`
+                    : selectedIds.length === 1
+                      ? `Add ${labelFor(selectedIds[0])} to wallet`
+                      : 'Add to wallet'}
               </button>
-              <span className="muted">You must accept the terms to continue.</span>
+              <span className="muted">
+                {selectedIds.length > 1
+                  ? 'The wallet takes one credential at a time, so you will be taken through each in turn.'
+                  : 'You must accept the terms to continue.'}
+              </span>
             </div>
 
             {requestedKinds && !showAll && (
@@ -355,6 +471,14 @@ function ClaimFlow() {
               {isMobile && !showQr ? 'Add to your wallet' : 'Scan with your wallet'}
             </h1>
             <p style={{ fontSize: 16, lineHeight: 1.65, color: 'var(--muted)', marginBottom: 28 }}>
+              {totalThisVisit > 1 && (
+                <>
+                  <strong>
+                    Credential {positionThisVisit} of {totalThisVisit}
+                  </strong>{' '}
+                  — {labelFor(current)}.{' '}
+                </>
+              )}
               {isMobile && !showQr
                 ? 'Tap the button below to open the Quals wallet app and add this credential to your device.'
                 : 'Open the Quals wallet app, scan this code, and your credential will be added to your device.'}
@@ -374,6 +498,18 @@ function ClaimFlow() {
                   You can also scan the code from another screen.
                 </p>
                 <div style={{ marginTop: 18, display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+                  <button
+                    type="button"
+                    className="btn btn-dark"
+                    onClick={handleAddedCurrent}
+                    disabled={busy}
+                  >
+                    {busy
+                      ? 'Preparing…'
+                      : queue.length
+                        ? `Added it — next: ${labelFor(queue[0])}`
+                        : 'Added it — finish'}
+                  </button>
                   <button type="button" className="btn btn-outline" onClick={() => setShowQr(true)}>
                     Show QR code
                   </button>
@@ -384,14 +520,7 @@ function ClaimFlow() {
                   >
                     Copy offer link
                   </button>
-                  <button
-                    type="button"
-                    className="btn btn-outline"
-                    onClick={() => {
-                      setOffer(null);
-                      if (token) loadCredentials(token).catch(() => undefined);
-                    }}
-                  >
+                  <button type="button" className="btn btn-outline" onClick={handleBackToSelection}>
                     Back
                   </button>
                 </div>
@@ -419,13 +548,22 @@ function ClaimFlow() {
                     )}
                     <button
                       type="button"
-                      className="btn btn-outline"
-                      onClick={() => {
-                        setOffer(null);
-                        if (token) loadCredentials(token).catch(() => undefined);
-                      }}
+                      className="btn btn-dark"
+                      onClick={handleAddedCurrent}
+                      disabled={busy}
                     >
-                      Add another credential
+                      {busy
+                        ? 'Preparing…'
+                        : queue.length
+                          ? `Added it — next: ${labelFor(queue[0])}`
+                          : 'Added it — finish'}
+                    </button>
+                    <button
+                      type="button"
+                      className="btn btn-outline"
+                      onClick={handleBackToSelection}
+                    >
+                      Back
                     </button>
                     {offer.offerUrl && (
                       <button
@@ -440,6 +578,31 @@ function ClaimFlow() {
                 </div>
               </div>
             )}
+          </>
+        )}
+
+        {finished && (
+          <>
+            <h1 style={{ fontSize: 30, letterSpacing: '-0.02em', margin: '14px 0 12px' }}>
+              That is everything
+            </h1>
+            <p style={{ fontSize: 16, lineHeight: 1.65, color: 'var(--muted)', marginBottom: 28 }}>
+              {added.length > 1
+                ? 'Both credentials are on your device.'
+                : 'Your credential is on your device.'}
+            </p>
+            <div className="panel">
+              <h3 style={{ marginTop: 0 }}>In your wallet</h3>
+              <ul style={{ margin: '0 0 14px', paddingLeft: 18, lineHeight: 1.9 }}>
+                {added.map((sessionId) => (
+                  <li key={sessionId}>{labelFor(sessionId)}</li>
+                ))}
+              </ul>
+              <p className="muted" style={{ marginBottom: 0 }}>
+                Open the Quals wallet app to see them. This link keeps working, so you can come back
+                if you need to add something else.
+              </p>
+            </div>
           </>
         )}
 
