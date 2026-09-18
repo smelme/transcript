@@ -204,6 +204,45 @@ offline.
 
 Outstanding: the disclosure test in criterion 3, the architecture-note decision row, marking P0-15
 superseded, and a live run of the scenario suite and a device run.
+
+## Follow-up: "there is only one kind now" (2026-09-18)
+
+The academy's next instruction was that there is only one kind, so the transcript/qualification
+distinction should go. Done so far, committed as `556b4e9`:
+
+- The wallet card is titled by the holder, not by a kind label, and its detail screen has no Kind row.
+- The system credential chooser entry is the holder's name: one kind means the prefix said nothing.
+- The academy's claim card carries no kind badge (the claim link already selects by namespace).
+
+**Decision taken while the academy was unavailable**, because the two readings differ in cost and one
+of them is not safe:
+
+- The **request-time input stays**, but it now means *what the record contains* rather than which kind
+  to issue. It has to: the demo generator synthesises the award and the study from the student id, so
+  without an input saying otherwise every credential would contain both halves - and the two cases the
+  academy asked for (a short course with no transcript, a study in progress with no award) would stop
+  being representable. Removing the input is only safe once the academy supplies real data that says
+  whether an award exists and whether there are grades.
+- The **two-type modelling goes**: kinds as types, their labels, the portal's Kind column and filter,
+  and the `kind` field carried through the API, audit entries and statistics.
+
+Remaining work, in order, with the files each touches:
+
+1. **Generator** (`credential-generator.js`): delete the `CREDENTIAL_KINDS` table; keep an inclusion
+   map from the input to the claim blocks it copies; drop `kind` from a record (it keeps
+   `academicNamespaces` and a contents label); delete `kindOfCredentialData`, rename
+   `labelOfCredentialData` to something that says "contents".
+2. **Issuer** (`index.js`, `share-service.js`): the ~50 references to `kind`/`kindLabel` in audit
+   entries, the portal listing, statistics and the share flow become `academicNamespaces` plus the
+   contents label. Historical rows keep whatever they recorded; nothing is migrated.
+3. **Portal**: remove the Kind column and its filter, and the by-kind counts.
+4. **Scripts and tests**: `test-academy-flow.mjs` (17 assertions), `smoke-share-transcript.mjs`,
+   `test-client-orgs.mjs`, and the issuer tests (37 references).
+5. **Docs**: rewrite the architecture note's Rejected row for this option (it is now the selected
+   design, and the note must say that disclosure, not document count, protects the relying party),
+   mark P0-15 superseded, and add the sentence to the P0-21 verification section.
+6. **The disclosure test** (criterion 3) and the live scenario run, which remain the two things that
+   make the rest safe to trust.
 3. **Scope of this story**: confirm that the short-course (qualification only) and in-progress
    (transcript only) cases stay exactly as they are, and that `both` is the default for a completed
    programme.
