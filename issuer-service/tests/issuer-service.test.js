@@ -48,7 +48,10 @@ test('Credential kinds - a transcript is its own credential', () => {
     'org.iso.23220.photoid.1',
     'both kinds are issued as photo-ID documents',
   );
-  assert.strictEqual(records[0].academicNamespace, 'org.iso.23220.education.transcript.1');
+  assert.strictEqual(records[0].academicNamespaces.length, 2, 'the transcript and its supplement');
+  assert.ok(
+    records[0].academicNamespaces.includes('org.iso.23220.education.transcript.1'),
+  );
   assert.ok(records[0].credentialData.education_transcript, 'expected transcript data');
   assert.strictEqual(
     records[0].credentialData.education_qualification,
@@ -98,22 +101,26 @@ test('Credential dates - a caller may state the issue date it is issuing for', (
   );
 });
 
-test('Credential kinds - both means two credentials, one per kind', () => {
+test('Credential kinds - both is ONE credential holding both', () => {
   const { records } = generateAcademicRecord({
     institution: 'Smart Academy',
     studentId: 'SA-T2',
     include: 'both',
   });
-  assert.deepStrictEqual(records.map((record) => record.kind), ['qualification', 'transcript']);
-  assert.deepStrictEqual(
-    records.map((record) => record.docType),
-    ['org.iso.23220.photoid.1', 'org.iso.23220.photoid.1'],
+  assert.strictEqual(records.length, 1, 'a completed programme is one document, not two');
+  assert.strictEqual(records[0].kind, 'academic');
+  assert.strictEqual(
+    records[0].docType,
+    'org.iso.23220.photoid.1',
     'the docType does not tell the kinds apart',
   );
-  assert.deepStrictEqual(records.map((record) => record.academicNamespace), [
+  assert.deepStrictEqual(records[0].academicNamespaces, [
     'org.iso.23220.education.qualification.1',
     'org.iso.23220.education.transcript.1',
+    'org.iso.23220.education.academic-record.1',
   ]);
+  assert.ok(records[0].credentialData.education_qualification, 'the award travels with it');
+  assert.ok(records[0].credentialData.education_transcript, 'and so does the study');
 });
 
 test('Credential kinds - qualification is the default, even for an unknown choice', () => {
@@ -140,9 +147,11 @@ test('Credential kinds - the kind comes from the academic namespace, not the doc
     'academic',
     'a credential holding both is the combined academic credential issued before the choice existed',
   );
-  assert.deepStrictEqual(academicNamespacesOf({ education_transcript: {} }), [
-    'org.iso.23220.education.transcript.1',
-  ]);
+  assert.deepStrictEqual(
+    academicNamespacesOf({ education_transcript: {} }),
+    ['org.iso.23220.education.transcript.1', 'org.iso.23220.education.academic-record.1'],
+    'the US supplement rides with the transcript, as it does in the wallet',
+  );
 });
 
 test('Credential kinds - a transcript mdoc carries no qualification namespace', () => {
@@ -781,13 +790,13 @@ test('Academy request - a repeat request finds the credential it already prepare
     include: 'both',
   });
   const prepared = records.map((record) => academySession(issuer, studentId, record));
-  assert.strictEqual(sessionsFor(studentId).length, 2);
+  assert.strictEqual(sessionsFor(studentId).length, 1, 'both is one credential');
 
   const candidates = records.map((record) =>
     issuer.findIssuanceSessionsFor({
       studentId,
       institution: 'Smart Academy',
-      academicNamespace: record.academicNamespace,
+      academicNamespace: record.academicNamespaces[0],
     }),
   );
 
@@ -803,7 +812,11 @@ test('Academy request - a repeat request finds the credential it already prepare
       'and it carries the claims this request would issue, which is what makes it reusable',
     );
   }
-  assert.strictEqual(sessionsFor(studentId).length, 2, 'and nothing duplicate was created');
+  assert.strictEqual(
+    sessionsFor(studentId).length,
+    1,
+    'both is one credential, so a repeat request creates nothing duplicate',
+  );
   dropSessionsFor(studentId);
 });
 
@@ -914,7 +927,7 @@ test('Academy request - a credential prepared from older claims is replaced, not
     issuer.findIssuanceSessionsFor({
       studentId,
       institution: 'Smart Academy',
-      academicNamespace: records[0].academicNamespace,
+      academicNamespace: records[0].academicNamespaces[0],
     }),
     [],
     'a replaced credential is no longer offered',
@@ -987,6 +1000,7 @@ test('Portal - each listed credential states the kind its namespace implies', ()
   assert.strictEqual(transcript.kindLabel, 'Academic transcript');
   assert.deepStrictEqual(transcript.academicNamespaces, [
     'org.iso.23220.education.transcript.1',
+    'org.iso.23220.education.academic-record.1',
   ]);
   assert.strictEqual(
     qualification.docType,
@@ -1232,7 +1246,10 @@ test('Transcript - the US supplement is not a kind discriminator', () => {
     'transcript',
     'the transcript namespace still decides the kind',
   );
-  assert.deepStrictEqual(academicNamespacesOf(record.credentialData), [TRANSCRIPT_NS]);
+  assert.deepStrictEqual(academicNamespacesOf(record.credentialData), [
+    TRANSCRIPT_NS,
+    'org.iso.23220.education.academic-record.1',
+  ]);
   assert.ok(core.student_id, 'the holder is still identified');
 });
 

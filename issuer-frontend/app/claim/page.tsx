@@ -16,16 +16,21 @@ function ClaimFlow() {
   const invitedEmail = (params.get('email') || '').trim().toLowerCase();
 
   /**
-   * What the applicant asked for, carried in the link by the request step. The claim page shows
-   * that rather than every credential the account happens to hold from earlier requests - which is
-   * otherwise confusing after a second request, or when testing. A link without a choice (an older
-   * invitation) shows everything.
+   * What the applicant asked for, carried in the link by the request step. Compared against the
+   * namespaces a credential holds, not against its kind: a combined credential is one document
+   * holding both, so it answers a request for either one - and a student part-way through a
+   * programme who asked for both is shown the transcript-only credential they actually hold.
    */
-  const requestedKinds = (() => {
+  const requestedNamespaces = (() => {
     const include = (params.get('include') || '').trim().toLowerCase();
-    if (include === 'both') return ['qualification', 'transcript'];
-    if (include === 'transcript') return ['transcript'];
-    if (include === 'qualification') return ['qualification'];
+    if (include === 'both') {
+      return [
+        'org.iso.23220.education.qualification.1',
+        'org.iso.23220.education.transcript.1',
+      ];
+    }
+    if (include === 'transcript') return ['org.iso.23220.education.transcript.1'];
+    if (include === 'qualification') return ['org.iso.23220.education.qualification.1'];
     return null;
   })();
   const [showAll, setShowAll] = useState(false);
@@ -76,7 +81,12 @@ function ClaimFlow() {
 
   /** What the holder is being shown: what they asked for, unless they asked to see everything. */
   const visibleCredentials = (credentials || []).filter(
-    (credential) => showAll || !requestedKinds || requestedKinds.includes(credential.kind),
+    (credential) =>
+      showAll ||
+      !requestedNamespaces ||
+      (credential.academicNamespaces || []).some((namespace) =>
+        requestedNamespaces.includes(namespace),
+      ),
   );
 
   // Keep the selection on what is on screen: after filtering, a previously ticked credential may
@@ -332,9 +342,9 @@ function ClaimFlow() {
               Your credentials
             </h1>
             <p style={{ fontSize: 16, lineHeight: 1.65, color: 'var(--muted)', marginBottom: 28 }}>
-              {requestedKinds && !showAll
-                ? `You asked for ${requestedKinds.map((kind) => (kind === 'transcript' ? 'an academic transcript' : 'your qualification certificate')).join(' and ')}. Tick what you want and add it — both can be added in one visit.`
-                : 'Tick what you want to add. Both is fine: you will be taken through them one at a time.'}
+              {requestedNamespaces && !showAll
+                ? `You asked for ${requestedNamespaces.length > 1 ? 'your qualification and transcript' : requestedNamespaces[0] === 'org.iso.23220.education.transcript.1' ? 'an academic transcript' : 'your qualification certificate'}. Tick what you want and add it — a completed programme comes as one credential holding both.`
+                : 'Tick what you want to add. A completed programme is one credential holding both.'}
             </p>
 
             {credentials.length === 0 ? (
@@ -451,7 +461,7 @@ function ClaimFlow() {
               </span>
             </div>
 
-            {requestedKinds && !showAll && (
+            {requestedNamespaces && !showAll && (
               <p style={{ marginTop: 18 }}>
                 <button
                   type="button"

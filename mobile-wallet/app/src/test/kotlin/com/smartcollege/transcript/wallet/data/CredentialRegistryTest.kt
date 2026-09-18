@@ -183,6 +183,31 @@ class CredentialRegistryTest {
     }
 
     @Test
+    fun `describes a combined credential by its award and its study`() {
+        val entry = CredentialRegistry.buildCredentialEntry(
+            credentialId = "8af0f2b1-0000-4000-8000-000000000005",
+            mdocBase64Url = academicMdoc(),
+            summary = CredentialSummary(
+                fullName = "Tessa Novak",
+                institution = "Smart Academy",
+                kind = AcademicNamespaces.KIND_BOTH,
+                programmeTitle = "Bachelor of Psychology",
+                degreeLevel = "Bachelor",
+                graduationDate = "2025-06-30",
+                courseCount = 5,
+                totalCredits = 24,
+            ),
+        )
+
+        // One document holding both halves, so nothing is repeated and nothing is left out.
+        assertEquals("Qualification and transcript - Tessa Novak", entry["title"])
+        assertEquals(
+            "Smart Academy · Bachelor of Psychology · Graduated 2025-06-30 · 5 courses · 24 credits",
+            entry["subtitle"],
+        )
+    }
+
+    @Test
     fun `an unlabelled credential is shown as an academic credential`() {
         val entry = CredentialRegistry.buildCredentialEntry(
             credentialId = "8af0f2b1-0000-4000-8000-000000000002",

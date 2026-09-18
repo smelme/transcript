@@ -1,7 +1,10 @@
 # P0-22: One academic credential per holder, not one per kind
 
 **Priority:** P0 — this is the shape of the credential itself; later changes to it cost more
-**Status:** **Proposed — awaiting two decisions** (see "Decisions needed"). No code has been changed
+**Status:** **In progress — both decisions resolved 2026-09-18.** Increments 1-3 are implemented
+(generator, issuer, wallet, academy app, portal); the disclosure test (criterion 3) and the
+architecture-note rewrite are outstanding, and the end-to-end scenario suite has not been run
+against the change yet
 **Raised by:** the academy, 2026-09-18
 **Supersedes:** the split introduced by P0-15 (`P0-15-transcript-credential-type-and-choice.md`)
 **Components:** credential generator, issuer service, wallet, academy app, portal, e2e scripts,
@@ -159,15 +162,48 @@ intended outcome. The pinned-issuer and status checks are per-document and unaff
 
 ## Decisions needed
 
-1. **For a study in progress**: when the programme completes and the combined credential is issued,
-   should the earlier transcript-only credential be **superseded** (the holder ends up with one
-   current document, and the claim page stops offering the old one), or should both remain in the
-   wallet? Superseding is cleaner for the holder; keeping both preserves the transcript as it stood
-   at that date.
-2. **Revocation granularity**: is one status per combined credential acceptable, or does the academy
-   need to be able to revoke a transcript while leaving the award standing (or the reverse)? If it
-   needs that, the design changes: the status would have to be carried per namespace rather than per
-   document, which is a larger change to the status list and the signed MSO.
+Answered by the academy on 2026-09-18:
+
+1. **For a study in progress**: there will be an **operational flow to revoke the old credential**
+   and issue the new combined one. So no automatic supersede: an operator revokes through the
+   portal (which records a reason and makes verifiers reject it immediately) and the combined
+   credential is then issued. The reuse logic therefore stays as it is, and a holder's wallet keeps
+   the revoked transcript-only credential until they delete it or the combined one replaces it in
+   a reissue.
+2. **Revocation granularity**: revoking revokes the **document** - transcript, qualification and
+   personal components together - not individual namespaces. This is the simpler design, and it is
+   what the implementation assumes: one status per credential, carried in the signed MSO. The
+   per-namespace alternative is explicitly not needed.
+
+Consequences worth keeping in view: a re-issue is all-or-nothing, so correcting one mark reissues
+both halves with a new credential id and issue date; and a holder who has had a credential revoked
+will still see it in their wallet until they remove it, because the wallet cannot check status
+offline.
+
+## What has been implemented (2026-09-18)
+
+- **Generator** (`credential-generator.js`): `CREDENTIAL_KINDS` now describes three shapes -
+  `qualification`, `transcript`, `academic` - each declaring the claim blocks it copies
+  (`dataFields`) and the academic namespaces it holds (`academicNamespaces`). `requestedKinds('both')`
+  returns `['academic']`, so a request for both produces **one** record carrying the qualification,
+  transcript and academic-record blocks. `academicNamespacesOf` now reads the blocks a credential
+  actually carries, which also makes it agree with the wallet about the transcript's supplement.
+- **Issuer** (`index.js`): the per-record `academicNamespace` is now `academicNamespaces`, both in
+  the session plumbing and in the `/academy/requests` response (and therefore in the app's type).
+  The session pre-filter uses the record's first namespace; the claim-set comparison remains what
+  decides whether a credential is reusable.
+- **Wallet**: a combined credential gets its own card and detail layout showing programme, award,
+  courses, credits, outcome, graduation and issue date, and `entrySubtitle` describes it as
+  "programme · Graduated date · courses · credits" without repeating the level.
+- **Academy app**: the claim page filters by **namespace** rather than kind, which fixes a real bug
+  the change would otherwise have introduced - a combined credential is no longer `kind:
+  'transcript'`, so a student following a transcript link would have seen nothing. Copy updated.
+- **Portal**: the combined kind is filterable and labelled "Qualification and transcript".
+- **Scripts and tests**: `test-academy-flow.mjs` updated to the combined model (three checks that
+  asserted two credentials now assert one holding both namespaces); issuer tests updated.
+
+Outstanding: the disclosure test in criterion 3, the architecture-note decision row, marking P0-15
+superseded, and a live run of the scenario suite and a device run.
 3. **Scope of this story**: confirm that the short-course (qualification only) and in-progress
    (transcript only) cases stay exactly as they are, and that `both` is the default for a completed
    programme.

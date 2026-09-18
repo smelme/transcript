@@ -226,25 +226,40 @@ export const ACADEMIC_RECORD_NAMESPACE = 'org.iso.23220.education.academic-recor
 /**
  * The credential kinds this issuer offers, keyed by kind.
  *
- * Both kinds are issued under the same docType - a photo-ID document carrying the
- * holder's personal components - and are told apart by the academic namespace they
- * hold: the qualification credential carries the qualification claims, the transcript
- * credential carries the grades. A relying party selects by namespace, not by docType.
+ * Every kind is issued under the same docType - a photo-ID document carrying the holder's
+ * personal components - and they are told apart by the academic namespaces the document holds.
+ * A relying party selects by namespace, not by docType, so one document holding both academic
+ * namespaces answers either request while still disclosing only what was asked for.
+ *
+ * Three shapes, for three real situations:
+ *   qualification  a short course or a certificate, with no transcript
+ *   transcript     a study in progress, with grades but no award yet
+ *   academic       a completed programme: one document holding both
  */
 export const CREDENTIAL_KINDS = {
   qualification: {
     label: 'Qualification',
     docType: PHOTOID_DOCTYPE,
-    academicNamespace: QUALIFICATION_NAMESPACE,
-    academicField: 'education_qualification',
-    namespaces: [PHOTOID_NAMESPACE, QUALIFICATION_NAMESPACE],
+    dataFields: ['education_qualification'],
+    academicNamespaces: [QUALIFICATION_NAMESPACE],
   },
   transcript: {
     label: 'Academic transcript',
     docType: PHOTOID_DOCTYPE,
-    academicNamespace: TRANSCRIPT_NAMESPACE,
-    academicField: 'education_transcript',
-    namespaces: [PHOTOID_NAMESPACE, TRANSCRIPT_NAMESPACE],
+    // The US-practice supplement rides with the transcript: it describes the same study and the
+    // record's own standing, so a transcript without it would be missing what a registrar reads.
+    dataFields: ['education_transcript', 'education_academic_record'],
+    academicNamespaces: [TRANSCRIPT_NAMESPACE, ACADEMIC_RECORD_NAMESPACE],
+  },
+  academic: {
+    label: 'Qualification and transcript',
+    docType: PHOTOID_DOCTYPE,
+    dataFields: [
+      'education_qualification',
+      'education_transcript',
+      'education_academic_record',
+    ],
+    academicNamespaces: [QUALIFICATION_NAMESPACE, TRANSCRIPT_NAMESPACE, ACADEMIC_RECORD_NAMESPACE],
   },
 };
 
@@ -252,13 +267,14 @@ export const DEFAULT_KIND = 'qualification';
 
 /**
  * The kinds a request asks for: `qualification` (the default and historic behaviour),
- * `transcript`, or `both`. Anything unrecognised is treated as `qualification` rather
- * than rejected here, so a typo cannot silently issue two credentials.
+ * `transcript`, or `both` - one document holding both, which is what a completed programme is
+ * issued as. Anything unrecognised is treated as `qualification` rather than rejected here, so a
+ * typo cannot silently issue something the holder did not ask for.
  */
 export function requestedKinds(include) {
   const value = String(include ?? '').trim().toLowerCase();
   if (value === 'transcript') {return ['transcript'];}
-  if (value === 'both') {return ['qualification', 'transcript'];}
+  if (value === 'both') {return ['academic'];}
   return [DEFAULT_KIND];
 }
 
@@ -284,14 +300,18 @@ export function labelOfCredentialData(credentialData) {
 }
 
 /**
- * The academic namespaces a credential holds: one for a qualification or a transcript,
- * both for a combined academic credential, none for an identity-only credential. This is
- * what tells the two kinds apart, since they share a docType.
+ * The academic namespaces a credential holds, read from the claim blocks it actually carries:
+ * one for a qualification, the transcript plus its supplement for a transcript, and all of them
+ * for a combined academic credential. None for an identity-only credential. This is what tells
+ * the kinds apart, since they share a docType.
  */
 export function academicNamespacesOf(credentialData = {}) {
-  return Object.values(CREDENTIAL_KINDS)
-    .filter((spec) => Boolean(credentialData[spec.academicField]))
-    .map((spec) => spec.academicNamespace);
+  const namespaces = [];
+  if (credentialData.education_qualification) {namespaces.push(QUALIFICATION_NAMESPACE);}
+  if (credentialData.education_transcript) {
+    namespaces.push(TRANSCRIPT_NAMESPACE, ACADEMIC_RECORD_NAMESPACE);
+  }
+  return namespaces;
 }
 
 /** The identity elements both credential kinds carry. */
@@ -357,7 +377,8 @@ function pickLetterGrade(rng) {
  * @param {{ institution: string, studentId: string, fullName?: string, include?: string,
  *   recognition?: boolean, issueDate?: string }} input
  * @returns {{ records: Array<{ kind: string, label: string, docType: string,
- *   academicNamespace: string, recognition: boolean, credentialData: object, display: object }> }}
+ *   academicNamespaces: string[], recognition: boolean, credentialData: object,
+ *   display: object }> }}
  */
 export function generateAcademicRecord({
   institution,
@@ -596,26 +617,21 @@ export function generateAcademicRecord({
     recognition,
   };
 
-  // Each credential carries the personal components plus only its own academic
-  // namespace: the holder chooses the kind, and a relying party must never receive
-  // qualification claims it did not ask for (or the reverse).
+  // One record per kind the request asks for. A request for both produces ONE document holding
+  // the qualification and the transcript, not two: the holder carries a single credential for the
+  // programme, and a relying party that asks for only one of the namespaces still receives only
+  // that - the wallet filters the response to the namespaces and fields that were requested.
   const records = requestedKinds(include).map((kind) => {
     const spec = CREDENTIAL_KINDS[kind];
     const credentialData = { docType: spec.docType };
     for (const field of IDENTITY_FIELDS) {credentialData[field] = record[field];}
-    credentialData[spec.academicField] = record[spec.academicField];
-    // The US-practice supplement rides with the transcript: it describes the same study and
-    // the record's own standing, so a transcript without it would be missing exactly what a
-    // registrar reads. A qualification credential does not carry it.
-    if (kind === 'transcript') {
-      credentialData.education_academic_record = record.education_academic_record;
-    }
+    for (const field of spec.dataFields) {credentialData[field] = record[field];}
 
     return {
       kind,
       label: spec.label,
       docType: spec.docType,
-      academicNamespace: spec.academicNamespace,
+      academicNamespaces: [...spec.academicNamespaces],
       // Whether this record carries the recognition details, so a caller can tell what it got.
       recognition,
       credentialData,

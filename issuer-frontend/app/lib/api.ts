@@ -146,7 +146,8 @@ export interface AcademyPreparedCredential {
   kind: string;
   label: string;
   docType: string;
-  academicNamespace: string;
+  /** Every academic namespace the credential holds: both of them for a combined credential. */
+  academicNamespaces: string[];
   /** True when this credential carries the recognition details (Tier 2). */
   recognition?: boolean;
   /** True when this request matched a credential already prepared: nothing new was created. */

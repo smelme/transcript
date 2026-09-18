@@ -60,6 +60,7 @@ export interface Credential {
 export const CREDENTIAL_KINDS = [
   { value: 'qualification', label: 'Qualification' },
   { value: 'transcript', label: 'Transcript' },
+  { value: 'academic', label: 'Qualification and transcript' },
 ] as const;
 
 /**

@@ -183,8 +183,10 @@ check(
 check(
   'the transcript credential is a photo-ID document holding the transcript namespace',
   transcriptRequest.credentials?.[0]?.docType === 'org.iso.23220.photoid.1' &&
-    transcriptRequest.credentials?.[0]?.academicNamespace === 'org.iso.23220.education.transcript.1',
-  `${transcriptRequest.credentials?.[0]?.docType} / ${transcriptRequest.credentials?.[0]?.academicNamespace}`,
+    transcriptRequest.credentials?.[0]?.academicNamespaces?.includes(
+      'org.iso.23220.education.transcript.1',
+    ),
+  `${transcriptRequest.credentials?.[0]?.docType} / ${JSON.stringify(transcriptRequest.credentials?.[0]?.academicNamespaces)}`,
 );
 check(
   'the transcript credential is labelled as a transcript',
@@ -241,12 +243,21 @@ const bothRequest = (await call('POST', '/academy/requests', {
   email: `both-${Date.now()}@example.com`,
   include: 'both',
 })).data;
-check('asking for both creates two credentials', (bothRequest.credentials || []).length === 2);
+check('asking for both creates ONE credential', (bothRequest.credentials || []).length === 1);
 check(
-  'both credentials are distinct kinds',
-  JSON.stringify((bothRequest.credentials || []).map((c) => c.kind)) ===
-    JSON.stringify(['qualification', 'transcript']),
-  JSON.stringify((bothRequest.credentials || []).map((c) => c.kind)),
+  'and that credential holds both academic namespaces',
+  JSON.stringify(bothRequest.credentials?.[0]?.academicNamespaces) ===
+    JSON.stringify([
+      'org.iso.23220.education.qualification.1',
+      'org.iso.23220.education.transcript.1',
+      'org.iso.23220.education.academic-record.1',
+    ]),
+  JSON.stringify(bothRequest.credentials?.[0]?.academicNamespaces),
+);
+check(
+  'and it is labelled as both',
+  bothRequest.credentials?.[0]?.kind === 'academic',
+  bothRequest.credentials?.[0]?.kind,
 );
 
 const unknownChoice = (await call('POST', '/academy/requests', {
@@ -267,7 +278,7 @@ const firstRequest = (await call('POST', '/academy/requests', {
   email: repeatEmail,
   include: 'both',
 })).data;
-check('a first request creates both kinds', (firstRequest.credentials || []).length === 2);
+check('a first request creates one credential', (firstRequest.credentials || []).length === 1);
 check(
   'nothing is reused on a first request',
   (firstRequest.credentials || []).every((c) => c.reused === false),
@@ -279,7 +290,7 @@ const repeatRequest = (await call('POST', '/academy/requests', {
   include: 'both',
 })).data;
 check(
-  'asking again reuses the same two credentials',
+  'asking again reuses the same credential',
   JSON.stringify((repeatRequest.credentials || []).map((c) => c.sessionId)) ===
     JSON.stringify((firstRequest.credentials || []).map((c) => c.sessionId)),
   JSON.stringify((repeatRequest.credentials || []).map((c) => c.sessionId)),
@@ -296,8 +307,8 @@ const repeatList = (await call('GET', '/academy/credentials', null, {
   authorization: `Bearer ${repeatToken.accessToken}`,
 })).data;
 check(
-  'the wallet is offered two credentials, not four',
-  (repeatList.credentials || []).length === 2,
+  'the wallet is offered one credential, not two',
+  (repeatList.credentials || []).length === 1,
   String((repeatList.credentials || []).length),
 );
 

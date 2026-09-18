@@ -135,18 +135,35 @@ object CredentialRegistry {
         if (summary == null) return "Academic credential"
         val parts = mutableListOf<String>()
         summary.institution.takeIf { it.isNotBlank() }?.let { parts += it }
-        if (summary.kind == AcademicNamespaces.KIND_TRANSCRIPT) {
-            // Which qualification the transcript is for, first: a holder with a transcript for a
-            // degree and one for a diploma can otherwise not tell them apart.
-            summary.programmeTitle
-                .ifBlank { summary.awardTitle }
-                .takeIf { it.isNotBlank() }
-                ?.let { parts += it }
+        val holdsAward = summary.kind == AcademicNamespaces.KIND_QUALIFICATION ||
+            summary.kind == AcademicNamespaces.KIND_BOTH
+        val holdsStudy = summary.kind == AcademicNamespaces.KIND_TRANSCRIPT ||
+            summary.kind == AcademicNamespaces.KIND_BOTH
+        if (holdsAward) {
+            // The programme names the level and the field together, so where it is stated it
+            // replaces the two separate fields instead of repeating them.
+            val programme = summary.programmeTitle.takeIf { it.isNotBlank() }
+            if (programme != null) {
+                parts += programme
+            } else {
+                summary.degreeLevel.takeIf { it.isNotBlank() }?.let { parts += it }
+                if (summary.kind == AcademicNamespaces.KIND_QUALIFICATION) {
+                    summary.fieldOfStudy.takeIf { it.isNotBlank() }?.let { parts += it }
+                }
+            }
+            summary.graduationDate.takeIf { it.isNotBlank() }?.let { parts += "Graduated $it" }
+        }
+        if (holdsStudy) {
+            if (!holdsAward) {
+                // Which qualification the transcript belongs to: a holder with a transcript for a
+                // degree and one for a diploma can otherwise not tell them apart.
+                summary.programmeTitle
+                    .ifBlank { summary.awardTitle }
+                    .takeIf { it.isNotBlank() }
+                    ?.let { parts += it }
+            }
             if (summary.courseCount > 0) parts += "${summary.courseCount} courses"
             if (summary.totalCredits > 0) parts += "${summary.totalCredits} credits"
-        } else {
-            summary.degreeLevel.takeIf { it.isNotBlank() }?.let { parts += it }
-            summary.graduationDate.takeIf { it.isNotBlank() }?.let { parts += "Graduated $it" }
         }
         return parts.joinToString(" · ").ifBlank { "Academic credential" }
     }

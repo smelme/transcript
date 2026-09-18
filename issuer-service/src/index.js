@@ -1952,7 +1952,10 @@ app.post('/academy/requests', async (req, res) => {
       const candidates = issuer.findIssuanceSessionsFor({
         studentId,
         institution: ACADEMY_NAME,
-        academicNamespace: record.academicNamespace,
+        // Any one of the record's namespaces is enough to find the candidates to compare;
+        // whether a candidate really is the same credential is decided by the claim-set
+        // comparison below, not by this filter.
+        academicNamespace: record.academicNamespaces[0],
       });
       const matching = candidates.find((session) =>
         sameClaimSet(session.credentialData, record.credentialData),
@@ -2025,7 +2028,7 @@ app.post('/academy/requests', async (req, res) => {
         kind: record.kind,
         label: record.label,
         docType: record.docType,
-        academicNamespace: record.academicNamespace,
+        academicNamespaces: record.academicNamespaces,
         // Whether this credential carries the recognition details, so a caller can tell what
         // it asked for and the app can say what the holder will receive.
         recognition: record.recognition === true,

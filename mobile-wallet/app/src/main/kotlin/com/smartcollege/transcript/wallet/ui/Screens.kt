@@ -311,8 +311,10 @@ private fun CredentialCard(
     val kind = summary?.kind ?: AcademicNamespaces.KIND_UNKNOWN
     val title = AcademicNamespaces.labelOf(kind)
     val isTranscript = kind == AcademicNamespaces.KIND_TRANSCRIPT
-    // A transcript is named by the qualification it belongs to, then the figures it holds.
-    val detail = if (isTranscript) {
+    val isCombined = kind == AcademicNamespaces.KIND_BOTH
+    // A study is named by the qualification it belongs to, then the figures it holds. A combined
+    // credential holds both halves, so the card shows the programme and the study together.
+    val detail = if (isTranscript || isCombined) {
         listOfNotNull(
             summary?.programmeTitle?.takeIf { it.isNotBlank() }
                 ?: summary?.awardTitle?.takeIf { it.isNotBlank() },
@@ -433,7 +435,8 @@ fun CredentialDetailScreen(
     val institution = summary?.institution?.takeIf { it.isNotBlank() } ?: "Smart Academy"
     val kind = summary?.kind ?: AcademicNamespaces.KIND_UNKNOWN
     val isTranscript = kind == AcademicNamespaces.KIND_TRANSCRIPT
-    val title = if (isTranscript) {
+    val isCombined = kind == AcademicNamespaces.KIND_BOTH
+    val title = if (isTranscript || isCombined) {
         listOfNotNull(
             summary?.programmeTitle?.takeIf { it.isNotBlank() }
                 ?: summary?.awardTitle?.takeIf { it.isNotBlank() },
@@ -544,7 +547,15 @@ fun CredentialDetailScreen(
                     DetailRow("Programme", summary?.programmeTitle)
                     DetailRow("Award", summary?.awardTitle)
                     DetailRow("Issued", issuedDate)
-                    if (isTranscript) {
+                    if (isCombined) {
+                        // One document, both halves: the award and the study it was earned in.
+                        DetailRow("Degree level", summary?.degreeLevel)
+                        DetailRow("Field of study", summary?.fieldOfStudy)
+                        DetailRow("Graduation date", summary?.graduationDate)
+                        DetailRow("Courses", summary?.courseCount?.takeIf { it > 0 }?.toString())
+                        DetailRow("Total credits", summary?.totalCredits?.takeIf { it > 0 }?.toString())
+                        DetailRow("Status", summary?.completionStatus)
+                    } else if (isTranscript) {
                         // A transcript credential carries no qualification namespace, so these
                         // are the figures it actually holds rather than blank award fields.
                         DetailRow("Courses", summary?.courseCount?.takeIf { it > 0 }?.toString())
