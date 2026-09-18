@@ -21,20 +21,6 @@ object CredentialRegistry {
     private const val TYPE_LEGACY = "com.credman.IdentityCredential"
     private const val TYPE_DIGITAL = "androidx.credentials.TYPE_DIGITAL_CREDENTIAL"
 
-    private val displayNames = mapOf(
-        "given_name" to "Given name",
-        "family_name" to "Family name",
-        "birth_date" to "Date of birth",
-        "issuing_authority" to "Issuing authority",
-        "institution_name" to "Institution",
-        "degree_level" to "Degree level",
-        "graduation_date" to "Graduation date",
-        "student_id" to "Student ID",
-        "total_credits" to "Total credits",
-        "status" to "Status",
-        "courses" to "Courses",
-    )
-
     /** Re-publishes the given credentials (already scoped to the current owner) to the system registry. Safe to call repeatedly. */
     fun register(context: Context, store: SecureStore, credentialIds: List<String> = store.credentialIdsForOwner(store.ownerEmail())) {
         try {
@@ -190,7 +176,9 @@ object CredentialRegistry {
                 val itemMap = CborCodec.decode(itemCbor) as? Map<*, *> ?: continue
                 val elementId = itemMap["elementIdentifier"] as? String ?: continue
                 val valueString = unwrap(itemMap["elementValue"])?.toString() ?: ""
-                val displayName = displayNames[elementId] ?: elementId
+                // The same catalogue the holder's own screen reads the document back with, so a
+                // claim is called the same thing in the chooser as it is in the wallet.
+                val displayName = ClaimCatalogue.labelFor(elementId)
                 nsMap[elementId] = listOf(displayName, valueString, valueString.take(128))
             }
             if (nsMap.isNotEmpty()) namespacesCbor[ns as String] = nsMap

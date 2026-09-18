@@ -90,7 +90,9 @@ class CredentialRegistryTest {
         // The float claim is the one that used to break the parse.
         @Suppress("UNCHECKED_CAST")
         val gpa = fieldsOf(namespaces, qualificationNs)["gpa"] as List<String>
-        assertEquals(listOf("gpa", "3.65", "3.65"), gpa)
+        // The label is the one the holder's own screen uses, so a claim reads the same wherever
+        // they meet it.
+        assertEquals(listOf("Grade point average", "3.65", "3.65"), gpa)
 
         assertEquals("Samuel", fieldsOf(namespaces, photoIdNs)["given_name"]?.let { (it as List<*>)[1] })
         assertEquals("Master", fieldsOf(namespaces, qualificationNs)["degree_level"]?.let { (it as List<*>)[1] })

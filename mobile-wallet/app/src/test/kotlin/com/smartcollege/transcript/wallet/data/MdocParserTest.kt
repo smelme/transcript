@@ -47,6 +47,39 @@ class MdocParserTest {
     )
 
     @Test
+    fun `reads every namespace in the document, in the order it was signed`() {
+        val namespaces = MdocParser.readNamespaces(
+            mdoc(
+                linkedMapOf(
+                    AcademicNamespaces.PHOTO_ID to photoId(),
+                    AcademicNamespaces.QUALIFICATION to listOf(
+                        item("award_title", CborCodec.encode("Bachelor of Arts")),
+                        item("total_credits", byteArrayOf(0x18, 0x1b)), // uint 27
+                    ),
+                )
+            )
+        )
+
+        // The holder's own screen shows the document as it was signed, so nothing may be lost on
+        // the way through the parser.
+        assertEquals(
+            listOf(AcademicNamespaces.PHOTO_ID, AcademicNamespaces.QUALIFICATION),
+            namespaces.keys.toList(),
+        )
+        assertEquals("Tessa", namespaces.getValue(AcademicNamespaces.PHOTO_ID)["given_name"])
+        assertEquals(
+            "Bachelor of Arts",
+            namespaces.getValue(AcademicNamespaces.QUALIFICATION)["award_title"],
+        )
+        assertEquals(27L, namespaces.getValue(AcademicNamespaces.QUALIFICATION)["total_credits"])
+    }
+
+    @Test
+    fun `a document that cannot be read yields no claims rather than failing`() {
+        assertEquals(emptyMap<String, Map<String, Any?>>(), MdocParser.readNamespaces("not-cbor"))
+    }
+
+    @Test
     fun `reads a transcript as a transcript, with the figures it holds`() {
         val summary = MdocParser.readCredentialSummary(
             mdoc(

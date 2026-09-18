@@ -49,6 +49,26 @@ object MdocParser {
         )
     }.getOrNull()
 
+    /**
+     * Every namespace in a stored credential and every element it holds, in the order the issuer
+     * signed them.
+     *
+     * The card draws a handful of these fields; a holder checking their own credential wants all
+     * of them, so they are read generically here rather than through a second hand-written list
+     * that would fall behind what the issuer signs.
+     */
+    fun readNamespaces(mdocBase64url: String): Map<String, Map<String, Any?>> = runCatching {
+        val issuerSigned = CborDecoder(Base64.getUrlDecoder().decode(mdocBase64url)).read() as? Map<*, *>
+            ?: return emptyMap()
+        val namespaces = issuerSigned["nameSpaces"] as? Map<*, *> ?: return emptyMap()
+        buildMap {
+            for ((key, value) in namespaces) {
+                val namespace = key as? String ?: continue
+                put(namespace, readNamespace(value))
+            }
+        }
+    }.getOrDefault(emptyMap())
+
     /** The course list is one JSON string claim, so what a holder wants is how many it holds. */
     private fun countCourses(value: Any?): Int {
         val json = value as? String ?: return 0

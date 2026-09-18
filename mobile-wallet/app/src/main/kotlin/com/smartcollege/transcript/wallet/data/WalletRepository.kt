@@ -64,6 +64,15 @@ class WalletRepository(private val client: IssuerClient, private val store: Secu
         check(store.deleteCredential(credentialId)) { "Could not delete credential from secure storage" }
     }
 
+    /**
+     * Every claim in a stored credential, grouped for display. Empty when the document cannot be
+     * read, which is the state a device is briefly in while it is locked.
+     */
+    fun credentialClaims(credentialId: String): List<ClaimGroup> =
+        store.mdoc(credentialId)
+            ?.let { ClaimCatalogue.groupsOf(MdocParser.readNamespaces(it)) }
+            .orEmpty()
+
     fun credentialSummary(credentialId: String): CredentialSummary? {
         val stored = store.credentialSummary(credentialId)
         if (stored?.hasDisplayFields() == true) return stored

@@ -54,6 +54,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.smartcollege.transcript.wallet.data.AcademicNamespaces
+import com.smartcollege.transcript.wallet.data.Claim
 import com.smartcollege.transcript.wallet.data.CredentialSummary
 import com.smartcollege.transcript.wallet.data.WalletRepository
 import kotlinx.coroutines.launch
@@ -486,6 +487,9 @@ fun CredentialDetailScreen(
     onShare: () -> Unit,
 ) {
     val summary = remember(credentialId) { repository.credentialSummary(credentialId) }
+    // The whole document, not the subset the card happens to draw. Read once: it cannot change
+    // while the screen is open.
+    val claimGroups = remember(credentialId) { repository.credentialClaims(credentialId) }
     var confirmDelete by remember { mutableStateOf(false) }
     var deleting by remember { mutableStateOf(false) }
     var deleteError by remember { mutableStateOf<String?>(null) }
@@ -574,47 +578,64 @@ fun CredentialDetailScreen(
                 }
             }
 
-            Spacer(Modifier.height(24.dp))
-            Text(
-                "DETAILS",
-                style = MaterialTheme.typography.labelLarge,
-                color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.6f),
-                modifier = Modifier.padding(bottom = 8.dp),
-            )
-            Card(
-                modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(16.dp),
-                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-                elevation = CardDefaults.cardElevation(defaultElevation = 1.dp),
-            ) {
-                Column(Modifier.padding(vertical = 6.dp)) {
-                    DetailRow("Name", summary?.fullName)
-                    DetailRow("Institution", summary?.institution)
-                    // Which qualification the study was for. A transcript states this itself, so a
-                    // holder can tell two transcripts apart without opening either.
-                    DetailRow("Programme", summary?.programmeTitle)
-                    DetailRow("Award", summary?.awardTitle)
-                    DetailRow("Issued", issuedDate)
-                    if (isCombined) {
-                        // One document, both halves: the award and the study it was earned in.
-                        DetailRow("Degree level", summary?.degreeLevel)
-                        DetailRow("Field of study", summary?.fieldOfStudy)
-                        DetailRow("Graduation date", summary?.graduationDate)
-                        DetailRow("Courses", summary?.courseCount?.takeIf { it > 0 }?.toString())
-                        DetailRow("Total credits", summary?.totalCredits?.takeIf { it > 0 }?.toString())
-                        DetailRow("Status", summary?.completionStatus)
-                    } else if (isTranscript) {
-                        // A transcript credential carries no qualification namespace, so these
-                        // are the figures it actually holds rather than blank award fields.
-                        DetailRow("Courses", summary?.courseCount?.takeIf { it > 0 }?.toString())
-                        DetailRow("Total credits", summary?.totalCredits?.takeIf { it > 0 }?.toString())
-                        DetailRow("Status", summary?.completionStatus)
-                    } else {
-                        DetailRow("Degree level", summary?.degreeLevel)
-                        DetailRow("Field of study", summary?.fieldOfStudy)
-                        DetailRow("Graduation date", summary?.graduationDate)
+            // The card above is the headline. This is the whole document: every claim the issuer
+            // signed, grouped by what it is about.
+            if (claimGroups.isNotEmpty()) {
+                claimGroups.forEach { group ->
+                    Spacer(Modifier.height(24.dp))
+                    SectionLabel(group.title)
+                    Card(
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(16.dp),
+                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                        elevation = CardDefaults.cardElevation(defaultElevation = 1.dp),
+                    ) {
+                        Column(Modifier.padding(vertical = 6.dp)) {
+                            group.claims.forEach { ClaimRow(it) }
+                        }
                     }
-                    DetailRow("Credential ID", credentialId)
+                }
+                Spacer(Modifier.height(24.dp))
+                SectionLabel("Wallet")
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(16.dp),
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                    elevation = CardDefaults.cardElevation(defaultElevation = 1.dp),
+                ) {
+                    Column(Modifier.padding(vertical = 6.dp)) {
+                        DetailRow("Credential ID", credentialId)
+                    }
+                }
+            } else {
+                // The document is briefly unreadable while the device is locked, so the screen
+                // falls back to the summary the wallet stored when the credential arrived.
+                Spacer(Modifier.height(24.dp))
+                SectionLabel("Details")
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(16.dp),
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                    elevation = CardDefaults.cardElevation(defaultElevation = 1.dp),
+                ) {
+                    Column(Modifier.padding(vertical = 6.dp)) {
+                        DetailRow("Name", summary?.fullName)
+                        DetailRow("Institution", summary?.institution)
+                        DetailRow("Programme", summary?.programmeTitle)
+                        DetailRow("Award", summary?.awardTitle)
+                        DetailRow("Issued", issuedDate)
+                        if (isCombined || isTranscript) {
+                            DetailRow("Graduation date", summary?.graduationDate)
+                            DetailRow("Courses", summary?.courseCount?.takeIf { it > 0 }?.toString())
+                            DetailRow("Total credits", summary?.totalCredits?.takeIf { it > 0 }?.toString())
+                            DetailRow("Status", summary?.completionStatus)
+                        } else {
+                            DetailRow("Degree level", summary?.degreeLevel)
+                            DetailRow("Field of study", summary?.fieldOfStudy)
+                            DetailRow("Graduation date", summary?.graduationDate)
+                        }
+                        DetailRow("Credential ID", credentialId)
+                    }
                 }
             }
 
@@ -673,6 +694,49 @@ fun CredentialDetailScreen(
             dismissButton = {
                 TextButton(onClick = { confirmDelete = false }, enabled = !deleting) { Text("Cancel") }
             },
+        )
+    }
+}
+
+@Composable
+private fun SectionLabel(title: String) {
+    Text(
+        title.uppercase(),
+        style = MaterialTheme.typography.labelLarge,
+        color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.6f),
+        modifier = Modifier.padding(bottom = 8.dp),
+    )
+}
+
+/**
+ * One claim: what it is on the left, what it says on the right, and - where the issuer recorded
+ * it - the qualifying detail underneath rather than buried in the value.
+ */
+@Composable
+private fun ClaimRow(claim: Claim) {
+    Row(
+        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 12.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Column(Modifier.weight(1f)) {
+            Text(
+                claim.label,
+                style = MaterialTheme.typography.bodyMedium,
+                fontWeight = FontWeight.SemiBold,
+            )
+            claim.detail?.let {
+                Text(
+                    it,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+        }
+        Text(
+            claim.value,
+            style = MaterialTheme.typography.bodyMedium,
+            textAlign = TextAlign.End,
+            modifier = Modifier.padding(start = 12.dp),
         )
     }
 }

@@ -521,13 +521,6 @@ function ClaimFlow() {
                   <button type="button" className="btn btn-outline" onClick={() => setShowQr(true)}>
                     Show QR code
                   </button>
-                  <button
-                    type="button"
-                    className="btn btn-outline"
-                    onClick={() => navigator.clipboard.writeText(offer.offerUrl || '')}
-                  >
-                    Copy offer link
-                  </button>
                   <button type="button" className="btn btn-outline" onClick={handleBackToSelection}>
                     Back
                   </button>
@@ -573,15 +566,6 @@ function ClaimFlow() {
                     >
                       Back
                     </button>
-                    {offer.offerUrl && (
-                      <button
-                        type="button"
-                        className="btn btn-outline"
-                        onClick={() => navigator.clipboard.writeText(offer.offerUrl || '')}
-                      >
-                        Copy offer link
-                      </button>
-                    )}
                   </div>
                 </div>
               </div>
