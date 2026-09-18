@@ -43,7 +43,6 @@ fun OfferScanScreen(
     onBack: () -> Unit,
     onScannerOpenChange: (Boolean) -> Unit = {},
 ) {
-    var manualUrl by remember { mutableStateOf("") }
     var busy by remember { mutableStateOf(false) }
     var message by remember { mutableStateOf<String?>(null) }
     val scope = rememberCoroutineScope()
@@ -89,7 +88,7 @@ fun OfferScanScreen(
     ) { padding ->
         Column(Modifier.fillMaxSize().padding(padding).padding(16.dp)) {
             Text(
-                "Scan the offer QR code to claim your credential. You can also paste an offer URL.",
+                "Scan the QR code your institution sent you to add the credential to this device.",
                 style = MaterialTheme.typography.bodyMedium,
             )
             Spacer(Modifier.height(12.dp))
@@ -101,30 +100,16 @@ fun OfferScanScreen(
                         .addOnSuccessListener { barcode ->
                             onScannerOpenChange(false)
                             barcode.rawValue?.let { claim(it) }
-                                ?: run { message = "The QR code did not contain an offer URL." }
+                                ?: run { message = "That QR code does not contain a credential offer." }
                         }
                         .addOnFailureListener { error ->
                             onScannerOpenChange(false)
-                            message = error.message
-                                ?: "Unable to start the QR scanner. Paste the offer URL instead."
+                            message = error.message ?: "Unable to start the camera."
                         }
                 },
                 enabled = !busy,
                 modifier = Modifier.fillMaxWidth(),
-            ) { Text("Scan offer QR code") }
-            Spacer(Modifier.height(12.dp))
-            OutlinedTextField(
-                value = manualUrl,
-                onValueChange = { manualUrl = it },
-                label = { Text("offer URL") },
-                modifier = Modifier.fillMaxWidth(),
-            )
-            Spacer(Modifier.height(8.dp))
-            Button(
-                onClick = { claim(manualUrl) },
-                enabled = !busy && manualUrl.isNotBlank(),
-                modifier = Modifier.fillMaxWidth(),
-            ) { Text("Claim credential") }
+            ) { Text("Scan QR code") }
             message?.let {
                 Spacer(Modifier.height(8.dp))
                 Text(it, color = MaterialTheme.colorScheme.error)

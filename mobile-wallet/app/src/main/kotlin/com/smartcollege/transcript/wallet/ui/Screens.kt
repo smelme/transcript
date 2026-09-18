@@ -313,7 +313,8 @@ private fun CredentialCard(
     val isCombined = kind == AcademicNamespaces.KIND_BOTH
     // A study is named by the qualification it belongs to, then the figures it holds. A combined
     // credential holds both halves, so the card shows the programme and the study together.
-    val detail = if (isTranscript || isCombined) {        listOfNotNull(
+    val detail = if (isTranscript || isCombined) {
+        listOfNotNull(
             summary?.programmeTitle?.takeIf { it.isNotBlank() }
                 ?: summary?.awardTitle?.takeIf { it.isNotBlank() },
             summary?.courseCount?.takeIf { it > 0 }?.let { "$it courses" },
@@ -328,29 +329,24 @@ private fun CredentialCard(
     // When the credential was signed, which is what "Issued" means. The graduation date is a
     // different fact and is shown as its own row.
     val issuedDate = formatDate(summary?.issueDate)
-    val cardColor = institutionColor(institution)
+    val brand = brandOf(institution)
 
     Card(
         modifier = modifier.fillMaxWidth().clickable(onClick = onClick),
         shape = RoundedCornerShape(20.dp),
         elevation = CardDefaults.cardElevation(defaultElevation = 4.dp),
-        colors = CardDefaults.cardColors(containerColor = cardColor),
+        colors = CardDefaults.cardColors(containerColor = brand.color),
     ) {
         Column(Modifier.padding(20.dp)) {
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.Top,
+                verticalAlignment = Alignment.CenterVertically,
             ) {
-                Text(
-                    institution.uppercase(),
-                    style = MaterialTheme.typography.labelMedium,
-                    color = Color.White.copy(alpha = 0.9f),
-                    modifier = Modifier.weight(1f),
-                )
+                InstitutionMark(brand, Modifier.weight(1f))
                 VerifiedPill()
             }
-            Spacer(Modifier.height(10.dp))
+            Spacer(Modifier.height(14.dp))
             Text(
                 summary?.fullName?.takeIf { it.isNotBlank() } ?: "Credential holder",
                 style = MaterialTheme.typography.titleLarge,
@@ -374,6 +370,40 @@ private fun CredentialCard(
                 )
             }
         }
+    }
+}
+
+/**
+ * The institution's mark and name, as they appear at the top of a card.
+ *
+ * The mark stands in for a logo the wallet has no licence to ship. A real deployment swaps it for
+ * the institution's own asset, which is the only reason this is a mark and not an image.
+ */
+@Composable
+private fun InstitutionMark(brand: InstitutionBrand, modifier: Modifier = Modifier) {
+    Row(modifier = modifier, verticalAlignment = Alignment.CenterVertically) {
+        Box(
+            modifier = Modifier
+                .size(34.dp)
+                .background(Color.White.copy(alpha = 0.16f), RoundedCornerShape(10.dp)),
+            contentAlignment = Alignment.Center,
+        ) {
+            Text(
+                brand.mark,
+                color = Color.White,
+                // A three or four letter mark needs to be smaller to fit the same square.
+                fontSize = if (brand.mark.length > 2) 11.sp else 13.sp,
+                fontWeight = FontWeight.Bold,
+                letterSpacing = 0.5.sp,
+            )
+        }
+        Spacer(Modifier.size(10.dp))
+        Text(
+            brand.title,
+            style = MaterialTheme.typography.labelMedium,
+            color = Color.White.copy(alpha = 0.92f),
+            maxLines = 1,
+        )
     }
 }
 
@@ -401,6 +431,39 @@ private fun VerifiedPill() {
 private fun institutionColor(institution: String): Color {
     val hash = institution.hashCode().let { if (it == Int.MIN_VALUE) 0 else kotlin.math.abs(it) }
     return InstitutionColors[hash % InstitutionColors.size]
+}
+
+/**
+ * How one institution's credential is presented: a short mark and a single brand colour.
+ *
+ * These are the institutions the wallet is demonstrated with. The mark stands in for a logo the
+ * wallet has no licence to ship, and the colours are chosen to be legible on a dark card rather
+ * than to reproduce an official palette - a real deployment would take both from the institution's
+ * own brand assets, which is why an unknown institution still gets a deliberate-looking card.
+ */
+private data class InstitutionBrand(val mark: String, val title: String, val color: Color)
+
+private val InstitutionBrands = mapOf(
+    "smart academy" to InstitutionBrand("SA", "Smart Academy", Color(0xFF1D3557)),
+    "university of auckland" to InstitutionBrand("AU", "University of Auckland", Color(0xFF0B2A4A)),
+    "university of otago" to InstitutionBrand("OU", "University of Otago", Color(0xFF0A4A5E)),
+    "mit" to InstitutionBrand("MIT", "MIT", Color(0xFF6E0B1B)),
+    "aws" to InstitutionBrand("AWS", "AWS", Color(0xFF232F3E)),
+)
+
+private fun brandOf(institution: String): InstitutionBrand {
+    val name = institution.trim().ifBlank { "Smart Academy" }
+    InstitutionBrands[name.lowercase()]?.let { return it }
+    // An institution the wallet has no assets for: initials from the name, and a colour from it,
+    // so the card still looks intentional rather than falling back to a default.
+    val mark = name
+        .split(' ', '-', '_', '.')
+        .filter { it.isNotBlank() }
+        .take(4)
+        .map { it.first().uppercaseChar() }
+        .joinToString("")
+        .ifBlank { "ID" }
+    return InstitutionBrand(mark, name, institutionColor(name))
 }
 
 private fun formatDate(raw: String?): String? {
@@ -448,7 +511,7 @@ fun CredentialDetailScreen(
         ).joinToString(" · ")
     }
     val issuedDate = formatDate(summary?.issueDate)
-    val cardColor = institutionColor(institution)
+    val brand = brandOf(institution)
 
     Scaffold(
         topBar = {
@@ -469,23 +532,18 @@ fun CredentialDetailScreen(
                 modifier = Modifier.fillMaxWidth(),
                 shape = RoundedCornerShape(24.dp),
                 elevation = CardDefaults.cardElevation(defaultElevation = 6.dp),
-                colors = CardDefaults.cardColors(containerColor = cardColor),
+                colors = CardDefaults.cardColors(containerColor = brand.color),
             ) {
                 Column(Modifier.padding(22.dp)) {
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.Top,
+                        verticalAlignment = Alignment.CenterVertically,
                     ) {
-                        Text(
-                            institution.uppercase(),
-                            style = MaterialTheme.typography.labelMedium,
-                            color = Color.White.copy(alpha = 0.9f),
-                            modifier = Modifier.weight(1f),
-                        )
+                        InstitutionMark(brand, Modifier.weight(1f))
                         VerifiedPill()
                     }
-                    Spacer(Modifier.height(16.dp))
+                    Spacer(Modifier.height(18.dp))
                     Text(
                         personName,
                         style = MaterialTheme.typography.headlineMedium,
