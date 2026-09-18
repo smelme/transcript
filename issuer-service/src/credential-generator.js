@@ -201,7 +201,7 @@ function isoDate(year, month, day) {
  * that generates a record - the academy app, a client organisation calling the API, a script -
  * dates its credentials to the day the request was made.
  */
-function todayIso() {
+export function todayIso() {
   return new Date().toISOString().slice(0, 10);
 }
 

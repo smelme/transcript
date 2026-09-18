@@ -21,9 +21,9 @@ process.on('exit', () => {
   }
 });
 
-const { IssuerService, sameClaimSet } = await import('../src/index.js');
+const { IssuerService, sameClaimSet, buildCredentialOfferUrl, isReissueOffer } = await import('../src/index.js');
 const { getDb } = await import('../../db.js');
-const { generateAcademicRecord, kindOfCredentialData, academicNamespacesOf } = await import(
+const { generateAcademicRecord, kindOfCredentialData, academicNamespacesOf, todayIso } = await import(
   '../src/credential-generator.js'
 );
 const { verifyIssuerSigned } = await import('../../mdoc-core.js');
@@ -98,6 +98,85 @@ test('Credential dates - a caller may state the issue date it is issuing for', (
   assert.strictEqual(
     records[0].credentialData.education_academic_record?.document_issued_at,
     '2025-03-24',
+  );
+});
+
+test('Re-issue - a credential already in a wallet is issued again as a new document', () => {
+  const issuer = new IssuerService();
+  const { records } = generateAcademicRecord({
+    institution: 'Smart Academy',
+    studentId: 'SA-R1',
+    include: 'both',
+  });
+  const session = issuer.createIssuanceSession({
+    studentId: 'SA-R1',
+    institution: 'Smart Academy',
+    credentialData: records[0].credentialData,
+    display: records[0].display,
+  });
+
+  const first = issuer.issueForSession(session, null);
+  assert.strictEqual(first.success, true, first.error);
+
+  const retry = issuer.issueForSession(session, null);
+  assert.strictEqual(retry.success, false, 'a retry must not mint a second credential');
+  assert.match(retry.error, /already claimed/);
+
+  const again = issuer.issueForSession(session, null, { allowReissue: true });
+  assert.strictEqual(again.success, true, again.error);
+  assert.notStrictEqual(again.credentialId, first.credentialId, 'a re-issue is its own credential');
+  assert.strictEqual(
+    issuer.getCredential(first.credentialId).credential.status,
+    'active',
+    'the copy the holder already has is untouched by the re-issue',
+  );
+});
+
+test('Re-issue - the new copy is dated the day it is issued, not the day of the invitation', () => {
+  const issuer = new IssuerService();
+  const { records } = generateAcademicRecord({
+    institution: 'Smart Academy',
+    studentId: 'SA-R2',
+    include: 'qualification',
+    issueDate: '2020-01-31',
+  });
+  const session = issuer.createIssuanceSession({
+    studentId: 'SA-R2',
+    institution: 'Smart Academy',
+    credentialData: records[0].credentialData,
+    display: records[0].display,
+  });
+
+  const first = issuer.issueForSession(session, null);
+  assert.strictEqual(first.success, true, first.error);
+  assert.strictEqual(issuer.getCredential(first.credentialId).credential.issue_date, '2020-01-31');
+
+  const again = issuer.issueForSession(session, null, { allowReissue: true });
+  assert.strictEqual(again.success, true, again.error);
+  assert.strictEqual(
+    issuer.getCredential(again.credentialId).credential.issue_date,
+    todayIso(),
+    'a re-issue is dated when it is issued',
+  );
+});
+
+test('Re-issue - only an offer that asks for a re-issue may be claimed again', () => {
+  const session = { sessionId: 's-1', institution: 'Smart Academy', nonce: 'n-1' };
+
+  assert.strictEqual(
+    isReissueOffer(buildCredentialOfferUrl(session)),
+    false,
+    'the first offer claims the session once',
+  );
+  assert.strictEqual(
+    isReissueOffer(buildCredentialOfferUrl(session, { reissue: true })),
+    true,
+    'the holder\'s request for another copy travels in the offer itself',
+  );
+  assert.strictEqual(
+    isReissueOffer('openid-credential-offer://?credential_offer=%7B%7D'),
+    false,
+    'an offer with no marker is not a re-issue',
   );
 });
 

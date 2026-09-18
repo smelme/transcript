@@ -189,7 +189,10 @@ export interface AcademyOfferResult {
   offerUrl?: string;
   appLinkUrl?: string | null;
   qrDataUrl?: string;
+  /** Kept for callers of older issuers, which refused a credential already in the wallet. */
   alreadyInWallet?: boolean;
+  /** True when this offer issues another copy of a credential the wallet already holds. */
+  reissued?: boolean;
   error?: string;
 }
 

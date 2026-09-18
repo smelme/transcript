@@ -194,7 +194,7 @@ export default function GetCredentialsPage() {
                       <span className="muted">Recognition details included</span>
                     )}
                     {credential.inWallet ? (
-                      <span className="badge ok">Already in your wallet</span>
+                      <span className="badge ok">In your wallet · you can add it again</span>
                     ) : (
                       credential.reused && (
                         <span className="muted">Already prepared — nothing new was issued</span>

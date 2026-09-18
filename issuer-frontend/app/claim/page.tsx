@@ -51,6 +51,8 @@ function ClaimFlow() {
   /** Handed over in this visit, including any the wallet already held. */
   const [added, setAdded] = useState<string[]>([]);
   const [offer, setOffer] = useState<{ qrDataUrl?: string; offerUrl?: string; appLinkUrl?: string | null } | null>(null);
+  /** True when the offer on screen issues another copy of a credential the wallet already holds. */
+  const [reissued, setReissued] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isMobile, setIsMobile] = useState(false);
@@ -94,9 +96,10 @@ function ClaimFlow() {
   // loop.
   useEffect(() => {
     if (!credentials) return;
-    const selectable = new Set(
-      visibleCredentials.filter((credential) => !credential.inWallet).map((c) => c.sessionId),
-    );
+    // Everything on screen stays selectable, including a credential the wallet already holds:
+    // asking for it again is how a holder gets a copy onto another device, or replaces one they
+    // no longer have.
+    const selectable = new Set(visibleCredentials.map((c) => c.sessionId));
     setSelectedIds((currentSelection) => {
       const kept = currentSelection.filter((id) => selectable.has(id));
       return kept.length === currentSelection.length ? currentSelection : kept;
@@ -112,8 +115,8 @@ function ClaimFlow() {
     );
   }
 
-  /** The credentials that can still be ticked right now. */
-  const selectableCredentials = visibleCredentials.filter((credential) => !credential.inWallet);
+  /** The credentials that can be ticked right now: all of them, whether the wallet holds one or not. */
+  const selectableCredentials = visibleCredentials;
 
   /** How a credential is named in messages: its kind, not its session id. */
   function labelFor(sessionId: string | null) {
@@ -164,6 +167,7 @@ function ClaimFlow() {
     if (!token || !remaining.length) return;
     setBusy(true);
     setError(null);
+    setReissued(false);
     const done = [...alreadyAdded];
     let rest = remaining;
     try {
@@ -172,16 +176,12 @@ function ClaimFlow() {
         setCurrent(next);
         const r = await createAcademyOffer(next, token);
         if (!r.success) throw new Error(r.error || 'Could not start the issuance');
-        if (r.alreadyInWallet) {
-          // Idempotent by design: the wallet holds it already, so nothing is issued again.
-          setError(`Your ${labelFor(next)} is already in your wallet.`);
-          done.push(next);
-          rest = tail;
-          continue;
-        }
         setAdded(done);
         setQueue(tail);
         setOffer({ qrDataUrl: r.qrDataUrl, offerUrl: r.offerUrl, appLinkUrl: r.appLinkUrl });
+        // A credential the wallet already holds is issued again rather than skipped: the holder
+        // asked for it, and a copy they no longer want can be revoked from the portal.
+        setReissued(Boolean(r.reissued));
         return;
       }
       // Everything selected was already held: nothing left to hand over.
@@ -401,15 +401,13 @@ function ClaimFlow() {
                     <label
                       key={c.sessionId}
                       className={`credential-card${isSelected ? ' selected' : ''}`}
-                      style={{ opacity: c.inWallet ? 0.7 : 1 }}
                     >
                       <input
                         className="checkbox"
                         type="checkbox"
                         value={c.sessionId}
                         checked={isSelected}
-                        disabled={c.inWallet}
-                        onChange={() => !c.inWallet && toggle(c.sessionId)}
+                        onChange={() => toggle(c.sessionId)}
                       />
                       <div style={{ flex: 1 }}>
                         <h3>{c.title}</h3>
@@ -424,7 +422,7 @@ function ClaimFlow() {
                           {c.courseCount ? ` · ${c.courseCount} modules` : ''}
                         </div>
                       </div>
-                      {c.inWallet && <span className="badge ok">In wallet</span>}
+                      {c.inWallet && <span className="badge ok">In wallet · add again</span>}
                     </label>
                   );
                 })}
@@ -491,6 +489,13 @@ function ClaimFlow() {
                 ? 'Tap the button below to open the Quals wallet app and add this credential to your device.'
                 : 'Open the Quals wallet app, scan this code, and your credential will be added to your device.'}
             </p>
+
+            {reissued && (
+              <div className="notice" style={{ marginBottom: 18 }}>
+                This credential is already in your wallet. Adding it now issues a new copy — the
+                one you already hold stays valid until your institution revokes it.
+              </div>
+            )}
 
             {isMobile && !showQr ? (
               <div className="panel" style={{ maxWidth: 520 }}>
