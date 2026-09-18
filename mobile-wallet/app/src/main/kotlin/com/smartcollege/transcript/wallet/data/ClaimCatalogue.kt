@@ -185,6 +185,19 @@ object ClaimCatalogue {
         (course[key] as? JsonPrimitive)?.contentOrNull?.takeIf { it.isNotBlank() }
 
     /**
+     * What to call a namespace when a disclosure is shown back to the holder. It is named here
+     * rather than inferred from the elements, because a log records what was asked for one
+     * namespace at a time and a request may name only one of the two halves of a namespace.
+     */
+    fun sectionTitleFor(namespace: String): String = when (namespace) {
+        AcademicNamespaces.PHOTO_ID -> "Identity and document"
+        AcademicNamespaces.QUALIFICATION -> "Qualification"
+        AcademicNamespaces.TRANSCRIPT -> "Study"
+        AcademicNamespaces.ACADEMIC_RECORD -> "Academic record"
+        else -> titleFor(namespace)
+    }
+
+    /**
      * The block for a namespace this wallet does not know: named from the namespace itself, and
      * from the last part of it that is a name rather than the version number every namespace
      * ends with - "org.example.education.internship.1" is an internship, not a "1".

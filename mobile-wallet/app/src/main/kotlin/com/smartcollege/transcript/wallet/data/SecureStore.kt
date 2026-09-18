@@ -192,6 +192,8 @@ class SecureStore(context: Context) {
             .remove("mdoc_$credentialId")
             .remove("summary_$credentialId")
             .remove("owner_$credentialId")
+            // What this credential disclosed goes with it: the record belongs to the credential.
+            .remove(activityKey(credentialId))
             .putString(KEY_IDS, JSONArray(ids.toList()).toString())
             .commit()
     }
@@ -252,6 +254,23 @@ class SecureStore(context: Context) {
         val owner = ownerEmail?.trim()?.lowercase() ?: return emptyList()
         return credentialIds().filter { id -> ownerEmailOf(id) == owner }
     }
+
+    /**
+     * What one credential has been used to disclose, newest first. This is the holder's own
+     * record of what they have handed over, so it is kept beside the credential it belongs to.
+     */
+    fun activity(credentialId: String): List<ShareActivity> =
+        ShareActivityCodec.decode(prefs.getString(activityKey(credentialId), null))
+
+    /** Appends a disclosure to that record. Only a disclosure that happened is ever written. */
+    fun recordActivity(activity: ShareActivity) {
+        val log = ShareActivityLog.record(activity(activity.credentialId), activity)
+        prefs.edit()
+            .putString(activityKey(activity.credentialId), ShareActivityCodec.encode(log))
+            .apply()
+    }
+
+    private fun activityKey(credentialId: String) = "activity_$credentialId"
 
     companion object {
         private const val TAG = "SecureStore"

@@ -58,6 +58,14 @@ class WalletRepository(private val client: IssuerClient, private val store: Secu
     fun credentialIds(): List<String> = store.credentialIdsForOwner(store.ownerEmail())
     fun mdoc(credentialId: String): String? = store.mdoc(credentialId)
 
+    /** The account this wallet is signed in as, for the profile panel. */
+    fun signedInEmail(): String? = store.ownerEmail()
+
+    /** What this credential has been used to disclose, newest first. */
+    fun activity(credentialId: String): List<ShareActivity> = store.activity(credentialId)
+
+    fun activityCount(credentialId: String): Int = store.activity(credentialId).size
+
     /** Re-publish the current user's stored credentials to the Android Credential Manager registry. */
     fun registerWithSystem(context: Context) = CredentialRegistry.register(context, store, credentialIds())
     fun deleteCredential(credentialId: String): Result<Unit> = runCatching {
@@ -125,6 +133,8 @@ class WalletRepository(private val client: IssuerClient, private val store: Secu
         deviceRequest: String,
         encryptionInfo: String,
         origin: String,
+        recipientEmail: String? = null,
+        recipientName: String? = null,
     ): Result<Unit> = runCatching {
         val token = freshAccessToken()
         val mdoc = store.mdoc(credentialId) ?: error("Credential could not be unlocked")
@@ -143,7 +153,29 @@ class WalletRepository(private val client: IssuerClient, private val store: Secu
             )
         )
         require(response.success) { response.error ?: "Share failed" }
+        // The disclosure is recorded only now, once it has actually happened: a failed share that
+        // left a line in the log would be a record of something the holder never did.
+        store.recordActivity(
+            ShareActivity(
+                credentialId = credentialId,
+                sharedAt = System.currentTimeMillis(),
+                // A share has a recipient; a presentment has only a verified origin.
+                recipient = recipientEmail?.takeIf { it.isNotBlank() } ?: origin,
+                recipientName = recipientName?.takeIf { it.isNotBlank() },
+                method = ShareActivityCodec.METHOD_EMAIL,
+                // What the relying party asked for is exactly what the wallet disclosed.
+                disclosure = disclosedClaims(deviceRequest),
+            )
+        )
     }
+
+    private fun disclosedClaims(deviceRequest: String): Map<String, List<String>> =
+        runCatching {
+            com.smartcollege.transcript.wallet.presentation.MdocResponseBuilder
+                .parseRequest(deviceRequest)
+                .requestedClaims
+                .mapValues { (_, fields) -> fields.sorted() }
+        }.getOrDefault(emptyMap())
 
     fun isSignedIn(): Boolean = store.accessToken() != null
 

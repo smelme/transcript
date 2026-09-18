@@ -26,6 +26,7 @@ import androidx.lifecycle.compose.LocalLifecycleOwner
 import com.smartcollege.transcript.wallet.data.IssuerClient
 import com.smartcollege.transcript.wallet.data.SecureStore
 import com.smartcollege.transcript.wallet.data.WalletRepository
+import com.smartcollege.transcript.wallet.ui.ActivityScreen
 import com.smartcollege.transcript.wallet.ui.CredentialDetailScreen
 import com.smartcollege.transcript.wallet.ui.CredentialListScreen
 import com.smartcollege.transcript.wallet.ui.OfferScanScreen
@@ -96,6 +97,7 @@ sealed interface Screen {
     data object List : Screen
     data class Detail(val credentialId: String) : Screen
     data class Share(val credentialId: String) : Screen
+    data class Activity(val credentialId: String) : Screen
     data class Receive(val offerUrl: String) : Screen
 }
 
@@ -258,11 +260,17 @@ fun WalletApp(
                     screen = Screen.List
                 },
                 onShare = { screen = Screen.Share(current.credentialId) },
+                onActivity = { screen = Screen.Activity(current.credentialId) },
             )
             is Screen.Share -> ShareFlowScreen(
                 repository,
                 current.credentialId,
                 onDone = { screen = Screen.List },
+                onBack = { screen = Screen.Detail(current.credentialId) },
+            )
+            is Screen.Activity -> ActivityScreen(
+                repository,
+                current.credentialId,
                 onBack = { screen = Screen.Detail(current.credentialId) },
             )
             is Screen.Receive -> ReceiveOfferScreen(

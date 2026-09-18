@@ -41,6 +41,8 @@ import androidx.credentials.provider.PendingIntentHandler
 import androidx.fragment.app.FragmentActivity
 import com.smartcollege.transcript.wallet.data.PresentationEligibility
 import com.smartcollege.transcript.wallet.data.SecureStore
+import com.smartcollege.transcript.wallet.data.ShareActivity
+import com.smartcollege.transcript.wallet.data.ShareActivityCodec
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.Dispatchers
@@ -308,7 +310,7 @@ class PresentationActivity : FragmentActivity() {
                     activity.finishWithFailure("Credential could not be unlocked for sharing")
                     return@LaunchedEffect
                 }
-                buildAndRespond(activity, store, mdocBase64Url, resolvedOrigin, resolvedRequest)
+                buildAndRespond(activity, store, credentialId, mdocBase64Url, resolvedOrigin, resolvedRequest)
             }
         }
 
@@ -387,6 +389,7 @@ class PresentationActivity : FragmentActivity() {
     private fun buildAndRespond(
         activity: PresentationActivity,
         store: SecureStore,
+        credentialId: String,
         mdocBase64Url: String,
         origin: String,
         request: Pair<String, String>,
@@ -403,6 +406,7 @@ class PresentationActivity : FragmentActivity() {
                 )
                 Log.d(TAG, "build ok len=${response.length}")
                 activity.sendResponse(response)
+                recordDisclosure(store, credentialId, origin, request.first)
             } catch (e: Throwable) {
                 Log.e(TAG, "build failed", e)
                 if (e is UserNotAuthenticatedException) {
@@ -413,6 +417,31 @@ class PresentationActivity : FragmentActivity() {
                 }
             }
         }
+    }
+
+    /**
+     * Writes the presentment into the holder's own log. A presentment is a disclosure like any
+     * other, and this wallet is the only place the holder can see that one happened.
+     */
+    private fun recordDisclosure(
+        store: SecureStore,
+        credentialId: String,
+        origin: String,
+        deviceRequest: String,
+    ) {
+        runCatching {
+            val requested = MdocResponseBuilder.parseRequest(deviceRequest).requestedClaims
+            store.recordActivity(
+                ShareActivity(
+                    credentialId = credentialId,
+                    sharedAt = System.currentTimeMillis(),
+                    recipient = origin,
+                    recipientName = null,
+                    method = ShareActivityCodec.METHOD_PRESENTMENT,
+                    disclosure = requested.mapValues { (_, fields) -> fields.sorted() },
+                )
+            )
+        }.onFailure { Log.w(TAG, "disclosure not recorded: ${it.message}") }
     }
 
     private fun sendResponse(encryptedResponseBase64Url: String) {

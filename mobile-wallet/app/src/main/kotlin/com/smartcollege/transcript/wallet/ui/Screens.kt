@@ -30,6 +30,7 @@ import androidx.compose.material3.Checkbox
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Scaffold
@@ -55,7 +56,10 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.smartcollege.transcript.wallet.data.AcademicNamespaces
 import com.smartcollege.transcript.wallet.data.Claim
+import com.smartcollege.transcript.wallet.data.ClaimCatalogue
 import com.smartcollege.transcript.wallet.data.CredentialSummary
+import com.smartcollege.transcript.wallet.data.ShareActivity
+import com.smartcollege.transcript.wallet.data.ShareActivityCodec
 import com.smartcollege.transcript.wallet.data.WalletRepository
 import kotlinx.coroutines.launch
 
@@ -242,19 +246,31 @@ fun CredentialListScreen(
 ) {
     val ids = remember { repository.credentialIds() }
     val summaries = remember(ids) { ids.associateWith { repository.credentialSummary(it) } }
+    // Who is signed in, so the panel can say it and offer the way out. The wallet knows the
+    // email; the holder's name comes from their own credential, which is the name a registrar
+    // would recognise.
+    val email = remember { repository.signedInEmail() }
+    val holderName = remember(summaries) {
+        summaries.values.mapNotNull { it?.fullName?.takeIf { name -> name.isNotBlank() } }.firstOrNull()
+    }
 
     Scaffold(
         topBar = {
             TopAppBar(
                 title = { Text("Quals") },
-                actions = {
-                    TextButton(onClick = onScan) { Text("Scan") }
-                    TextButton(onClick = onSignOut) { Text("Sign out") }
-                },
+                actions = { TextButton(onClick = onScan) { Text("Scan") } },
             )
         },
     ) { padding ->
         Column(Modifier.fillMaxSize().padding(padding)) {
+            ProfilePanel(
+                name = holderName
+                    ?: email?.substringBefore('@')?.takeIf { it.isNotBlank() }
+                    ?: "Signed in",
+                email = email,
+                credentialCount = ids.size,
+                onSignOut = onSignOut,
+            )
             Text(
                 "YOUR CREDENTIALS",
                 style = MaterialTheme.typography.labelLarge,
@@ -298,6 +314,77 @@ private val InstitutionColors = listOf(
     Color(0xFF006064), // teal
     Color(0xFF4E342E), // brown
 )
+
+/**
+ * Who is signed in, what the wallet holds for them, and the way out.
+ *
+ * The account is the holder's own, so it is stated plainly rather than left to be inferred from
+ * the credentials below it - and signing out belongs here, with the account it ends, rather than
+ * in the title bar where it was one tap away from being pressed by accident.
+ */
+@Composable
+private fun ProfilePanel(
+    name: String,
+    email: String?,
+    credentialCount: Int,
+    onSignOut: () -> Unit,
+) {
+    Card(
+        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
+        shape = RoundedCornerShape(16.dp),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+        elevation = CardDefaults.cardElevation(defaultElevation = 1.dp),
+    ) {
+        Column(Modifier.padding(16.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Box(
+                    Modifier
+                        .size(44.dp)
+                        .background(
+                            MaterialTheme.colorScheme.primaryContainer,
+                            RoundedCornerShape(999.dp),
+                        ),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Text(
+                        initialsOf(name).ifBlank { "ID" },
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.onPrimaryContainer,
+                    )
+                }
+                Spacer(Modifier.width(12.dp))
+                Column(Modifier.weight(1f)) {
+                    Text(
+                        name,
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold,
+                    )
+                    if (!email.isNullOrBlank()) {
+                        Text(
+                            email,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                }
+            }
+            Spacer(Modifier.height(10.dp))
+            Text(
+                when (credentialCount) {
+                    0 -> "No credentials in this wallet yet"
+                    1 -> "1 credential in this wallet"
+                    else -> "$credentialCount credentials in this wallet"
+                },
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            Spacer(Modifier.height(6.dp))
+            TextButton(onClick = onSignOut, modifier = Modifier.align(Alignment.End)) {
+                Text("Sign out")
+            }
+        }
+    }
+}
 
 @Composable
 private fun CredentialCard(
@@ -457,15 +544,16 @@ private fun brandOf(institution: String): InstitutionBrand {
     InstitutionBrands[name.lowercase()]?.let { return it }
     // An institution the wallet has no assets for: initials from the name, and a colour from it,
     // so the card still looks intentional rather than falling back to a default.
-    val mark = name
-        .split(' ', '-', '_', '.')
-        .filter { it.isNotBlank() }
-        .take(4)
-        .map { it.first().uppercaseChar() }
-        .joinToString("")
-        .ifBlank { "ID" }
-    return InstitutionBrand(mark, name, institutionColor(name))
+    return InstitutionBrand(initialsOf(name).ifBlank { "ID" }, name, institutionColor(name))
 }
+
+/** Initials for a panel: "University of Auckland" is "AU", "tessa.novak@example.com" is "TN". */
+private fun initialsOf(name: String): String = name
+    .split(' ', '-', '_', '.', '@')
+    .filter { it.isNotBlank() }
+    .take(4)
+    .map { it.first().uppercaseChar() }
+    .joinToString("")
 
 private fun formatDate(raw: String?): String? {
     if (raw.isNullOrBlank()) return null
@@ -485,11 +573,14 @@ fun CredentialDetailScreen(
     credentialId: String,
     onBack: () -> Unit,
     onShare: () -> Unit,
+    onActivity: () -> Unit,
 ) {
     val summary = remember(credentialId) { repository.credentialSummary(credentialId) }
     // The whole document, not the subset the card happens to draw. Read once: it cannot change
     // while the screen is open.
     val claimGroups = remember(credentialId) { repository.credentialClaims(credentialId) }
+    // How many times this credential has been shared, so the way to the record of it can say so.
+    val activityCount = remember(credentialId) { repository.activityCount(credentialId) }
     var confirmDelete by remember { mutableStateOf(false) }
     var deleting by remember { mutableStateOf(false) }
     var deleteError by remember { mutableStateOf<String?>(null) }
@@ -652,6 +743,18 @@ fun CredentialDetailScreen(
                 Text("Share credential", fontWeight = FontWeight.Bold, fontSize = 16.sp)
             }
             Spacer(Modifier.height(12.dp))
+            OutlinedButton(
+                onClick = onActivity,
+                modifier = Modifier.fillMaxWidth().height(52.dp),
+                shape = RoundedCornerShape(14.dp),
+            ) {
+                Text(
+                    if (activityCount == 0) "Activity" else "Activity ($activityCount)",
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 16.sp,
+                )
+            }
+            Spacer(Modifier.height(12.dp))
             Button(
                 onClick = { confirmDelete = true },
                 enabled = !deleting,
@@ -762,6 +865,156 @@ private fun DetailRow(label: String, value: String?) {
     }
 }
 
+/**
+ * What this credential has been used to disclose, newest first.
+ *
+ * The log records which fields were disclosed; their values are read from the credential itself,
+ * because what a relying party received is what the document says and not a copy the wallet kept.
+ * A holder is therefore shown exactly what left the wallet, claim by claim.
+ */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun ActivityScreen(
+    repository: WalletRepository,
+    credentialId: String,
+    onBack: () -> Unit,
+) {
+    val activities = remember(credentialId) { repository.activity(credentialId) }
+    val valuesByLabel = remember(credentialId) {
+        repository.credentialClaims(credentialId)
+            .flatMap { group -> group.claims }
+            .associate { claim -> claim.label to claim.value }
+    }
+    // One entry open at a time: the screen is for reading one disclosure at a time, and every
+    // entry opened at once is the same as none of them being readable.
+    var expanded by remember { mutableStateOf<Int?>(null) }
+
+    Scaffold(
+        topBar = {
+            TopAppBar(
+                title = { Text("Activity") },
+                navigationIcon = { TextButton(onClick = onBack) { Text("Back") } },
+            )
+        },
+    ) { padding ->
+        Column(
+            Modifier
+                .fillMaxSize()
+                .padding(padding)
+                .verticalScroll(rememberScrollState())
+                .padding(16.dp),
+        ) {
+            Text(
+                "Sharing activity",
+                style = MaterialTheme.typography.titleLarge,
+                fontWeight = FontWeight.Bold,
+            )
+            Spacer(Modifier.height(6.dp))
+            Text(
+                "What this credential has been used to share, and with whom.",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.6f),
+            )
+            if (activities.isEmpty()) {
+                Spacer(Modifier.height(24.dp))
+                Text(
+                    "Nothing has been shared from this credential.",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            } else {
+                activities.forEachIndexed { index, activity ->
+                    Spacer(Modifier.height(12.dp))
+                    ActivityCard(
+                        activity = activity,
+                        expanded = expanded == index,
+                        claimValues = valuesByLabel,
+                        onToggle = { expanded = if (expanded == index) null else index },
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun ActivityCard(
+    activity: ShareActivity,
+    expanded: Boolean,
+    claimValues: Map<String, String>,
+    onToggle: () -> Unit,
+) {
+    Card(
+        modifier = Modifier.fillMaxWidth().clickable { onToggle() },
+        shape = RoundedCornerShape(16.dp),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+        elevation = CardDefaults.cardElevation(defaultElevation = 1.dp),
+    ) {
+        Column(Modifier.padding(16.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Column(Modifier.weight(1f)) {
+                    Text(
+                        activity.recipientName?.takeIf { it.isNotBlank() } ?: activity.recipient,
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold,
+                    )
+                    // A named recipient is shown with the address it went to, so the entry is
+                    // identifiable by something other than the name the holder typed.
+                    activity.recipientName?.takeIf { it.isNotBlank() }?.let {
+                        Text(
+                            activity.recipient,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                    Spacer(Modifier.height(4.dp))
+                    Text(
+                        activityLine(activity),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+                Text(
+                    if (expanded) "Hide" else "What was shared",
+                    style = MaterialTheme.typography.labelLarge,
+                    color = MaterialTheme.colorScheme.primary,
+                )
+            }
+            if (expanded) {
+                for ((namespace, elements) in activity.disclosure) {
+                    Spacer(Modifier.height(14.dp))
+                    Text(
+                        ClaimCatalogue.sectionTitleFor(namespace).uppercase(),
+                        style = MaterialTheme.typography.labelLarge,
+                        color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.6f),
+                    )
+                    for (element in elements) {
+                        val label = ClaimCatalogue.labelFor(element)
+                        DetailRow(label, claimValues[label])
+                    }
+                }
+            }
+        }
+    }
+}
+
+/** The collapsed line: how it was shared, when, and how much of the document it covered. */
+private fun activityLine(activity: ShareActivity): String = listOfNotNull(
+    when (activity.method) {
+        ShareActivityCodec.METHOD_PRESENTMENT -> "Presented to a website"
+        else -> "Shared by link"
+    },
+    // A record with no time is shown as undated rather than as 1970, which would read as a
+    // disclosure that never happened.
+    activity.sharedAt.takeIf { it > 0L }?.let(::formatTimestamp),
+    if (activity.sectionCount == 1) "1 section" else "${activity.sectionCount} sections",
+    if (activity.claimCount == 1) "1 field" else "${activity.claimCount} fields",
+).joinToString(" · ")
+
+private fun formatTimestamp(epochMillis: Long): String =
+    java.text.SimpleDateFormat("d MMM yyyy, HH:mm", java.util.Locale.getDefault())
+        .format(java.util.Date(epochMillis))
+
 private data class ShareCategory(val id: String, val label: String, val description: String)
 
 private val ShareCategories = listOf(
@@ -825,7 +1078,17 @@ fun ShareFlowScreen(
                 val deviceRequest = created.deviceRequest ?: error("No device request returned")
                 val encryptionInfo = created.encryptionInfo ?: error("No encryption info returned")
                 val origin = created.origin ?: error("No origin returned")
-                repository.submitShare(shareId, credentialId, deviceRequest, encryptionInfo, origin)
+                repository.submitShare(
+                    shareId = shareId,
+                    credentialId = credentialId,
+                    deviceRequest = deviceRequest,
+                    encryptionInfo = encryptionInfo,
+                    origin = origin,
+                    // Named with the recipient the holder chose, so the record of the share says
+                    // who it went to rather than only which verifier answered.
+                    recipientEmail = recipientEmail,
+                    recipientName = recipientName,
+                )
                     .onSuccess {
                         sharedTo = recipientEmail
                         step = 2
