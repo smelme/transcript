@@ -306,16 +306,14 @@ private fun CredentialCard(
     modifier: Modifier = Modifier,
 ) {
     val institution = summary?.institution?.takeIf { it.isNotBlank() } ?: "Smart Academy"
-    // The kind is the card's title: both kinds are photo-ID documents, so the label is the
-    // only thing that tells the holder which credential they are looking at.
+    // The kind no longer titles the card: there is one kind, and the person's name, the programme
+    // and the figures are what a holder reads.
     val kind = summary?.kind ?: AcademicNamespaces.KIND_UNKNOWN
-    val title = AcademicNamespaces.labelOf(kind)
     val isTranscript = kind == AcademicNamespaces.KIND_TRANSCRIPT
     val isCombined = kind == AcademicNamespaces.KIND_BOTH
     // A study is named by the qualification it belongs to, then the figures it holds. A combined
     // credential holds both halves, so the card shows the programme and the study together.
-    val detail = if (isTranscript || isCombined) {
-        listOfNotNull(
+    val detail = if (isTranscript || isCombined) {        listOfNotNull(
             summary?.programmeTitle?.takeIf { it.isNotBlank() }
                 ?: summary?.awardTitle?.takeIf { it.isNotBlank() },
             summary?.courseCount?.takeIf { it > 0 }?.let { "$it courses" },
@@ -354,7 +352,7 @@ private fun CredentialCard(
             }
             Spacer(Modifier.height(10.dp))
             Text(
-                title,
+                summary?.fullName?.takeIf { it.isNotBlank() } ?: "Credential holder",
                 style = MaterialTheme.typography.titleLarge,
                 color = Color.White,
                 fontWeight = FontWeight.Bold,
@@ -489,13 +487,6 @@ fun CredentialDetailScreen(
                     }
                     Spacer(Modifier.height(16.dp))
                     Text(
-                        AcademicNamespaces.labelOf(kind),
-                        style = MaterialTheme.typography.labelLarge,
-                        color = Color.White.copy(alpha = 0.85f),
-                        fontWeight = FontWeight.Bold,
-                    )
-                    Spacer(Modifier.height(6.dp))
-                    Text(
                         personName,
                         style = MaterialTheme.typography.headlineMedium,
                         color = Color.White,
@@ -539,7 +530,6 @@ fun CredentialDetailScreen(
                 elevation = CardDefaults.cardElevation(defaultElevation = 1.dp),
             ) {
                 Column(Modifier.padding(vertical = 6.dp)) {
-                    DetailRow("Kind", AcademicNamespaces.labelOf(kind))
                     DetailRow("Name", summary?.fullName)
                     DetailRow("Institution", summary?.institution)
                     // Which qualification the study was for. A transcript states this itself, so a

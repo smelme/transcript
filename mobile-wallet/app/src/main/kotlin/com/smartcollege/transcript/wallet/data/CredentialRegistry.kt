@@ -122,9 +122,10 @@ object CredentialRegistry {
      * then who it belongs to.
      */
     internal fun entryTitle(summary: CredentialSummary?): String {
-        val kindLabel = AcademicNamespaces.labelOf(summary?.kind ?: AcademicNamespaces.KIND_UNKNOWN)
+        // One kind now, so the kind label said nothing a holder could act on; the subtitle names
+        // the institution and the study. What the chooser is for is whose credential it is.
         val name = summary?.fullName?.takeIf { it.isNotBlank() }
-        return listOfNotNull(kindLabel, name).joinToString(" - ")
+        return name ?: "Academic credential"
     }
 
     /**

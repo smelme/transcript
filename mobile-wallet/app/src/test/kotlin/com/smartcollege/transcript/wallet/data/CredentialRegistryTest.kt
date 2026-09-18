@@ -111,9 +111,8 @@ class CredentialRegistryTest {
             ),
         )
 
-        // The kind leads, because both kinds are photo-ID documents and the chooser is where
-        // the holder decides which one to present.
-        assertEquals("Qualification certificate - Samuel Melese", entry["title"])
+        // The kind no longer titles the entry: one kind means it told the holder nothing.
+        assertEquals("Samuel Melese", entry["title"])
         assertEquals("Smart Academy · Master · Graduated 2025-06-30", entry["subtitle"])
         assertEquals(
             "6ab66df2-5fee-4481-9e76-7146beee511b",
@@ -135,7 +134,7 @@ class CredentialRegistryTest {
             ),
         )
 
-        assertEquals("Academic transcript - Tessa Novak", entry["title"])
+        assertEquals("Tessa Novak", entry["title"])
         assertEquals(
             "a transcript credential holds no award date, so it is described by what it has",
             "Smart Academy · 3 courses · 24 credits",
@@ -200,7 +199,7 @@ class CredentialRegistryTest {
         )
 
         // One document holding both halves, so nothing is repeated and nothing is left out.
-        assertEquals("Qualification and transcript - Tessa Novak", entry["title"])
+        assertEquals("Tessa Novak", entry["title"])
         assertEquals(
             "Smart Academy · Bachelor of Psychology · Graduated 2025-06-30 · 5 courses · 24 credits",
             entry["subtitle"],
@@ -215,7 +214,7 @@ class CredentialRegistryTest {
             summary = CredentialSummary(fullName = "Someone"),
         )
 
-        assertEquals("Academic credential - Someone", entry["title"])
+        assertEquals("Someone", entry["title"])
         assertEquals(
             "no institution and no kind is stated as such rather than guessed at",
             "Academic credential",

@@ -412,9 +412,7 @@ function ClaimFlow() {
                         onChange={() => !c.inWallet && toggle(c.sessionId)}
                       />
                       <div style={{ flex: 1 }}>
-                        <h3>
-                          {c.title} <span className="badge kind">{c.label}</span>
-                        </h3>
+                        <h3>{c.title}</h3>
                         <div className="meta">
                           {c.institution}
                           {c.degreeLevel ? ` · ${c.degreeLevel}` : ''}
