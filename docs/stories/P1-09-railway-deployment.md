@@ -1,7 +1,7 @@
 # P1-09: The system runs on Railway
 
 **Priority:** P1. The demo has to be reachable without a laptop running it
-**Status:** Deployed and verified. Four items remain, listed below
+**Status:** Deployed, verified, and emailing. Two items remain, listed below
 **Components:** `railway.json` (removed), `scripts/prepare-signer-keys.mjs`, `docs/deployment/railway.md`, `.env.example`
 
 ## What was deployed
@@ -63,31 +63,32 @@ placeholders (`admin@transcript.local`, `registrar@transcript.local`) and the pa
 
 ## What is still open
 
-1. **Email.** The Brevo key and sender are set on the issuer, and the provider refuses every send: it
-   answers `401` because the deployment's outbound address is not on the account's authorised list.
-   The fix is in the Brevo account, not in this code. Either allow the address it names in the
-   refusal, or turn the restriction off. Note that Railway's outbound address is not fixed, so an
-   allowlisted address can stop matching when the service moves; a static egress address is the
-   durable version of that option. The code logs the refusal in full, so the cause is never a
-   mystery.
-   The academy flow depends on the one-time code, so it cannot be walked end to end until a send
-   succeeds. What the failure looks like from the outside is worth knowing: the request still
-   succeeds, the item is prepared, and the page offers the claim link instead, which is why the
-   fallback wording says the email could not be sent rather than claiming email is unconfigured.
-   Note too that a share carries a link and the issuer logs that link when a send does not happen,
-   so a share can still be followed by hand. A sign-in code is sent as text in the body of the
-   message, so nothing in the log recovers it. Local development is unaffected, because with
-   `NODE_ENV` unset the issuer accepts a development code. Production deliberately does not, and
-   should not be changed to: that flag lets anyone sign in as anyone.
-2. **The administrator passwords.** They must be changed from the placeholders, and the addresses to
+1. **The administrator passwords.** They must be changed from the placeholders, and the addresses to
    real ones. The seeded account is not recreated when the variables change, so a new password is set
    in the portal rather than in the dashboard.
-3. **Android App Links.** `/.well-known/assetlinks.json` held the fingerprint of the debug keystore
-   on the machine that built the wallet, which covers a build installed from Android Studio. A
-   release build needs its own fingerprint added to the same variable, comma separated.
-4. **The wallet release.** It must be built against these addresses with a signing key, which is not
+2. **The wallet release.** It must be built against these addresses with a signing key, which is not
    in the repository:
    `./gradlew assembleRelease -PissuerBaseUrl=<issuer> -PwalletAppLinkHost=<academy-host>`.
+   A release build also needs its own App Link fingerprint added to `ANDROID_APP_SHA256`, comma
+   separated after the debug one that is there today.
+
+## The email provider, which took two attempts
+
+Sending failed at first with `401 unauthorized`. The cause was not the key or the sender: Brevo has an
+authorised-address setting, and the deployment's outbound address was not on it. The refusal named
+the address, so there was nothing to guess. It is fixed in the Brevo account.
+
+Two things worth keeping:
+
+- Railway's outbound address is **not fixed**. Allowing the address that was refused works today and
+  can stop matching when the service moves. A static egress address is the durable version.
+- The address in that refusal was the deployment's, not the developer's machine's, which is why a send
+  that works locally can fail once deployed while everything else about it looks identical.
+
+Once a send succeeds the academy flow is complete: the credentials-ready email carries the claim link,
+and the sign-in code arrives as a message. The code is not returned in the API response in
+production, which is correct, and is why the flow is verified by walking it rather than by reading a
+response body.
 
 ## Two things found while setting this up
 
@@ -118,5 +119,6 @@ no code reads is a liability with no upside. Wiring a real provider is its own s
   Met, and demonstrated by two rows with timestamps either side of a redeploy.
 - `git grep` finds no private key material, and the prepare step is the only thing that writes keys to
   disk. Met.
-- A credential claimed at the academy verifies at the verifier and appears in the portal, with email
-  configured. Blocked on item 1, which needs a Brevo key.
+- A credential claimed at the academy verifies at the verifier and appears in the portal. The issuer
+  now sends both emails and refuses none, so the remaining dependency is a phone with the wallet on
+  it, not the deployment.

@@ -164,6 +164,25 @@ from a link. It answers 404 until `ANDROID_APP_SHA256` is set on the academy ser
 fingerprint of the certificate the wallet is signed with. Set it in the same breath as building the
 release, or tapping a link opens the browser instead of the wallet.
 
+The value set on this deployment is the fingerprint of the **debug** keystore on the machine that
+built it, which is what an app installed straight from Android Studio is signed with. It is correct
+for testing on a phone and wrong for any release build. A release fingerprint is added to the same
+variable, separated by a comma, and both then work:
+
+```
+ANDROID_APP_SHA256=<debug fingerprint>,<release fingerprint>
+```
+
+Get the release one from the keystore:
+
+```
+keytool -list -v -keystore <your keystore> -alias <alias>
+```
+
+This route reads the environment on every request, which is not the default. Next would otherwise
+settle the answer during the build and serve it until the next build, so setting the fingerprint
+after a deployment would look like it had done nothing.
+
 ## How a deploy happens
 
 ### Today, from a machine
@@ -219,5 +238,8 @@ domain does not, so without TLS the wallet can claim a credential but never pres
 - **Multiple instances.** See above.
 - **The Digital Credentials API for issuance.** Rolled back deliberately: the platform has no
   issuance API yet. Presentation does work.
+- **A payment provider.** The checkout in the issuer is simulated: it records a fee, marks the
+  session pending and then paid, and calls nobody. Stripe keys are not read anywhere in this
+  repository, so setting them would achieve nothing.
 - **Backups.** A Railway volume is persistent, not backed up. Worth arranging before anyone relies
   on it.
