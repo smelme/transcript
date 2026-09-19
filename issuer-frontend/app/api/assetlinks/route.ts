@@ -21,6 +21,11 @@ const SHA256_FINGERPRINTS = (process.env.ANDROID_APP_SHA256 || '')
   .map((value) => value.trim())
   .filter(Boolean);
 
+// Read the environment on every request. Without this, Next evaluates the route once during the
+// build and then serves that answer for the life of the deployment, so setting the fingerprint
+// would appear to do nothing until the next build.
+export const dynamic = 'force-dynamic';
+
 export function GET() {
   if (SHA256_FINGERPRINTS.length === 0) {
     return NextResponse.json(
