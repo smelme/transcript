@@ -27,11 +27,11 @@ import com.smartcollege.transcript.wallet.data.IssuerClient
 import com.smartcollege.transcript.wallet.data.SecureStore
 import com.smartcollege.transcript.wallet.data.WalletRepository
 import com.smartcollege.transcript.wallet.ui.ActivityScreen
+import com.smartcollege.transcript.wallet.ui.AddCredentialScreen
 import com.smartcollege.transcript.wallet.ui.CredentialDetailScreen
 import com.smartcollege.transcript.wallet.ui.CredentialListScreen
-import com.smartcollege.transcript.wallet.ui.OfferScanScreen
 import com.smartcollege.transcript.wallet.ui.QualsTheme
-import com.smartcollege.transcript.wallet.ui.ReceiveOfferScreen
+import com.smartcollege.transcript.wallet.ui.ScanScreen
 import com.smartcollege.transcript.wallet.ui.ShareFlowScreen
 import com.smartcollege.transcript.wallet.ui.SignInScreen
 import kotlinx.coroutines.launch
@@ -93,12 +93,16 @@ class MainActivity : FragmentActivity() {
 
 sealed interface Screen {
     data object SignIn : Screen
+
+    /** The reader: camera first, no page in the way. */
     data object Scan : Screen
     data object List : Screen
     data class Detail(val credentialId: String) : Screen
     data class Share(val credentialId: String) : Screen
     data class Activity(val credentialId: String) : Screen
-    data class Receive(val offerUrl: String) : Screen
+
+    /** Add a credential from a link, whether pasted or the one the wallet was opened with. */
+    data class Add(val offerUrl: String?) : Screen
 }
 
 @Composable
@@ -196,7 +200,7 @@ fun WalletApp(
     // first and lands here afterwards.
     LaunchedEffect(initialOfferUrl, signedIn, unlocked) {
         if (!initialOfferUrl.isNullOrBlank() && signedIn && unlocked) {
-            screen = Screen.Receive(initialOfferUrl)
+            screen = Screen.Add(initialOfferUrl)
         }
     }
 
@@ -221,15 +225,15 @@ fun WalletApp(
                     screen = Screen.List
                 },
             )
-            Screen.Scan -> OfferScanScreen(
+            Screen.Scan -> ScanScreen(
                 repository,
                 onScannerOpenChange = { scannerOpen = it },
-                onDone = {
+                onClaimed = {
                     scannerOpen = false
                     hasCredentials = repository.credentialIds().isNotEmpty()
                     screen = Screen.List
                 },
-                onBack = {
+                onCancel = {
                     scannerOpen = false
                     screen = Screen.List
                 },
@@ -237,6 +241,7 @@ fun WalletApp(
             Screen.List -> CredentialListScreen(
                 repository,
                 onScan = { screen = Screen.Scan },
+                onAdd = { screen = Screen.Add(null) },
                 onOpen = { screen = Screen.Detail(it) },
                 onSignOut = {
                     val refreshToken = repository.signOut()
@@ -273,7 +278,7 @@ fun WalletApp(
                 current.credentialId,
                 onBack = { screen = Screen.Detail(current.credentialId) },
             )
-            is Screen.Receive -> ReceiveOfferScreen(
+            is Screen.Add -> AddCredentialScreen(
                 repository = repository,
                 offerUrl = current.offerUrl,
                 onDone = {
@@ -281,7 +286,7 @@ fun WalletApp(
                     onOfferConsumed()
                     screen = Screen.List
                 },
-                onCancel = {
+                onBack = {
                     onOfferConsumed()
                     screen = if (signedIn) Screen.List else Screen.SignIn
                 },

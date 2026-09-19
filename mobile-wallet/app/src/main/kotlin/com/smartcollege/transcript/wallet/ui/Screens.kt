@@ -39,6 +39,7 @@ import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Scaffold
@@ -253,6 +254,7 @@ fun SignInScreen(repository: WalletRepository, onSignedIn: () -> Unit) {
 fun CredentialListScreen(
     repository: WalletRepository,
     onScan: () -> Unit,
+    onAdd: () -> Unit,
     onOpen: (String) -> Unit,
     onSignOut: () -> Unit,
 ) {
@@ -270,7 +272,10 @@ fun CredentialListScreen(
         topBar = {
             TopAppBar(
                 title = { Text("Quals") },
-                actions = { TextButton(onClick = onScan) { Text("Scan") } },
+                actions = {
+                    TextButton(onClick = onAdd) { Text("Add") }
+                    TextButton(onClick = onScan) { Text("Scan") }
+                },
             )
         },
     ) { padding ->
@@ -294,7 +299,9 @@ fun CredentialListScreen(
                     Column(horizontalAlignment = Alignment.CenterHorizontally) {
                         Text("No credentials yet")
                         Spacer(Modifier.height(8.dp))
-                        Button(onClick = onScan) { Text("Scan offer QR") }
+                        Button(onClick = onScan) { Text("Scan a QR code") }
+                        Spacer(Modifier.height(8.dp))
+                        OutlinedButton(onClick = onAdd) { Text("Add credential from a link") }
                     }
                 }
             } else {
