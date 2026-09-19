@@ -17,7 +17,19 @@ if (-not (Test-Path $adb)) { $adb = 'adb' }
 
 $devices = & $adb devices | Select-String '\sdevice$'
 if (-not $devices) {
-    Write-Error 'No Android device detected. Connect the phone over USB and enable USB debugging.'
+    # A phone that is attached but has not trusted this computer is the common case, and it looks
+    # nothing like "no device": it is on the cable, it just cannot be talked to.
+    if (& $adb devices | Select-String 'unauthorized$') {
+        Write-Error @'
+The phone is attached but not authorised, so no tunnel can be created.
+
+  Accept "Allow USB debugging?" on the phone (tick "Always allow from this computer"), then run
+  this script again. If no prompt appears, revoke the old trust on the phone under
+  Developer options -> Revoke USB debugging authorisations, reconnect, and accept the prompt.
+'@
+    } else {
+        Write-Error 'No Android device detected. Connect the phone over USB and enable USB debugging.'
+    }
     exit 1
 }
 

@@ -99,6 +99,21 @@ if (Test-Path $adb) {
     $phonePorts = @(3000, 3001, 3002, 3003, 3004, 3007)
     foreach ($port in $phonePorts) { & $adb reverse "tcp:$port" "tcp:$port" | Out-Null }
     Write-Host "`nPhone detected: USB tunnels restored for $($phonePorts -join ', ')." -ForegroundColor Green
+  } elseif ($deviceState -eq 'unauthorized') {
+    # The phone is on the cable but has not trusted this computer, so no tunnel can be created and
+    # the wallet fails with "failed to connect to /127.0.0.1:3000" while every service is up.
+    # Say so here, where the cause is fixable, rather than leaving it to be found on the phone.
+    Write-Warning @'
+Phone attached but NOT authorised: no USB tunnels were created, and the wallet will fail with
+"failed to connect to /127.0.0.1:3000" until this is fixed.
+
+  Accept "Allow USB debugging?" on the phone (tick "Always allow from this computer"), then run:
+      ./scripts/phone-connect.ps1
+  No prompt appearing? Revoke the old trust on the phone under Developer options ->
+  Revoke USB debugging authorisations, reconnect the cable, and accept the prompt.
+'@
+  } elseif ($deviceState) {
+    Write-Warning "Phone reported state '$deviceState', so no USB tunnels were created."
   }
 }
 
