@@ -61,7 +61,7 @@ unset, each one proxies to localhost and fails in a way that looks like the serv
 | Service | Variable | Value |
 | --- | --- | --- |
 | `academy` | `ISSUER_API_URL` | `https://<issuer-domain>` |
-| `portal` | the issuer address, read by its `/api` route handler | `https://<issuer-domain>` |
+| `portal` | `ISSUER_API_URL` | `https://<issuer-domain>` |
 | `my-jobs` | `VERIFIER_API_URL` | `https://<verifier-domain>` |
 | `trust-university` | `VERIFIER_API_URL` | `https://<verifier-domain>` |
 
