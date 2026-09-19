@@ -72,6 +72,9 @@ class SecureStore(context: Context) {
         return (ks.getEntry(KEY_ALIAS, null) as KeyStore.PrivateKeyEntry).privateKey
     }
 
+    /** The public half of the device key, which is what a credential is bound to. */
+    fun devicePublicJwk(): Map<String, String> = getOrCreateDeviceKey().publicJwk
+
     /** Build the public JWK { kty, crv, x, y } from an EC P-256 public key. */
     private fun publicJwk(key: ECPublicKey): Map<String, String> {
         val size = (key.params.curve.field.fieldSize + 7) / 8

@@ -40,6 +40,12 @@ class WalletRepository(private val client: IssuerClient, private val store: Secu
 
     /** Claim an issuance offer: one BFF call, the mdoc is returned and stored. */
     suspend fun claim(offerUrl: String): Result<StoredCredential> = runCatching {
+        // A standard OpenID4VCI offer is claimed the standard way, which brings its own access
+        // token and needs no sign-in of ours. Our own offer shape is not a standard one, so it
+        // falls through to the path the wallet has always used.
+        CredentialOffer.parse(offerUrl)
+            ?.takeIf { it.preAuthorizedCode != null }
+            ?.let { return@runCatching claimThroughOpenId4Vci(it) }
         val token = freshAccessToken()
         val offer = Cwt.parseOffer(offerUrl) ?: error("Invalid credential offer")
         val deviceKey = store.getOrCreateDeviceKey()
@@ -52,6 +58,71 @@ class WalletRepository(private val client: IssuerClient, private val store: Secu
         store.saveMdoc(id, mdoc, ownerEmail = store.ownerEmail())
         store.saveCredentialSummary(id, summary)
         StoredCredential(id, response.docType ?: "org.iso.23220.photoid.1", mdoc, response.deviceBound, summary)
+    }
+
+    /**
+     * Claim a credential through the OpenID4VCI pre-authorized code flow.
+     *
+     * No wallet sign-in is needed: the code in the offer is the authorization, and the access token
+     * it buys belongs to the issuance rather than to the holder's account. The credential comes back
+     * bound to this device's key, which is what the proof of possession is for.
+     */
+    private suspend fun claimThroughOpenId4Vci(offer: CredentialOffer): StoredCredential {
+        val metadataJson = client.oid4vciMetadata(offer.credentialIssuer)
+            ?: error("The issuer did not publish its metadata")
+        val metadata = IssuerMetadata.parse(metadataJson)
+            ?: error("The issuer's metadata could not be read")
+        val configuration = metadata.configurationFor(offer.configurationIds)
+            ?: error("This wallet does not know ${offer.configurationIds.joinToString()}")
+
+        val token = client.oid4vciToken(offer.credentialIssuer, offer.preAuthorizedCode.orEmpty())
+        val accessToken = token.accessToken ?: error(token.error ?: "The issuer refused the offer")
+        val nonce = metadata.nonceEndpoint
+            ?.let { endpoint -> runCatching { client.oid4vciNonce(endpoint) }.getOrNull() }
+            ?.cNonce
+
+        val proof = ProofOfPossession.build(
+            privateKey = store.devicePrivateKey(),
+            publicJwk = store.devicePublicJwk(),
+            audience = metadata.credentialIssuer,
+            nonce = nonce,
+        )
+        val issued = client.oid4vciCredential(
+            credentialEndpoint = metadata.credentialEndpoint,
+            accessToken = accessToken,
+            request = Oid4vciCredentialRequest(configuration.id, Oid4vciProofs(listOf(proof))),
+        )
+        val mdoc = issued.credentials.firstOrNull()?.credential?.takeIf { it.isNotBlank() }
+            ?: error(issued.error ?: "The issuer did not return a credential")
+
+        // The credential arrives without an id, so the wallet names the copy it stores. The
+        // issuer's notification id is kept only long enough to tell it what happened.
+        val credentialId = java.util.UUID.randomUUID().toString()
+        store.saveMdoc(credentialId, mdoc, ownerEmail = store.ownerEmail())
+        val summary = MdocParser.readCredentialSummary(mdoc) ?: CredentialSummary()
+        store.saveCredentialSummary(credentialId, summary)
+
+        issued.notificationId?.let { notificationId ->
+            metadata.notificationEndpoint?.let { endpoint ->
+                // Best effort: a notification that fails must not cost the holder a credential it
+                // has already been given.
+                runCatching {
+                    client.oid4vciNotify(
+                        endpoint,
+                        accessToken,
+                        Oid4vciNotification(notificationId, "credential_accepted"),
+                    )
+                }
+            }
+        }
+
+        return StoredCredential(
+            credentialId = credentialId,
+            docType = configuration.doctype,
+            mdocBase64url = mdoc,
+            deviceBound = true,
+            summary = summary,
+        )
     }
 
     /** Credential ids belonging to the currently signed-in account. */

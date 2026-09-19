@@ -3,8 +3,11 @@ package com.smartcollege.transcript.wallet.data
 import io.ktor.client.HttpClient
 import io.ktor.client.call.body
 import io.ktor.client.plugins.contentnegotiation.ContentNegotiation
+import io.ktor.client.request.get
+import io.ktor.client.request.header
 import io.ktor.client.request.post
 import io.ktor.client.request.setBody
+import io.ktor.client.statement.bodyAsText
 import io.ktor.http.ContentType
 import io.ktor.http.contentType
 import io.ktor.serialization.kotlinx.json.json
@@ -161,6 +164,54 @@ class IssuerClient(private val baseUrl: String) {
             contentType(ContentType.Application.Json)
             setBody(IssuanceRequest(offerUrl, accessToken, cwt))
         }.body()
+
+    /**
+     * The issuer's published capabilities, as OpenID4VCI defines them.
+     *
+     * A wallet reads this before anything else, which is what frees it from knowing an issuer's
+     * endpoints in advance.
+     */
+    suspend fun oid4vciMetadata(issuer: String): String? =
+        runCatching {
+            client.get("$issuer/.well-known/openid-credential-issuer").bodyAsText()
+        }.getOrNull()
+
+    /** Exchange the pre-authorized code from an offer for an access token. */
+    suspend fun oid4vciToken(issuer: String, preAuthorizedCode: String): Oid4vciTokenResponse =
+        client.post("$issuer/token") {
+            contentType(ContentType.Application.FormUrlEncoded)
+            setBody(
+                "grant_type=urn:ietf:params:oauth:grant-type:pre-authorized_code" +
+                    "&pre-authorized_code=$preAuthorizedCode",
+            )
+        }.body()
+
+    suspend fun oid4vciNonce(nonceEndpoint: String): Oid4vciNonceResponse =
+        client.post(nonceEndpoint).body()
+
+    suspend fun oid4vciCredential(
+        credentialEndpoint: String,
+        accessToken: String,
+        request: Oid4vciCredentialRequest,
+    ): Oid4vciCredentialResponse =
+        client.post(credentialEndpoint) {
+            contentType(ContentType.Application.Json)
+            header("Authorization", "Bearer $accessToken")
+            setBody(request)
+        }.body()
+
+    /** Tell the issuer what became of the credential. The holder already has it either way. */
+    suspend fun oid4vciNotify(
+        notificationEndpoint: String,
+        accessToken: String,
+        request: Oid4vciNotification,
+    ) {
+        client.post(notificationEndpoint) {
+            contentType(ContentType.Application.Json)
+            header("Authorization", "Bearer $accessToken")
+            setBody(request)
+        }
+    }
 
     suspend fun createShare(request: ShareCreateRequest): ShareCreateResponse =
         client.post("$baseUrl/shares") {
