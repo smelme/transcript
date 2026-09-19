@@ -93,6 +93,15 @@ class SecureStore(context: Context) {
         }
     }
 
+    /**
+     * How the wallet should be drawn. Kept beside the other wallet settings rather than with the
+     * credential material: this is a preference, not a secret.
+     */
+    fun saveAppearance(appearance: Appearance) =
+        prefs.edit().putString("appearance", appearance.stored).apply()
+
+    fun appearance(): Appearance = Appearance.of(prefs.getString("appearance", null))
+
     fun saveAccessToken(token: String) = prefs.edit().putString(KEY_TOKEN, token).apply()
     fun accessToken(): String? = prefs.getString(KEY_TOKEN, null)
     fun clearAccessToken() = prefs.edit().remove(KEY_TOKEN).apply()

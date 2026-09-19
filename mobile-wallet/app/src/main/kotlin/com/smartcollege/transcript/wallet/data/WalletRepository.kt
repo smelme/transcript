@@ -61,6 +61,11 @@ class WalletRepository(private val client: IssuerClient, private val store: Secu
     /** The account this wallet is signed in as, for the profile panel. */
     fun signedInEmail(): String? = store.ownerEmail()
 
+    /** How the holder wants the wallet to look, as they last chose it. */
+    fun appearance(): Appearance = store.appearance()
+
+    fun setAppearance(appearance: Appearance) = store.saveAppearance(appearance)
+
     /** What this credential has been used to disclose, newest first. */
     fun activity(credentialId: String): List<ShareActivity> = store.activity(credentialId)
 

@@ -6,6 +6,7 @@ import androidx.compose.material3.darkColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.graphics.Color
+import com.smartcollege.transcript.wallet.data.Appearance
 
 // Quals brand palette — green & white with a gold accent.
 val QualsGold = Color(0xFFFFC400)
@@ -61,3 +62,8 @@ fun QualsTheme(
         content = content,
     )
 }
+
+/** The theme as the holder asked for it: their choice, or the device's if they have not chosen. */
+@Composable
+fun QualsTheme(appearance: Appearance, content: @Composable () -> Unit) =
+    QualsTheme(darkTheme = appearance.dark(isSystemInDarkTheme()), content = content)

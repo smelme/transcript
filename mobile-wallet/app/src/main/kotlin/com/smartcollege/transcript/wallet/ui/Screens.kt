@@ -37,6 +37,7 @@ import androidx.compose.material3.Checkbox
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
@@ -68,6 +69,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.smartcollege.transcript.wallet.data.AcademicNamespaces
+import com.smartcollege.transcript.wallet.data.Appearance
 import com.smartcollege.transcript.wallet.data.Claim
 import com.smartcollege.transcript.wallet.data.ClaimCatalogue
 import com.smartcollege.transcript.wallet.data.ClaimGroup
@@ -259,6 +261,8 @@ fun CredentialListScreen(
     onAdd: () -> Unit,
     onOpen: (String) -> Unit,
     onSignOut: () -> Unit,
+    appearance: Appearance = Appearance.System,
+    onAppearanceChange: (Appearance) -> Unit = {},
     message: String? = null,
     onMessageShown: () -> Unit = {},
 ) {
@@ -301,6 +305,9 @@ fun CredentialListScreen(
                 email = email,
                 credentialCount = ids.size,
                 onSignOut = onSignOut,
+                onScan = onScan,
+                appearance = appearance,
+                onAppearanceChange = onAppearanceChange,
             )
             Text(
                 "YOUR CREDENTIALS",
@@ -353,6 +360,9 @@ private fun AccountPanel(
     email: String?,
     credentialCount: Int,
     onSignOut: () -> Unit,
+    onScan: () -> Unit,
+    appearance: Appearance,
+    onAppearanceChange: (Appearance) -> Unit,
 ) {
     var expanded by remember { mutableStateOf(false) }
 
@@ -412,7 +422,32 @@ private fun AccountPanel(
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
+                Spacer(Modifier.height(12.dp))
+                // The camera again, for a holder who looks under their account rather than in the
+                // title bar, and the display choice, which belongs to the wallet rather than to
+                // any one credential.
+                TextButton(
+                    onClick = onScan,
+                    modifier = Modifier.align(Alignment.Start),
+                ) {
+                    Text("Scan a QR code")
+                }
                 Spacer(Modifier.height(4.dp))
+                Text(
+                    "Appearance",
+                    style = MaterialTheme.typography.labelLarge,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                Spacer(Modifier.height(8.dp))
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Appearance.entries.forEach { option ->
+                        FilterChip(
+                            selected = option == appearance,
+                            onClick = { onAppearanceChange(option) },
+                            label = { Text(option.label) },
+                        )
+                    }
+                }
                 TextButton(onClick = onSignOut, modifier = Modifier.align(Alignment.End)) {
                     Text("Sign out")
                 }

@@ -23,6 +23,7 @@ import androidx.fragment.app.FragmentActivity
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
+import com.smartcollege.transcript.wallet.data.Appearance
 import com.smartcollege.transcript.wallet.data.IssuerClient
 import com.smartcollege.transcript.wallet.data.SecureStore
 import com.smartcollege.transcript.wallet.data.WalletRepository
@@ -44,6 +45,9 @@ class MainActivity : FragmentActivity() {
      */
     private val incomingOffer = mutableStateOf<String?>(null)
 
+    /** The holder's appearance choice, applied to the theme and written down when changed. */
+    private val appearance = mutableStateOf(Appearance.System)
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
@@ -52,12 +56,18 @@ class MainActivity : FragmentActivity() {
         val repository = WalletRepository(client, store)
 
         incomingOffer.value = extractOfferUrl(intent)
+        appearance.value = repository.appearance()
 
         setContent {
-            QualsTheme {
+            QualsTheme(appearance.value) {
                 WalletApp(
                     repository = repository,
                     activity = this,
+                    appearance = appearance.value,
+                    onAppearanceChange = { chosen ->
+                        appearance.value = chosen
+                        repository.setAppearance(chosen)
+                    },
                     initialOfferUrl = incomingOffer.value,
                     onOfferConsumed = { incomingOffer.value = null },
                 )
@@ -101,7 +111,7 @@ sealed interface Screen {
     data class Share(val credentialId: String) : Screen
     data class Activity(val credentialId: String) : Screen
 
-    /** Add a credential from a link, whether pasted or the one the wallet was opened with. */
+    /** Add credential: scan the offer an institution sent, or claim the link that opened us. */
     data class Add(val offerUrl: String?) : Screen
 }
 
@@ -109,6 +119,8 @@ sealed interface Screen {
 fun WalletApp(
     repository: WalletRepository,
     activity: FragmentActivity,
+    appearance: Appearance = Appearance.System,
+    onAppearanceChange: (Appearance) -> Unit = {},
     initialOfferUrl: String? = null,
     onOfferConsumed: () -> Unit = {},
 ) {
@@ -249,6 +261,8 @@ fun WalletApp(
                 },
                 onAdd = { screen = Screen.Add(null) },
                 onOpen = { screen = Screen.Detail(it) },
+                appearance = appearance,
+                onAppearanceChange = onAppearanceChange,
                 message = scanMessage,
                 onMessageShown = { scanMessage = null },
                 onSignOut = {
