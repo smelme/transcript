@@ -31,7 +31,6 @@ import {
   todayIso,
 } from './credential-generator.js';
 import * as emailService from './email-service.js';
-import { registerOpenId4Vci, CREDENTIAL_CONFIGURATION_ID } from './openid4vci.js';
 import { getDb } from '../../db.js';
 import {
   packStatusList,
@@ -1321,10 +1320,6 @@ const shareService = new ShareService({
 function buildCredentialOfferUrl(session, { reissue = false } = {}) {
   const offer = {
     credential_issuer: process.env.ISSUER_BASE_URL || 'https://issuer.smartcollege.example',
-    // The standard names the offered credential configuration. The fields below it are what our own
-    // wallet builds read; a conformant wallet must ignore parameters it does not recognise, which
-    // is what lets the two coexist in one offer.
-    credential_configuration_ids: [CREDENTIAL_CONFIGURATION_ID],
     issuer_id: session.institution,
     credentials: [docTypeOf(session)],
     grants: {
@@ -2394,10 +2389,6 @@ app.use((err, req, res, _next) => {
 });
 
 // Export for testing
-// The OpenID4VCI issuance surface: issuer metadata, token, nonce, credential and notification. A
-// conformant wallet can run the whole flow against these without any Smart College specific path.
-registerOpenId4Vci(app, { issuer });
-
 export { IssuerService, app, issuer, buildCredentialOfferUrl, isReissueOffer };
 
 // Start server if run directly (robust entry-point detection)

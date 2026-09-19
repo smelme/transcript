@@ -53,3 +53,29 @@ Sequence it the other way round from the ask:
 - **Android-side issuance API unverified** — the two `developer.android.com` pages for issuance
   404'd, so `CreateDigitalCredentialRequest` availability in the wallet's `androidx.credentials`
   version and the Android version it needs are both unchecked. Resolve before estimating Phase 2.
+
+## Status — Phase 1 implemented, then rolled back (2026-09-19)
+
+Phase 1 was built, tested and reverted. It worked (issuer 96 tests, wallet 58, and a conformant
+round trip against the running issuer), but the pre-authorized code grant identifies nobody: the
+code is the session id, nothing there answers to the legacy path's `hasLink(sub, institution,
+studentId)` check, and the credential then binds to whoever scanned the offer. That is a weaker
+guarantee than the path it was meant to replace, so issuing anonymously is not a trade worth making
+for interop we do not need yet.
+
+The work is in history rather than lost:
+
+- `4cbdce5` — issuer surface: metadata, token, nonce, credential and notification endpoints
+- `501d7b1` — wallet client: offer and metadata parsing, proof of possession, claim via the flow
+
+Reverting the revert, or cherry-picking those two commits, brings it back unchanged. Before it
+returns, the account binding has to be settled — `tx_code` out of band, a pre-authorized code bound
+at mint time to the account's registered device keys, or the `authorization_code` grant with
+Keycloak so the access token carries `sub` and the same account check applies.
+
+The offer no longer carries `credential_configuration_ids`, and the legacy `/wallet/issuance` path
+is once again the only way to claim.
+
+**Phase 2's blocking unknown is now resolved** (this outlives the rollback): `androidx.credentials`
+1.5.0 ships no issuance API — passkeys, passwords and presentation only — so there is nothing in the
+Android credential manager for an offer to be handed to. QR stays first-class until that changes.
