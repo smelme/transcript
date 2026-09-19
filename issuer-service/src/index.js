@@ -2103,7 +2103,7 @@ app.post('/academy/requests', async (req, res) => {
         ? 'These credentials are already in your wallet, so no new link was emailed. You can issue another copy from here.'
         : sent.success
           ? 'We have emailed you a link to add your credentials to your wallet.'
-          : 'Email delivery is not configured. Use the link below to continue.',
+          : 'We could not email you the link. Use the link below to continue.',
     });
   } catch (e) {
     res.status(400).json({ success: false, error: e.message });

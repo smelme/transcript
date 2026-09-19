@@ -63,22 +63,42 @@ placeholders (`admin@transcript.local`, `registrar@transcript.local`) and the pa
 
 ## What is still open
 
-1. **Email.** No Brevo key is configured, so sign-in codes and share notifications are not sent. The
-   academy flow depends on the one-time code, so it cannot be walked end to end until this is set.
-   Note what that means precisely: a share carries a link, and the issuer logs that link when there
-   is no provider, so a share can still be followed by hand. A sign-in code is sent as text in the
-   body of the message, so nothing in the log recovers it. Local development is unaffected, because
-   with `NODE_ENV` unset the issuer accepts a development code. Production deliberately does not, and
+1. **Email.** The Brevo key and sender are set on the issuer, and the provider refuses every send: it
+   answers `401` because the deployment's outbound address is not on the account's authorised list.
+   The fix is in the Brevo account, not in this code. Either allow the address it names in the
+   refusal, or turn the restriction off. Note that Railway's outbound address is not fixed, so an
+   allowlisted address can stop matching when the service moves; a static egress address is the
+   durable version of that option. The code logs the refusal in full, so the cause is never a
+   mystery.
+   The academy flow depends on the one-time code, so it cannot be walked end to end until a send
+   succeeds. What the failure looks like from the outside is worth knowing: the request still
+   succeeds, the item is prepared, and the page offers the claim link instead, which is why the
+   fallback wording says the email could not be sent rather than claiming email is unconfigured.
+   Note too that a share carries a link and the issuer logs that link when a send does not happen,
+   so a share can still be followed by hand. A sign-in code is sent as text in the body of the
+   message, so nothing in the log recovers it. Local development is unaffected, because with
+   `NODE_ENV` unset the issuer accepts a development code. Production deliberately does not, and
    should not be changed to: that flag lets anyone sign in as anyone.
 2. **The administrator passwords.** They must be changed from the placeholders, and the addresses to
    real ones. The seeded account is not recreated when the variables change, so a new password is set
    in the portal rather than in the dashboard.
-3. **Android App Links.** `/.well-known/assetlinks.json` answers 404 until `ANDROID_APP_SHA256` holds
-   the SHA-256 fingerprint of the wallet's signing certificate. Until then a tapped link opens the
-   browser instead of the wallet.
+3. **Android App Links.** `/.well-known/assetlinks.json` held the fingerprint of the debug keystore
+   on the machine that built the wallet, which covers a build installed from Android Studio. A
+   release build needs its own fingerprint added to the same variable, comma separated.
 4. **The wallet release.** It must be built against these addresses with a signing key, which is not
    in the repository:
    `./gradlew assembleRelease -PissuerBaseUrl=<issuer> -PwalletAppLinkHost=<academy-host>`.
+
+## Two things found while setting this up
+
+**The App Link file was frozen at build time.** Next evaluated the route once during the build and
+served that answer from then on, so setting the fingerprint on a running deployment changed nothing
+and the file kept replying that it was not configured. It now reads the environment per request.
+
+**Stripe keys have nowhere to go.** They were offered, and nothing in this repository reads them.
+The only payment in the system is the simulated checkout for the identity document fee, which
+records a status and calls no provider. They were deliberately not set: a key in an environment that
+no code reads is a liability with no upside. Wiring a real provider is its own story.
 
 ## Known limits of this deployment
 
