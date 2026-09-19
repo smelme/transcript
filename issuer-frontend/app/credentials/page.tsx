@@ -1,7 +1,7 @@
 import Link from 'next/link';
 
 export const metadata = {
-  title: 'Digital credentials — Smart Academy',
+  title: 'Digital credentials: Smart Academy',
 };
 
 export default function DigitalCredentialsPage() {

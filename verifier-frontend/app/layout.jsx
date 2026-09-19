@@ -5,7 +5,7 @@ import ThemeToggle from './theme-toggle';
 import './globals.css';
 
 export const metadata = {
-  title: 'My Jobs — Credential Verification',
+  title: 'My Jobs: credential verification',
   description: 'Verify ISO 18013-5 mDOC academic credentials',
   icons: { icon: '/logo.svg' },
 };

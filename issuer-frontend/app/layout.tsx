@@ -5,7 +5,7 @@ import ThemeToggle from './theme-toggle';
 import './globals.css';
 
 export const metadata: Metadata = {
-  title: 'Smart Academy — Digital qualifications and transcripts',
+  title: 'Smart Academy: digital qualifications and transcripts',
   description:
     'Access your academic qualifications and transcripts as verifiable digital credentials you can save, share and prove anywhere.',
   icons: { icon: '/logo.svg' },

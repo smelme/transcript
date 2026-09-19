@@ -3,7 +3,7 @@ import './globals.css';
 import Shell from './shell';
 
 export const metadata: Metadata = {
-  title: 'Quals — Credential management',
+  title: 'Quals: credential management',
   description: 'Centralised management of issued credentials, sharing and wallet accounts.',
 };
 

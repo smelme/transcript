@@ -520,8 +520,8 @@ function ClaimFlow() {
                     {busy
                       ? 'Preparing…'
                       : queue.length
-                        ? `Added it — next: ${labelFor(queue[0])}`
-                        : 'Added it — finish'}
+                        ? `Added it. Next: ${labelFor(queue[0])}`
+                        : 'Added it. That is everything.'}
                   </button>
                   <button type="button" className="btn btn-outline" onClick={() => setShowQr(true)}>
                     Show QR code
@@ -561,8 +561,8 @@ function ClaimFlow() {
                       {busy
                         ? 'Preparing…'
                         : queue.length
-                          ? `Added it — next: ${labelFor(queue[0])}`
-                          : 'Added it — finish'}
+                          ? `Added it. Next: ${labelFor(queue[0])}`
+                          : 'Added it. That is everything.'}
                     </button>
                     <button
                       type="button"

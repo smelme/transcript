@@ -194,15 +194,15 @@ class WalletRepository(private val client: IssuerClient, private val store: Secu
 
         val refresh = store.refreshToken() ?: run {
             clearSession()
-            error("Session expired — please sign in again")
+            error("Session expired. Please sign in again.")
         }
         val response = runCatching { client.refresh(refresh) }.getOrElse {
             clearSession()
-            error("Session expired — please sign in again")
+            error("Session expired. Please sign in again.")
         }
         val newAccess = response.accessToken ?: run {
             clearSession()
-            error(response.error ?: "Session expired — please sign in again")
+            error(response.error ?: "Session expired. Please sign in again.")
         }
         store.saveAccessToken(newAccess)
         response.refreshToken?.let { store.saveRefreshToken(it) }
