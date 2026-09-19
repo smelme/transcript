@@ -2,7 +2,7 @@
  * Client for the status list referenced from a credential's signed MSO.
  *
  * The MSO (the signed payload of `issuerAuth`) carries the standard revocation
- * reference — `status` -> `status_list` -> `{ idx, uri }` — so a verifier can
+ * reference, `status` -> `status_list` -> `{ idx, uri }`, so a verifier can
  * resolve a presented credential's status without the presentation disclosing
  * any claim, and without the credential having to contain an identifier of its
  * own. The MSO is always available: it is not subject to selective disclosure.

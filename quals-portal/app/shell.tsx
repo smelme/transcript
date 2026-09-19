@@ -81,7 +81,7 @@ export default function Shell({ children }: { children: React.ReactNode }) {
               {signingOut ? 'Signing out…' : 'Sign out'}
             </button>
             <p className="sidebar-note">
-              Credential metadata only — no credential contents are stored.
+              Credential metadata only. No credential contents are stored.
             </p>
           </div>
         </aside>

@@ -1,5 +1,5 @@
 /**
- * mdoc-core — shared ISO/IEC 18013-5 (mDL / mdoc) library.
+ * mdoc-core. Shared ISO/IEC 18013-5 (mDL / mdoc) library.
  *
  * Single source of truth for the credential format used by:
  *   - issuer-service  (generates IssuerSigned credentials)
@@ -569,7 +569,7 @@ export function parseMdoc(input) {
 // At presentation, the wallet signs the ISO 18013-5 SessionTranscript (which
 // binds the verifier's challenge) with the device's mdoc authentication private
 // key. The verifier checks the signature against the public key embedded in the
-// MSO's deviceKeyInfo — proving the presenting wallet holds the private key.
+// MSO's deviceKeyInfo. Proving the presenting wallet holds the private key.
 
 // Sign challenge bytes with the device private JWK, producing a COSE_Sign1 (ES256).
 export function buildDeviceSignature(privateJwk, challengeBytes) {

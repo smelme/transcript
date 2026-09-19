@@ -1,4 +1,4 @@
-# Transcript credentials — discovery
+# Transcript credentials. Discovery
 
 Scope: let a student hold a **qualification** credential, a **transcript** credential, or
 both; let Smart Academy manage and issue them; let an academic relying party

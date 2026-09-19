@@ -36,10 +36,10 @@ Environment variables: See `.env.example`
 The reusable verifier exposes a one-time, replay-protected presentation flow backed
 by the same library the Smart College verifier uses (`id-verifier`):
 
-- `POST /presentation/sessions` — creates a short-lived session and an
+- `POST /presentation/sessions`. Creates a short-lived session and an
   `org-iso-mdoc` request (`deviceRequest` + `encryptionInfo`) for
   `navigator.credentials.get()`.
-- `POST /presentation/sessions/:id/response` — decrypts and verifies the wallet's
+- `POST /presentation/sessions/:id/response`. Decrypts and verifies the wallet's
   encrypted Annex C `DeviceResponse` (HPKE + device signature + issuer signature
   + claim digests), consumes the session, and returns only server-verified claims:
   `name`, `institution`, `degreeLevel`, `graduationDate`.

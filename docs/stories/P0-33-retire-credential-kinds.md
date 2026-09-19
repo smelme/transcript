@@ -1,6 +1,6 @@
-# P0-33 — Should credential kinds be retired?
+# P0-33. Should credential kinds be retired?
 
-**Status:** Open — needs a product decision, not a cleanup
+**Status:** Open. Needs a product decision, not a cleanup
 **Raised by:** "there is no kind anymore, it's one credential"
 
 ## The finding
@@ -10,7 +10,7 @@ evidence is specific:
 
 | Where | What it does |
 | --- | --- |
-| `issuer-frontend/app/get-credentials/page.tsx:29` | `useState<CredentialChoice>('qualification')` — a **picker** on the student's own page |
+| `issuer-frontend/app/get-credentials/page.tsx:29` | `useState<CredentialChoice>('qualification')`. A **picker** on the student's own page |
 | `issuer-frontend/app/claim/page.tsx:26-33` | maps the choice to namespaces: `both`, `transcript`, `qualification` |
 | `issuer-service/src/credential-generator.js:274` | `requestedKinds(include)` decides which claim blocks the document carries |
 | `issuer-service/tests/issuer-service.test.js` | **44 assertions** covering the three shapes |
@@ -18,7 +18,7 @@ evidence is specific:
 
 What *is* true is that the issuer mints **one document**: a request for both produces a single
 credential holding the qualification and the transcript, and the wallet filters by namespace at
-presentation. So the taxonomy survives as *contents*, not as separate documents — which is exactly
+presentation. So the taxonomy survives as *contents*, not as separate documents. Which is exactly
 why the wallet's own comment in `CredentialRegistry.kt:111` says "one kind now, so the kind label
 said nothing a holder could act on" and drops the label from the chooser.
 
@@ -29,10 +29,10 @@ choice students currently have.
 ## The decision to make
 
 1. **Keep kinds** (recommended if the picker is wanted): then nothing is removed. The only tidy-up
-   worth doing is calling the concept what it is — *contents* rather than *kind* — in the places
+   worth doing is calling the concept what it is, *contents* rather than *kind*, in the places
    that still say "kind" to a reader: the portal's credentials column, the audit table, and the
    share page's badge.
-2. **Retire the issuance choice** — always issue the combined credential, and let presentation
+2. **Retire the issuance choice**. Always issue the combined credential, and let presentation
    filter by namespace as it already does. This is coherent, and cheap in the wallet (it already
    treats one kind as the norm); it is *not* cheap in the issuer or the academy.
 
@@ -50,12 +50,12 @@ choice students currently have.
   transcript-only path and would need updating.
 
 Estimate: a focused day, most of it in tests and the academy's copy, with the risk that a student
-who wanted a transcript-only credential no longer gets one — unless presentation-time filtering is
+who wanted a transcript-only credential no longer gets one. Unless presentation-time filtering is
 explained in the offer's own words.
 
 ## Recommendation
 
 Ask the registrar whether a student should still be able to receive a transcript on its own. If yes,
-keep the machinery and do the naming tidy-up. If no, retire it deliberately — with the issuer's own
+keep the machinery and do the naming tidy-up. If no, retire it deliberately. With the issuer's own
 smoke scripts updated in the same change, since they are the only place the old promise is written
 down.

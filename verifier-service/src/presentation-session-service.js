@@ -14,7 +14,7 @@ import { STATUS_VALID } from '../../status-list-core.js';
 /**
  * Ephemeral state for one W3C Digital Credentials API (org-iso-mdoc)
  * presentation. The service intentionally retains no claim values or credential
- * bytes — only the one-time nonce and the reader's ephemeral decryption key.
+ * bytes. Only the one-time nonce and the reader's ephemeral decryption key.
  *
  * Request/response construction mirrors the `id-verifier` package used by the
  * Smart College verifier so the wallet-facing wire format stays interoperable.

@@ -1,4 +1,4 @@
-# P0-24 — A credential in a wallet must not block issuing it again
+# P0-24. A credential in a wallet must not block issuing it again
 
 ## Why
 
@@ -9,7 +9,7 @@ Two independent refusals, both treating "already held" as a terminal state:
    credential with `inWallet`, so there was no way to ask.
 2. **The issuer refused the offer.** `POST /academy/credentials/:sessionId/offer` returned
    `{ alreadyInWallet: true }` with no offer, and the page turned that into the error
-   "Your transcript is already in your wallet." — which also stopped a multi-credential run
+   "Your transcript is already in your wallet.". Which also stopped a multi-credential run
    part-way through.
 
 The holder did nothing wrong. They wanted the credential on another device, or wanted it back
@@ -20,7 +20,7 @@ after deleting it, and the product had no way to say yes.
 - **Holding a copy is not a reason to refuse.** Asking again is asking for the document, so the
   credential is issued again.
 - **A re-issue is a new document, not the old one replayed.** It gets its own credential id, its own
-  status index, a device-bound mdoc for the device claiming it, and today's issue date — the day it
+  status index, a device-bound mdoc for the device claiming it, and today's issue date. The day it
   is issued, not the day the original invitation was prepared.
 - **The copy already held is untouched.** It keeps its own date and stays active. Replacing it is
   the operator's revocation flow, not a side effect of issuing another.
@@ -43,7 +43,7 @@ after deleting it, and the product had no way to say yes.
 
 ## Verification
 
-- `issuer-service` tests: **81 pass, 0 fail** — three new: a re-issue is a distinct credential and
+- `issuer-service` tests: **81 pass, 0 fail**. Three new: a re-issue is a distinct credential and
   leaves the earlier one active; the retry without `allowReissue` is still refused; the re-issued
   copy carries today's date while the original keeps its own; and only an offer carrying the marker
   counts as a re-issue.

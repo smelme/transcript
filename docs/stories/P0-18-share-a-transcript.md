@@ -1,7 +1,7 @@
 # P0-18: Share a transcript by email
 
-**Priority:** P0 — the holder must be able to disclose a transcript outside an RP website
-**Status:** In progress — increments 1 and 2 are done and covered by
+**Priority:** P0. The holder must be able to disclose a transcript outside an RP website
+**Status:** In progress. Increments 1 and 2 are done and covered by
 `issuer-service/scripts/smoke-share-transcript.mjs` and `smoke-share.mjs`. Increment 3, the wallet
 share entry point, is implemented with P0-20 (the share screen offers only the sections the
 credential holds, and its own academic section starts selected); what remains is a device run
@@ -59,10 +59,10 @@ recipient having an account anywhere.
 
 ## Verification
 
-- `issuer-service/scripts/smoke-share-transcript.mjs` — the recipient is told they have been sent an
+- `issuer-service/scripts/smoke-share-transcript.mjs`. The recipient is told they have been sent an
   academic transcript (`kind: transcript`, `kindLabel: Academic transcript`), and the downloaded PDF
   carries that label in its bytes; the grades still arrive with no qualification claims disclosed.
-- `issuer-service/scripts/smoke-share.mjs` — the qualification path is unchanged (claims, view and
+- `issuer-service/scripts/smoke-share.mjs`. The qualification path is unchanged (claims, view and
   PDF all still pass).
 - 66 issuer unit tests and 58 verifier tests pass; `issuer-frontend` type-checks clean.
 

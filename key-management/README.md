@@ -7,8 +7,8 @@ Key Management for mDoc Credential Signing (EdDSA + ES256)
 Handles secure generation, storage, rotation, and distribution of cryptographic keys used for signing academic credentials. Provides both file-based storage (development) and HSM-ready integration (production).
 
 Supported key types:
-- **EdDSA (Ed25519)** — general-purpose credential signing
-- **ES256 (ECDSA P-256)** — ISO 18013-5 mdoc `issuerAuth` signing
+- **EdDSA (Ed25519)**. General-purpose credential signing
+- **ES256 (ECDSA P-256)**. ISO 18013-5 mdoc `issuerAuth` signing
 
 ## Features
 
@@ -61,9 +61,9 @@ npm run generate-mdoc-signer
 
 Outputs to `keys/`:
 
-- `mdoc-signer.private.pem` — private key (never commit)
-- `mdoc-signer.cert.der` — X.509 certificate (embedded in the mdoc x5chain)
-- `mdoc-signer.json` — public key + metadata registry entry
+- `mdoc-signer.private.pem`. Private key (never commit)
+- `mdoc-signer.cert.der`. X.509 certificate (embedded in the mdoc x5chain)
+- `mdoc-signer.json`. Public key + metadata registry entry
 
 ### List Keys
 

@@ -214,8 +214,8 @@ question rather than just the value). Each is a value in the generator, not a st
    scale by id (`overall_mark_scale_id` → `grading_scale_id`). Nesting a `{scheme, value}` map
    inside an element would make it opaque to selective disclosure and to mdoc debuggers.
 2. **The course list is all or nothing.** `courses` stays one element (one JSON string), so
-   anything a reader may want *without* the marks — the programme, the total, the outcome, the
-   average — must be its own element. That is why the aggregates are in the core.
+   anything a reader may want *without* the marks. The programme, the total, the outcome, the
+   average. Must be its own element. That is why the aggregates are in the core.
 3. **Dates are date-only, CBOR tag 1004**, and decode as such in every inspector.
 4. **Codes are strings, not numbers.** `programme_level` is `"7"`, not `7`, so nothing adds up
    levels by accident; likewise `programme_code` and `outcome`.
@@ -254,6 +254,6 @@ request, which leaves already-issued transcript credentials verifiable but uncla
 Each kind adds one registry row and one status index per issuance, so the status list
 grows twice as fast when both are chosen; gaps are already harmless. The transcript
 namespace carries a JSON `courses` string, so claim payloads are larger than a
-qualification's — the portal and RP must not assume qualification-sized claims. No new
+qualification's. The portal and RP must not assume qualification-sized claims. No new
 personal data is collected: the transcript is generated from the same academic record as
 today.

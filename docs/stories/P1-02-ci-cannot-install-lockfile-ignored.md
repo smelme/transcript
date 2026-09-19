@@ -1,7 +1,7 @@
 # P1-02: CI cannot install anything, because the lockfile is gitignored
 
-**Priority:** P1 — every build and test step fails before it reaches any code
-**Status:** Resolved — lockfiles committed, two workflows replaced by one that runs
+**Priority:** P1. Every build and test step fails before it reaches any code
+**Status:** Resolved. Lockfiles committed, two workflows replaced by one that runs
 **Components:** `.gitignore`, `.github/workflows/ci-cd.yml`
 
 ## Problem
@@ -13,7 +13,7 @@
   run: cd issuer-service && npm ci
 ```
 
-`npm ci` refuses to run without a lockfile — it exists to install *exactly* what a lockfile
+`npm ci` refuses to run without a lockfile. It exists to install *exactly* what a lockfile
 records. But `.gitignore` lists `package-lock.json`:
 
 ```
@@ -25,7 +25,7 @@ pnpm-lock.yaml
 and `git ls-files package-lock.json` returns nothing, so the file is not in the repository. A CI
 checkout therefore has no lockfile, and every install step fails before a single test runs.
 
-## Second problem — a workflow names a workspace that does not exist
+## Second problem. A workflow names a workspace that does not exist
 
 `cd.yml` builds `mobile-wallet-native`. That directory is not in the repository: it exists locally
 with nothing tracked inside it, apart from a stray `package-lock.json` (tracked as P1-04). So even
@@ -56,7 +56,7 @@ could not run at all. What was actually wrong:
   could ever have executed.
 - **Three workspaces were installed separately with `npm ci`** inside an npm-workspaces monorepo, and
   one of them, `mobile-wallet-native`, does not exist. `npm ci` also refuses to run without a
-  lockfile, which was gitignored — hence this story.
+  lockfile, which was gitignored. Hence this story.
 - **`devops` and `e2e-integration-tests` had steps but no committed lockfile either**, so their
   installs failed on the same grounds.
 - **The branch filters were wrong**: both triggered on `main`/`develop`, while this repository's
@@ -69,12 +69,12 @@ failing silently:
 - **`lint` failed everywhere.** `linebreak-style: unix` reported thousands of errors on Windows
   because `core.autocrlf=true` rewrites the working tree to CRLF while the repository stores LF. A
   `.gitattributes` with `text=auto eol=lf` now states the convention, and the rule is off. The real
-  remainder — dead code, unused imports, `==`, a function declared inside a block, Express error
-  handlers whose unused fourth parameter was reported as unused — is fixed, so `npm run lint`
+  remainder. Dead code, unused imports, `==`, a function declared inside a block, Express error
+  handlers whose unused fourth parameter was reported as unused. Is fixed, so `npm run lint`
   passes in all seven workspaces rather than being ignored.
 - **`next lint` no longer exists in Next 16**, so the three apps that used it were failing with
   "Invalid project directory provided, no such directory: …/lint". ESLint here has no TypeScript
-  parser, so the two TypeScript apps lint with `tsc --noEmit` — a real check, not a placeholder —
+  parser, so the two TypeScript apps lint with `tsc --noEmit`, a real check, not a placeholder —
   and the JSX apps lint with `eslint app`.
 - **The production build was broken** (P1-01). It is now part of the pipeline.
 
@@ -96,8 +96,8 @@ workspaces, unit tests (10 + 76 + 61), and `next build` for all four web apps.
 
 ## Why it is not obvious locally
 
-Locally `npm ci` succeeds because the untracked lockfile is sitting there. Only a fresh clone — which
-is what CI is — exposes it. The same applies to anyone onboarding, or to any runner that clears its
+Locally `npm ci` succeeds because the untracked lockfile is sitting there. Only a fresh clone. Which
+is what CI is. Exposes it. The same applies to anyone onboarding, or to any runner that clears its
 workspace.
 
 ## Options

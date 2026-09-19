@@ -1,7 +1,7 @@
-# P0-17: Management portal — Smart Academy manages both credential kinds
+# P0-17: Management portal. Smart Academy manages both credential kinds
 
-**Priority:** P0 — the organisation must see what it issued
-**Status:** Done — the kind is derived by the issuer and travels with the credential list, the
+**Priority:** P0. The organisation must see what it issued
+**Status:** Done. The kind is derived by the issuer and travels with the credential list, the
 statistics and the audit trail; the portal labels and filters on it. Not verified: a signed-in
 click-through (no browser driver in this repo's test suite)
 **Components:** Quals management portal, issuer admin API
@@ -52,7 +52,7 @@ a feature branch.
 
 ## Verification
 
-- `issuer-service/tests/issuer-service.test.js` — four tests: the list states each kind derived
+- `issuer-service/tests/issuer-service.test.js`. Four tests: the list states each kind derived
   from the namespace while the shared docType proves the namespace is what distinguishes them; a
   credential holding no academic namespace is reported as `credential` and its raw docType is what
   the portal shows; the organisation's counts split by kind and a revoked transcript drops out of
@@ -61,7 +61,7 @@ a feature branch.
 - Live against the running issuer: all 50 sampled credentials carry `kind`, `kindLabel` and
   `academicNamespaces`; `/statistics` returns
   `byKind: {academic: 37, credential: 167, qualification: 8, transcript: 2}` for the dev store,
-  which is the honest split — the `credential` rows are identity-only credentials from earlier
+  which is the honest split. The `credential` rows are identity-only credentials from earlier
   work that hold no academic namespace, and the `academic` rows are the combined credentials issued
   before the choice existed; and the audit trail shows `credential_issued:Qualification` and
   `credential_revoked:Qualification`.

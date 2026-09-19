@@ -1,6 +1,6 @@
 # P1-03: Development database has no seed or reset path
 
-**Priority:** P1 — testers chase credentials the database believes are already claimed
+**Priority:** P1. Testers chase credentials the database believes are already claimed
 **Status:** Resolved — `npm run db:reset` and `npm run db:seed` implement it
 **Components:** `scripts/dev-database.mjs`, `package.json`, `data/transcript.db` (better-sqlite3)
 
@@ -8,7 +8,7 @@
 
 `npm run db:reset` deletes the database (and its `-wal`/`-shm` siblings) and recreates an empty
 schema. `npm run db:seed` creates the two demo client organisations and an administrator for each,
-idempotently — a second run reports "Admin already present" rather than duplicating or failing.
+idempotently. A second run reports "Admin already present" rather than duplicating or failing.
 
 Both refuse to run when `NODE_ENV=production`, and when `DATABASE_PATH` points outside the
 repository's `data/` directory, so a developer who aimed the variable at something real cannot lose

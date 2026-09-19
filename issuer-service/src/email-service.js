@@ -187,7 +187,7 @@ export async function sendCredentialsReadyEmail({ email, institution, claimUrl, 
     <p style="margin: 22px 0;">
       <a class="btn" href="${claimUrl}">Add to wallet</a>
     </p>
-    <p class="muted">Sign in with <strong>${email}</strong> — the same address this email was sent to.</p>
+    <p class="muted">Sign in with <strong>${email}</strong>. The same address this email was sent to.</p>
     <p class="muted">Or copy this link into your browser:<br>${claimUrl}</p>
     <p class="muted">If you did not request this, you can safely ignore this email.</p>
   </div>

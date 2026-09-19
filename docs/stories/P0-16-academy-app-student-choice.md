@@ -1,7 +1,7 @@
-# P0-16: Smart Academy app — student chooses what to claim
+# P0-16: Smart Academy app. Student chooses what to claim
 
-**Priority:** P0 — makes the choice usable by a holder
-**Status:** Done — the choice, the kind-labelled claim list and repeat-request reuse are
+**Priority:** P0. Makes the choice usable by a holder
+**Status:** Done. The choice, the kind-labelled claim list and repeat-request reuse are
 implemented and covered. Not verified: a click-through in a browser (this repo has no browser
 driver in its test suite) and a real wallet claim of a transcript (_P0-20_)
 **Components:** Smart Academy app (issuer-frontend), issuer service academy API
@@ -60,7 +60,7 @@ the `both` path, and the change is submitted for review on a feature branch.
 **Reuse is claim-aware (added after a device test).** A prepared credential is reused only when it
 carries the claims this issuer would produce *now*, compared by value and independent of key order.
 Reusing one whose claims have since changed is how a student ends up presenting a record the issuer
-no longer produces — in the reported case, marks on a scale that had been replaced and none of the
+no longer produces. In the reported case, marks on a scale that had been replaced and none of the
 programme context, so every derived field showed a dash. So:
 
 - same claims → the same session comes back (a repeat request still creates nothing new);
@@ -77,11 +77,11 @@ it. Before this, a second request showed the previous requests' credentials too,
 in use and worse when testing.
 
 ## Verification
-- `issuer-service/scripts/test-academy-flow.mjs` — 43 checks pass against a running issuer,
+- `issuer-service/scripts/test-academy-flow.mjs`. 43 checks pass against a running issuer,
   including the chosen kind reflected in the response, the offer and the wallet list; asking twice
   reusing the same sessions with `reused: true` and no duplicate created; asking for a subset
   touching only that kind; and the wallet being offered two credentials rather than four.
-- `issuer-service/tests/issuer-service.test.js` — four unit tests for reuse: the same sessions come
+- `issuer-service/tests/issuer-service.test.js`. Four unit tests for reuse: the same sessions come
   back in the same order, the namespace decides which credential is reused, a credential already in
   the wallet is reported rather than re-issued, and linking a session attaches the account without
   disturbing the offer the holder already has.

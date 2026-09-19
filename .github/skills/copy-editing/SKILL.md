@@ -1,6 +1,6 @@
 ---
 name: copy-editing
-description: Use when writing or reviewing text that a person reads — site pages, app strings, emails, PDFs. Removes the marks of generated prose (em dashes, semicolon-joined clauses, stacked hyphens, marketing adjectives) and restores a plain voice. Applies across the academy, the verifier, the portal, Trust University and the wallet.
+description: Use when writing or reviewing text that a person reads. Site pages, app strings, emails, PDFs. Removes the marks of generated prose (em dashes, semicolon-joined clauses, stacked hyphens, marketing adjectives) and restores a plain voice. Applies across the academy, the verifier, the portal, Trust University and the wallet.
 ---
 
 # Copy editing
@@ -66,7 +66,7 @@ Rules of thumb:
    It reads only text a person sees: JSX text, quoted strings passed to a Text-like renderer, the
    email templates and the PDF. Comments and code identifiers are not copy and are not reported.
 
-2. Fix what it found. The checker finds the mechanical tells; the judgement is yours — see the
+2. Fix what it found. The checker finds the mechanical tells; the judgement is yours. See the
    rules above, and prefer a rewrite over a substitution.
 
 3. Run it again. It exits non-zero while anything remains, so it can gate a change.
@@ -77,7 +77,7 @@ Rules of thumb:
   Science` reads better than a dash, but a title that a person actually wrote that way stays as it
   is. The issuer's catalogue is data, not copy.
 - **Technical terms.** Never simplify a term the reader needs to act correctly (a form label, a
-  legal phrase). Do simplify the ones only the machinery needs — see the plain-language pass:
+  legal phrase). Do simplify the ones only the machinery needs. See the plain-language pass:
   no `docType`, no `namespace`, no `offer URL` in text a holder reads.
 - **No em dashes at all**, in copy or in the documents that describe this standard. The one dash
   worth keeping is the en dash in a range such as 2020–2021, where it carries meaning rather than

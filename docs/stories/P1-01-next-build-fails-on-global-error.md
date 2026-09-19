@@ -1,7 +1,7 @@
 # P1-01: The academy app does not build
 
-**Priority:** P1 — the app runs in development but cannot be built for release
-**Status:** Resolved — cause identified and fixed; all four apps build
+**Priority:** P1. The app runs in development but cannot be built for release
+**Status:** Resolved. Cause identified and fixed; all four apps build
 **Components:** `issuer-frontend` and `quals-portal` (Next.js 16, Turbopack)
 
 ## Resolution

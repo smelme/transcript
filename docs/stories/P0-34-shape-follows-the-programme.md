@@ -1,6 +1,6 @@
-# P0-34 — The shape of a credential follows the programme, not the applicant
+# P0-34. The shape of a credential follows the programme, not the applicant
 
-**Status:** Open — rule agreed, implementation next
+**Status:** Open. Rule agreed, implementation next
 **Answers:** P0-33 (kinds stay; the *choice* goes)
 
 ## The rule
@@ -20,11 +20,11 @@ replaces that with a fact about the record.
 
 ## What is wrong today, beyond the picker
 
-- `PROGRAMMES` in `credential-generator.js` holds eight degrees — four bachelors and four masters —
+- `PROGRAMMES` in `credential-generator.js` holds eight degrees, four bachelors and four masters —
   and **no certification**, so the third case cannot even be expressed.
 - Nothing in the generated record says whether the student has graduated ✗. A record is synthesised
   from a seed and always looks complete, so "half way through" has no representation.
-- An in-progress transcript would need the courses **completed so far** — a couple of semesters —
+- An in-progress transcript would need the courses **completed so far**, a couple of semesters —
   not the full programme's list, which is what the generator produces now.
 - The picker's own description of `both` reads *"Two credentials, held separately so you can
   present one without the other."* That is not what happens: one document is issued holding both,
@@ -34,9 +34,9 @@ replaces that with a fact about the record.
 
 The demo should hold exactly these three, and nothing that does not fit the rule:
 
-1. **Bachelor, completed** — a graduated student, issued the combined qualification and transcript.
-2. **Master, in progress** — partway through, issued a transcript for the semesters completed.
-3. **Certificate, six weeks** — issued a qualification only.
+1. **Bachelor, completed**. A graduated student, issued the combined qualification and transcript.
+2. **Master, in progress**. Partway through, issued a transcript for the semesters completed.
+3. **Certificate, six weeks**. Issued a qualification only.
 
 ## Work
 
@@ -45,11 +45,11 @@ The demo should hold exactly these three, and nothing that does not fit the rule
   certificate programme with its own short course pool, and let an in-progress record generate only
   the semesters completed.
 - `index.js` (academy request, ~line 1978): stop reading `include` from the request; derive it from
-  the record. The `recognition` option stays — it is independent and already documented as such.
+  the record. The `recognition` option stays. It is independent and already documented as such.
 - `get-credentials/page.tsx`: remove the picker and say what the institution will issue instead. The
   claim page keeps working, since it already filters by the namespaces a credential holds.
 - `issuer-service/tests/issuer-service.test.js`: the 44 kind assertions become assertions about
-  programme state — one per case, plus the unrecognised-input path if any input remains.
+  programme state. One per case, plus the unrecognised-input path if any input remains.
 - `issuer-service/scripts/test-academy-flow.mjs` and `smoke-share-transcript.mjs` assert the old
   transcript path; update them with the rule.
 - Wallet: nothing. It already copes with a qualification-only credential and with a transcript-only
@@ -57,7 +57,7 @@ The demo should hold exactly these three, and nothing that does not fit the rule
 
 ## Data
 
-The database has been reset and reseeded (organisations and administrators only — the seed
+The database has been reset and reseeded (organisations and administrators only. The seed
 deliberately never creates credentials, because an unsigned credential is metadata pretending to be
 one). Two consequences to be aware of:
 
@@ -71,12 +71,12 @@ one). Two consequences to be aware of:
 1. **Sign in with an email one-time code.** The academy then knows who the student is. In a real
    institution other checks would sit around this; for the demo the OTP *is* the check, and it is
    the same identity the wallet signs in with, so the academy and the wallet agree on who is asking.
-2. **See what is theirs to be issued** — a list, not a menu:
+2. **See what is theirs to be issued**. A list, not a menu:
    - Bachelor's degree, completed → one item holding the qualification **and** the transcript
    - Master's degree, partway → one item holding a transcript for the semesters completed
    - Certificate, completed → one item holding the qualification, with no transcript
 3. **Select one or more items.** The selection is which credentials to take, never what is inside
-   them — that follows from the rule above.
+   them. That follows from the rule above.
 4. **Take them one at a time**: each selected item gets its own screen with its own offer URL and QR,
    and moving on to the next until the last, then done.
 
@@ -87,7 +87,7 @@ who stops halfway can sign in again and finish. Nothing needs to be re-created f
 
 | Step | Endpoint today | Change needed |
 | --- | --- | --- |
-| Sign in | `/auth/otp`, `/otp/verify`, `/auth/token` | none — reuse for the academy |
+| Sign in | `/auth/otp`, `/otp/verify`, `/auth/token` | none. Reuse for the academy |
 | What is theirs | `/academy/credentials` | already lists the signed-in account's items with sessionId, status, title, institution, kind, label; add the programme's state so each item can say *why* it is what it is |
 | Prepare them | `/academy/requests` | stop reading `include`; create one item per programme the record supports |
 | Offer per item | `/academy/credentials/:sessionId/offer`, `/issuance-sessions/:id/offer-qr` | none |

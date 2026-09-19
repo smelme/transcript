@@ -7,7 +7,7 @@ package com.smartcollege.transcript.wallet.data
  * API's cross-device code is a FIDO URL, and the phone's camera app does not try to read it: it
  * hands it to whichever app registered for that scheme, which is how the system's credential
  * manager gets to answer the request. This wallet scans the same codes, so it has to draw the same
- * conclusion — a presentation code scanned here is handed on, and ends up back at this wallet only
+ * conclusion. A presentation code scanned here is handed on, and ends up back at this wallet only
  * if the credential manager picks it as the provider to ask.
  */
 sealed interface ScannedCode {

@@ -1,6 +1,6 @@
 # P1-07: The documentation and container images describe a system that was never built
 
-**Priority:** P1 — a new contributor, or an institutional reviewer, reads the wrong system first
+**Priority:** P1. A new contributor, or an institutional reviewer, reads the wrong system first
 **Status:** Open, partially addressed (README, launcher script and the stale compose file are done)
 **Components:** `DEVELOPMENT.md`, `LOCAL_DEPLOYMENT.md`, `SETUP.md`, `QUICKSTART.md`,
 `CONTRIBUTING.md`, `devops/Dockerfile.*`, `devops/docker-compose.yml`
@@ -55,4 +55,4 @@ to tell which parts of the repository are real.
 - Leave `docs/` alone: the analysis, architecture and story files are accurate and current.
 - The wallet has its own README under `mobile-wallet/`; check it against the Gradle tasks that exist.
 - `package.json` still declares `"engines": { "node": ">=18.17.0" }`. Next 16 needs Node 20, and CI
-  runs 20, so the declared floor is lower than reality — worth correcting here.
+  runs 20, so the declared floor is lower than reality. Worth correcting here.

@@ -1,4 +1,4 @@
-# P0-32 — Content and visual consistency pass
+# P0-32. Content and visual consistency pass
 
 **Status:** Wave 1 done; wave 2 open
 **Depends on:** nothing; informed by `docs/analysis-discovery/content-and-visual-audit.md`
@@ -14,11 +14,11 @@ University. Nothing looked *wrong*; nothing looked related.
 
 Two kinds of surface, differing in exactly one way:
 
-- **Quals surfaces** (wallet, academy, verifier, portal) carry the product identity — gold with a
+- **Quals surfaces** (wallet, academy, verifier, portal) carry the product identity. Gold with a
   green companion, on a shared neutral, radius and type foundation. The palette's origin is the
   wallet's theme, because that is where a holder meets the product first.
 - **Institutional surfaces** (a university's own site) keep their own brand colour and share
-  everything else — the same distinction the wallet already draws when it paints a credential in its
+  everything else. The same distinction the wallet already draws when it paints a credential in its
   institution's colours.
 
 Written up in `docs/design/design-system.md`, with the one hard rule: **gold is a fill, never text,
@@ -46,6 +46,6 @@ and never with white on top of it.**
 ## Acceptance criteria
 
 - Any two Quals surfaces, side by side, look like the same product at different jobs.
-- No combination in use falls below a readable contrast ratio — checked, not assumed.
+- No combination in use falls below a readable contrast ratio. Checked, not assumed.
 - No institution's identity is flattened into the product's.
 - A page has one job and one primary action.

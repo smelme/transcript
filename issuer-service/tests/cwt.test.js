@@ -49,7 +49,7 @@ test('CWT rejects a tampered payload', () => {
   const tampered = Buffer.from(cwt);
   tampered[tampered.length - 66] ^= 0xff; // inside the signature region is safest
   const result = verifyCwt(tampered, { audience: 'issuer-001', nonce: 'abc123' });
-  // Either the decode fails or the signature fails — but never valid.
+  // Either the decode fails or the signature fails. But never valid.
   assert.strictEqual(result.valid, false);
 });
 

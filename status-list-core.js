@@ -4,7 +4,7 @@
  *
  * A credential references the list from its signed MSO
  * (`status` -> `status_list` -> `{ idx, uri }`), so a verifier can resolve
- * revocation from the MSO alone — no disclosed claim is involved.
+ * revocation from the MSO alone. No disclosed claim is involved.
  *
  * The list itself follows the IETF OAuth/Token Status List conventions:
  *   - the bitstring is packed LSB-first, one bit per status by default;

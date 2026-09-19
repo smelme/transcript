@@ -5,7 +5,7 @@ import { getDb, sha256Hex, parseTtlMs } from '../../db.js';
 import { devOtpAllowed } from './email-service.js';
 
 /**
- * WalletAccountService — invitation-based wallet account provisioning.
+ * WalletAccountService. Invitation-based wallet account provisioning.
  *
  * The wallet account is auth-only: it stores the email (login handle), a stable
  * `sub` (issuer-created subject), and the links asserted by trusted institutes
@@ -307,7 +307,7 @@ export class WalletAccountService {
     const normalized = this._normalize(email);
     const account = this._accountByEmail(normalized);
     if (!account) {
-      throw new Error('No wallet account for this email — an institute must invite you first');
+      throw new Error('No wallet account for this email. An institute must invite you first');
     }
     const otp = this._issueOtp(normalized);
     const sent = await this._sendOtpEmail(normalized, otp, 'signin');

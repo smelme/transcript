@@ -304,7 +304,7 @@ function ClaimFlow() {
                   </div>
                   {devOtp && (
                     <div className="notice" style={{ marginTop: 16 }}>
-                      Development mode — email delivery is not configured. Your code is{' '}
+                      Development mode. Email delivery is not configured. Your code is{' '}
                       <strong className="mono">{devOtp}</strong>.
                     </div>
                   )}
@@ -343,7 +343,7 @@ function ClaimFlow() {
             </h1>
             <p style={{ fontSize: 16, lineHeight: 1.65, color: 'var(--muted)', marginBottom: 28 }}>
               {requestedNamespaces && !showAll
-                ? `You asked for ${requestedNamespaces.length > 1 ? 'your qualification and transcript' : requestedNamespaces[0] === 'org.iso.23220.education.transcript.1' ? 'an academic transcript' : 'your qualification certificate'}. Tick what you want and add it — a completed programme comes as one credential holding both.`
+                ? `You asked for ${requestedNamespaces.length > 1 ? 'your qualification and transcript' : requestedNamespaces[0] === 'org.iso.23220.education.transcript.1' ? 'an academic transcript' : 'your qualification certificate'}. Tick what you want and add it. A completed programme comes as one credential holding both.`
                 : 'Tick what you want to add. A completed programme is one credential holding both.'}
             </p>
 
@@ -492,7 +492,7 @@ function ClaimFlow() {
 
             {reissued && (
               <div className="notice" style={{ marginBottom: 18 }}>
-                This credential is already in your wallet. Adding it now issues a new copy — the
+                This credential is already in your wallet. Adding it now issues a new copy. The
                 one you already hold stays valid until your institution revokes it.
               </div>
             )}

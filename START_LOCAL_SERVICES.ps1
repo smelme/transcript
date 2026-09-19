@@ -54,7 +54,7 @@ if (-not (Test-Path (Join-Path $repo 'node_modules'))) {
 # This has to override, not defer to, `issuer-service/.env`: a developer machine usually has a real
 # BREVO_API_KEY there, so code that was emailed is code the local flow can never see. Setting a
 # placeholder makes the send fail, which is what makes the issuer return the code. Verified both
-# ways — see docs/stories/P1-08-local-env-changes-demo-behaviour.md.
+# ways. See docs/stories/P1-08-local-env-changes-demo-behaviour.md.
 if (-not $env:BREVO_API_KEY) { $env:BREVO_API_KEY = 'dev-disabled' }
 if (-not $env:ALLOW_DEV_OTP) { $env:ALLOW_DEV_OTP = 'true' }
 
@@ -90,7 +90,7 @@ foreach ($service in $services) {
 
 # If a phone is attached, restore its USB tunnels now. `adb reverse` mappings are cleared whenever
 # the adb server restarts or the cable is reconnected, and the wallet is built against
-# http://127.0.0.1:3000 — so without this the wallet reports "failed to connect to /127.0.0.1:3000"
+# http://127.0.0.1:3000. So without this the wallet reports "failed to connect to /127.0.0.1:3000"
 # even though every service is running.
 $adb = Join-Path $env:LOCALAPPDATA 'Android\Sdk\platform-tools\adb.exe'
 if (Test-Path $adb) {

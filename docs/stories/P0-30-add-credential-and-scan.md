@@ -1,12 +1,12 @@
-# P0-30 — Two ways in: add credential, or scan
+# P0-30. Two ways in: add credential, or scan
 
 **Status:** Done
 **Depends on:** P0-29 (the scanner that can tell codes apart)
 
 ## Problem
 
-One screen tried to be two things. "Receive credential" was a page — a heading, an explanation, and
-a button — whose only job was to open a camera. It also assumed the holder had a **QR code**, when
+One screen tried to be two things. "Receive credential" was a page. A heading, an explanation, and
+a button. Whose only job was to open a camera. It also assumed the holder had a **QR code**, when
 the institution's invitation arrives as a **link**, and the wallet's own deeplink path already
 claimed those without ever showing that screen.
 
@@ -14,11 +14,11 @@ claimed those without ever showing that screen.
 
 Split it by what the holder actually has:
 
-- **Scan** — a camera and nothing else. Tapping it opens the camera on arrival: no page, no
+- **Scan**. A camera and nothing else. Tapping it opens the camera on arrival: no page, no
   explanation, no second tap. When it is done it *leaves*: a credential arrives and the holder is
   back where they were, or a link is opened and another app takes over. The outcome travels back
   with them and is said on the screen they came from, so there is no page to dismiss.
-- **Add credential** — the guided way in, for a holder who has been **told to scan something**:
+- **Add credential**. The guided way in, for a holder who has been **told to scan something**:
   what to do, one button that does it, and then what happened, by name — *your credential from
   Auckland is successfully added* rather than *success*. A link the wallet was opened with is
   claimed on arrival without any of that, since tapping it was following the instruction.
@@ -29,7 +29,7 @@ screen is that instruction rather than a URL field.
 
 ## The outcomes still have to go somewhere
 
-A claim is a network round trip, and it can fail for reasons the holder has to act on — an offer
+A claim is a network round trip, and it can fail for reasons the holder has to act on. An offer
 already claimed, terms not accepted, payment outstanding. So the outcome is never dropped: the
 reader shows *Adding your credential…* while the claim runs, and whatever it has to say afterwards
 is handed to the screen the holder returns to and shown there. Without that, a failed claim would

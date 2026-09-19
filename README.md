@@ -1,7 +1,7 @@
 # Academic credentials as ISO mDoc
 
 Issue a university qualification or transcript as a verifiable credential, hold it in a mobile
-wallet, and let a third party check it — including its revocation status — without calling the
+wallet, and let a third party check it, including its revocation status, without calling the
 issuing institution.
 
 The credential is an ISO/IEC 18013-5 mDoc, the same signed document format a driving licence uses
@@ -14,10 +14,10 @@ a verifier receives only the values it asks for and the holder approves.
 | --- | --- | --- |
 | `issuer-service/` | Issues credentials, manages their lifecycle, serves every API the apps use | :3000 |
 | `verifier-service/` | Requests and verifies presentations, checks revocation fail-closed | :3001 |
-| `issuer-frontend/` | **Smart Academy** — the student-facing app: choose, claim, hold, share | :3002 |
-| `verifier-frontend/` | **My Jobs** — verification for an employer or background-check use case | :3003 |
-| `quals-portal/` | **Quals** — the management portal: credentials, shares, audit, API keys | :3004 |
-| `trust-university-frontend/` | **Trust University** — postgraduate admissions as a relying party | :3007 |
+| `issuer-frontend/` | **Smart Academy**. The student-facing app: choose, claim, hold, share | :3002 |
+| `verifier-frontend/` | **My Jobs**. Verification for an employer or background-check use case | :3003 |
+| `quals-portal/` | **Quals**. The management portal: credentials, shares, audit, API keys | :3004 |
+| `trust-university-frontend/` | **Trust University**. Postgraduate admissions as a relying party | :3007 |
 | `mobile-wallet/` | Kotlin/Android wallet (multipaz) that holds and presents credentials | Android |
 | `key-management/` | Key generation, storage and rotation for the signing keys | CLI |
 | `mdoc-core.js`, `db.js`, `status-list-core.js` | Shared libraries: mDoc encoding and verification, SQLite persistence, status lists | — |
@@ -42,7 +42,7 @@ A student may hold any combination. A verifier asks for the namespace it needs a
 credentials that can satisfy it, which is why a registrar asking for a transcript does not receive a
 bare qualification certificate.
 
-Values follow **US conventions for now** — a 0–4 GPA, credit hours, CIP programme codes, IPEDS award
+Values follow **US conventions for now**. A 0–4 GPA, credit hours, CIP programme codes, IPEDS award
 levels, Fall/Spring terms. These are defaults, not a design commitment: the model facts that would
 replace them are collected in `docs/analysis-discovery/transcript-model-facts.md`.
 
@@ -99,16 +99,16 @@ The **mdoc bytes themselves are never persisted**: a credential exists in the wa
 ephemeral session for it expires. The portal shows metadata and lifecycle only.
 
 Revocation lives in the signed MSO as a status-list index, so a verifier resolves it from the
-credential and the published list — it does not have to trust, or contact, the issuer.
+credential and the published list. It does not have to trust, or contact, the issuer.
 
 ## Not built yet
 
 These are tracked as stories rather than implied by this document:
 
 - **Container images** (`devops/Dockerfile.*`) predate the npm-workspaces layout and cannot build as
-  written — they expect a per-workspace lockfile. See P1-07.
+  written. They expect a per-workspace lockfile. See P1-07.
 - **A hosted deployment** for this repository; the demo runs locally.
-- **Values an institution owns** — real calendars, grading scales and identifiers: P0-21.
+- **Values an institution owns**. Real calendars, grading scales and identifiers: P0-21.
 - **Older documents** (`DEVELOPMENT.md`, `LOCAL_DEPLOYMENT.md`, `SETUP.md`, `QUICKSTART.md`) still
   describe PostgreSQL and Keycloak, which this system does not use. P1-07 covers bringing them in
   line or removing them.

@@ -76,7 +76,7 @@ const readerJwk = {
 const expectedTranscript = buildSessionTranscript({ origin: ORIGIN, nonceHex, jwk: readerJwk });
 
 // 5. Unwrap the signed payload and inspect the structure. Note the signature
-// covers ReaderAuthenticationBytes — the whole #6.24 tagged encoding.
+// covers ReaderAuthenticationBytes. The whole #6.24 tagged encoding.
 const signedBytes = new Uint8Array(payload);
 const signedTag = cbor2.decode(signedBytes);
 const readerAuthentication = cbor2.decode(new Uint8Array(signedTag.contents ?? signedTag.value));

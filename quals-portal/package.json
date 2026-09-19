@@ -1,7 +1,7 @@
 {
   "name": "quals-portal",
   "version": "0.1.0",
-  "description": "Quals — centralised management portal for verifiable credentials",
+  "description": "Quals. Centralised management portal for verifiable credentials",
   "private": true,
   "engines": {
     "node": ">=20.9.0"

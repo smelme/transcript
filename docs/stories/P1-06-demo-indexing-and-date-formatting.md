@@ -1,7 +1,7 @@
 # P1-06: Demo sites are indexable, and dates are shown in two shapes
 
-**Priority:** P1 — small, visible, and both are read as bugs by reviewers
-**Status:** Resolved — noindex on all four apps, and one date shape where a person reads one
+**Priority:** P1. Small, visible, and both are read as bugs by reviewers
+**Status:** Resolved. Noindex on all four apps, and one date shape where a person reads one
 **Components:** `issuer-frontend`, `verifier-frontend`, `quals-portal`, `trust-university-frontend`
 
 ## What was done
@@ -12,12 +12,12 @@ through a metadata route. The academy allows `/.well-known/` so Android's App Li
 stays reachable. Verified by fetching all four hosts: every page and every `robots.txt` returns the
 header, and the academy's file allows `/.well-known/` before disallowing the rest.
 
-**Dates.** The portal was already consistent — every timestamp goes through one helper. The mixed
+**Dates.** The portal was already consistent. Every timestamp goes through one helper. The mixed
 shapes were elsewhere: a shared document printed `2022-08-29`, `20220829` or a JavaScript `Date`
 according to which decoder produced it, and the two verification screens printed full timestamps with
 seconds in the browser's own locale, so the same fact looked different on two machines. Date-shaped
-claim values are now rendered the same way wherever a person reads them — the share view, the shared
-PDF, and the verification result — while every other value is passed through untouched, because a
+claim values are now rendered the same way wherever a person reads them. The share view, the shared
+PDF, and the verification result. While every other value is passed through untouched, because a
 matriculation number must not be reformatted.
 
 Related, and also fixed: the verifier's date claims are normalised to `YYYY-MM-DD` at the API
@@ -25,13 +25,13 @@ boundary (`toDateString` in `presentation-session-service.js`). A dependency ref
 decoder can hand back a `Date` for CBOR tag 1004, which leaked into the API as a full timestamp and
 is not a contract anyone should depend on.
 
-## Problem 1 — demo sites can be crawled
+## Problem 1. Demo sites can be crawled
 
 None of the four applications ships a `robots.txt` and none sets a `noindex` directive. The
 deployment therefore exposes a fictional university, a demo portal that accepts real-looking personal
 data, and sample transcripts to search engines.
 
-## Problem 2 — dates are rendered in two shapes
+## Problem 2. Dates are rendered in two shapes
 
 In the same tables, some timestamps are locale-formatted and others are printed as stored ISO
 strings (`2026-02-14T09:31:00.000Z`), and the wallet-facing claim dates keep their `YYYYMMDD`

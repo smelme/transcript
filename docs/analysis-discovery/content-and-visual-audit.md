@@ -1,4 +1,4 @@
-# Content and visual audit — sites and app
+# Content and visual audit. Sites and app
 
 **Date:** 2026-09-19
 **Scope:** `issuer-frontend` (academy), `verifier-frontend` (My Jobs), `quals-portal`, `trust-university-frontend`, and the Android wallet.
@@ -7,7 +7,7 @@
 ## Headline finding
 
 The **copy is in better shape than expected**. It is mostly plain, specific and free of the usual
-tells of generated text — no "unlock the power of", no stacked triples, no em-dash-heavy
+tells of generated text. No "unlock the power of", no stacked triples, no em-dash-heavy
 enthusiasm. What is inconsistent is the **presentation**: four separate front-ends, four separate
 stylesheets, four headers, and different or missing brand assets. That, not the words, is what makes
 the estate look assembled rather than designed.
@@ -18,7 +18,7 @@ the estate look assembled rather than designed.
 | `verifier-frontend` (My Jobs :3003) | React + JSX | 8 | `public/logo.svg` | its own |
 | `quals-portal` (:3004) | Next.js + TSX, has `components/ui.tsx` | 12 | **none** | its own (`nav.tsx`, `shell.tsx`) |
 | `trust-university-frontend` (:3007) | React + JSX | 4 | **none** | its own |
-| Wallet | Compose | — | institution marks drawn in code | — |
+| Wallet | Compose |, | institution marks drawn in code |, |
 
 Two sites ship a logo, two ship none. Only the academy has a light/dark control, while the wallet
 now has Device/Light/Dark. The wallet's palette (green/gold, `QualsTheme`) has no counterpart on the
@@ -29,7 +29,7 @@ sites, so nothing ties the app to the sites it belongs to.
 Worth fixing, in order of how wrong they are:
 
 1. **Demo-speak leaking into a product surface.** `issuer-frontend/app/layout.tsx:46` —
-   *"Smart Academy — example issuing authority for the Quals network."* A holder should not be told
+   *"Smart Academy. Example issuing authority for the Quals network."* A holder should not be told
    the issuer is an example.
 2. **Awkward phrasing.** `trust-university-frontend/app/page.jsx:178` — *"What we matched this
    record against"*. "Checked" is the word a verifier would use.

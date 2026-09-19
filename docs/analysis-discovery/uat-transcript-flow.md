@@ -1,7 +1,7 @@
-# UAT — Transcript credential flow (exploratory pass and cleanup iteration)
+# UAT. Transcript credential flow (exploratory pass and cleanup iteration)
 
 **Date:** 2026-02 (iteration 1)
-**Mode:** exploratory UAT — route inventory, then evidence-driven checks on the running system
+**Mode:** exploratory UAT. Route inventory, then evidence-driven checks on the running system
 **Scope:** the four web applications and the two APIs that make up the demo: Smart Academy
 (`issuer-frontend` :3002), My Jobs verification (`verifier-frontend` :3003), Quals portal
 (`quals-portal` :3004), Trust University admissions (`trust-university-frontend` :3007), issuer
@@ -25,7 +25,7 @@ values and labels owned by the academy (P0-21), and load or security penetration
 | Journey / area | How it was checked | Result |
 | --- | --- | --- |
 | Academy: choose → claim → add to wallet | Source read, live page fetch, existing end-to-end checks | Pass (findings UAT-010) |
-| Academy: claimable-credential reuse across requests | Live reproduction of the reported student case | Pass — 1 superseded, claim link carries the requested kind |
+| Academy: claimable-credential reuse across requests | Live reproduction of the reported student case | Pass. 1 superseded, claim link carries the requested kind |
 | My Jobs: verify for My Jobs, trusted issuers | Live page fetch, source read | Pass (findings UAT-005, UAT-003) |
 | Trust University: apply with a presented transcript | Live page fetch, source read | Pass (findings UAT-009) |
 | Portal: credentials, audit, shares, API keys | Source read, live page fetch (login screen) | Pass (findings UAT-006, UAT-003, UAT-011, UAT-014) |
@@ -51,7 +51,7 @@ values and labels owned by the academy (P0-21), and load or security penetration
 Severity: **Blocker** (stops a journey), **High** (breaks trust or accessibility for a real user),
 **Medium** (visible inconsistency or dead end), **Low** (polish, or a risk that is not user-facing).
 
-### UAT-001 — No security headers on any of the four web applications
+### UAT-001. No security headers on any of the four web applications
 
 - **Severity:** High
 - **Journey / page:** every page of all four apps
@@ -64,14 +64,14 @@ Severity: **Blocker** (stops a journey), **High** (breaks trust or accessibility
   presentation on a user's behalf; the absence is also the first thing a technical due-diligence
   review flags.
 - **Cause:** no `headers()` hook existed in any Next config.
-- **Recommendation / status:** **fixed** — shared policy in `shared-web/security-headers.mjs`,
+- **Recommendation / status:** **fixed**. Shared policy in `shared-web/security-headers.mjs`,
   applied by all four configs. The CSP deliberately enforces only the directives that cannot break
   a rendered page (`frame-ancestors`, `base-uri`, `object-src`); a full `script-src` policy depends
   on how the production build inlines scripts, which is P1-01's territory.
-- **Evidence:** before — no headers on any host; after — all four return `nosniff`, `DENY`,
+- **Evidence:** before, no headers on any host; after, all four return `nosniff`, `DENY`,
   `strict-origin-when-cross-origin`, `camera=(self), microphone=(), geolocation=()` and the CSP.
 
-### UAT-002 — A fresh checkout cannot install or build
+### UAT-002. A fresh checkout cannot install or build
 
 - **Severity:** High
 - **Journey / page:** CI, and any onboarding developer
@@ -87,7 +87,7 @@ Severity: **Blocker** (stops a journey), **High** (breaks trust or accessibility
   Not fixed here because committing a lockfile changes every future dependency diff and should be a
   deliberate decision.
 
-### UAT-003 — Search and control inputs have no accessible name
+### UAT-003. Search and control inputs have no accessible name
 
 - **Severity:** High
 - **Journey / page:** portal credentials search and filters; portal "revoke" and "stop sharing"
@@ -97,7 +97,7 @@ Severity: **Blocker** (stops a journey), **High** (breaks trust or accessibility
   fields were preceded by a `<label>` that was not associated with the input; the trust-score slider
   had no name at all.
 - **Expected:** every input is announced with a name that survives being cleared or typed into.
-- **Business impact:** a registrar using assistive technology cannot use the credential search — the
+- **Business impact:** a registrar using assistive technology cannot use the credential search. The
   primary portal task.
 - **Cause:** labels written as visual text next to the field, not bound to it.
 - **Recommendation / status:** **fixed** — `aria-label` on the search field and the slider,
@@ -105,7 +105,7 @@ Severity: **Blocker** (stops a journey), **High** (breaks trust or accessibility
 - **Evidence:** source audit of every `<input>` in the three frontends; the remaining inputs already
   have bound labels.
 
-### UAT-004 — Stale private key material sitting in the working tree
+### UAT-004. Stale private key material sitting in the working tree
 
 - **Severity:** High
 - **Journey / page:** developer and build environment
@@ -119,12 +119,12 @@ Severity: **Blocker** (stops a journey), **High** (breaks trust or accessibility
 - **Cause:** a previous key layout was left behind when keys moved to `key-management/keys`.
 - **Recommendation / status:** **deferred** to P1-05 (a decision, not a code change: delete the
   directory, or move it into the documented archive location with the key blanked).
-  Deliberately not deleted unilaterally — it is an untracked file in the user's working tree.
+  Deliberately not deleted unilaterally. It is an untracked file in the user's working tree.
 
-### UAT-005 — The verification app is called two different names
+### UAT-005. The verification app is called two different names
 
 - **Severity:** Medium
-- **Journey / page:** My Jobs — navigation, and the app title
+- **Journey / page:** My Jobs. Navigation, and the app title
 - **Observed:** the header and metadata say "My Jobs"; the primary navigation link said "Verify for
   MyJob". The relying-party identifier in the presentation sessions is `myjob`, and the verifier
   frontend sends `https://myjob.example` as its origin.
@@ -132,12 +132,12 @@ Severity: **Blocker** (stops a journey), **High** (breaks trust or accessibility
 - **Business impact:** small, but it is exactly the kind of detail that makes a reviewer wonder which
   name is the product.
 - **Cause:** the nav label was typed from the identifier.
-- **Recommendation / status:** **fixed** — nav link is now "Verify for My Jobs". The relying-party
+- **Recommendation / status:** **fixed**. Nav link is now "Verify for My Jobs". The relying-party
   id and origin are **left unchanged on purpose**: they are protocol-level identifiers bound into
   issued presentation sessions, so renaming them would invalidate stored sessions and is a
   deployment-time decision. Component names and element ids that read `MyJob` are internal only.
 
-### UAT-006 — The portal credentials page over-claims its scope
+### UAT-006. The portal credentials page over-claims its scope
 
 - **Severity:** Medium
 - **Journey / page:** portal → Credentials
@@ -147,11 +147,11 @@ Severity: **Blocker** (stops a journey), **High** (breaks trust or accessibility
 - **Business impact:** a registrar at one institution reads a claim of network-wide visibility and
   concludes either that the numbers are wrong or that the portal is not scoped as promised.
 - **Cause:** a single subtitle written for the platform-admin case.
-- **Recommendation / status:** **fixed** — the subtitle is now scope-aware: platform administrators
+- **Recommendation / status:** **fixed**. The subtitle is now scope-aware: platform administrators
   see "Every credential issued across the network…", organisation administrators see the name of
   their own institution.
 
-### UAT-007 — No way to skip the navigation with a keyboard
+### UAT-007. No way to skip the navigation with a keyboard
 
 - **Severity:** Medium
 - **Journey / page:** all four web apps
@@ -161,11 +161,11 @@ Severity: **Blocker** (stops a journey), **High** (breaks trust or accessibility
 - **Business impact:** keyboard users repeat the same tab sequence on every page; the tab order is
   the first thing an accessibility reviewer tests.
 - **Cause:** layouts were built without one.
-- **Recommendation / status:** **fixed** — skip link and matching `id="main"` target on all four
+- **Recommendation / status:** **fixed**. Skip link and matching `id="main"` target on all four
   apps. The portal login screen is intentionally excluded: it renders outside the shell, has no
   navigation, and the login card is the only content.
 
-### UAT-008 — Focus visibility was inconsistent and mostly absent
+### UAT-008. Focus visibility was inconsistent and mostly absent
 
 - **Severity:** Medium
 - **Journey / page:** all four web apps
@@ -176,10 +176,10 @@ Severity: **Blocker** (stops a journey), **High** (breaks trust or accessibility
 - **Business impact:** a keyboard user can lose their place, which is worse on white-on-colour
   buttons.
 - **Cause:** no shared focus rule.
-- **Recommendation / status:** **fixed** — a global `:focus-visible` rule in all four stylesheets,
+- **Recommendation / status:** **fixed**. A global `:focus-visible` rule in all four stylesheets,
   in each app's own accent colour.
 
-### UAT-009 — Trust University's "About" link leaves the site for a code repository
+### UAT-009. Trust University's "About" link leaves the site for a code repository
 
 - **Severity:** Medium
 - **Journey / page:** Trust University → header
@@ -189,23 +189,23 @@ Severity: **Blocker** (stops a journey), **High** (breaks trust or accessibility
 - **Business impact:** an admissions reviewer clicking "About" lands on a source repository, which
   reads as an unfinished demo and leaks the implementation story into a user-facing flow.
 - **Cause:** the link was a placeholder carried from the scaffold.
-- **Recommendation / status:** **fixed** — the item is removed rather than pointed somewhere
+- **Recommendation / status:** **fixed**. The item is removed rather than pointed somewhere
   invented. Navigation is now "Apply" and "How it works", both of which exist on the page.
 
-### UAT-010 — Academy empty state points at a body that does not exist
+### UAT-010. Academy empty state points at a body that does not exist
 
 - **Severity:** Medium
 - **Journey / page:** Smart Academy → claim
 - **Trigger:** claim with an email that has no credentials
 - **Observed:** the message told the user to "contact the academy registry".
 - **Expected:** the message should say what the user can actually do.
-- **Business impact:** a dead end during the demo's most likely failure — a mistyped address — and a
+- **Business impact:** a dead end during the demo's most likely failure, a mistyped address, and a
   support request that cannot be answered.
 - **Cause:** copy written before the demo had a real contact point.
-- **Recommendation / status:** **fixed** — the message now explains that credentials can only be
+- **Recommendation / status:** **fixed**. The message now explains that credentials can only be
   claimed at the address the academy holds on the record.
 
-### UAT-011 — The demo database makes the portal claim credentials are "In wallet"
+### UAT-011. The demo database makes the portal claim credentials are "In wallet"
 
 - **Severity:** Low
 - **Journey / page:** portal → Credentials; academy → claim
@@ -218,7 +218,7 @@ Severity: **Blocker** (stops a journey), **High** (breaks trust or accessibility
 - **Cause:** no seed or reset script for the development database.
 - **Recommendation / status:** **deferred** to P1-03.
 
-### UAT-012 — Scaffold directories and a stale build output directory
+### UAT-012. Scaffold directories and a stale build output directory
 
 - **Severity:** Low
 - **Journey / page:** repository
@@ -232,7 +232,7 @@ Severity: **Blocker** (stops a journey), **High** (breaks trust or accessibility
 - **Cause:** directories were emptied during the Next.js migration without being removed.
 - **Recommendation / status:** **deferred** to P1-04.
 
-### UAT-013 — Demo sites are indexable
+### UAT-013. Demo sites are indexable
 
 - **Severity:** Low
 - **Journey / page:** all four web apps
@@ -244,7 +244,7 @@ Severity: **Blocker** (stops a journey), **High** (breaks trust or accessibility
 - **Cause:** nothing was added for a demo deployment.
 - **Recommendation / status:** **deferred** to P1-06.
 
-### UAT-014 — Dates are shown in two different shapes
+### UAT-014. Dates are shown in two different shapes
 
 - **Severity:** Low
 - **Journey / page:** portal (credentials and audit), academy claim and share views
@@ -286,7 +286,7 @@ project.
 
 ---
 
-# Iteration 2 — the deferred items, worked through
+# Iteration 2. The deferred items, worked through
 
 Every finding above except the two that need a product decision has now been closed, and closing
 them turned up more than the findings themselves listed. The work is on `refactor`; the stories in
@@ -294,18 +294,18 @@ them turned up more than the findings themselves listed. The work is on `refacto
 
 | Finding | Outcome |
 | --- | --- |
-| UAT-002 / P1-02 | Lockfiles committed; the two workflows replaced by one that runs. See below — it was much worse than "cannot install". |
+| UAT-002 / P1-02 | Lockfiles committed; the two workflows replaced by one that runs. See below. It was much worse than "cannot install". |
 | UAT-004 / P1-05 | Archived key pair confirmed unused (`sha256 FAC18A22…` ≠ the live certificate) and deleted. |
 | UAT-011 / P1-03 | `npm run db:reset` and `npm run db:seed`, both guarded against production and against a database outside the repository. |
 | UAT-012 / P1-04 | Seven directories holding nothing but `node_modules` and a stray lockfile removed (203 MB reclaimed), stale `dist/` removed. |
 | UAT-013 / P1-06 | `X-Robots-Tag: noindex, nofollow` on all four apps plus a `robots.txt` each; `/.well-known/` allowed so App Links verification still works. |
-| UAT-014 / P1-06 | One date shape wherever a person reads one — the share view, the shared PDF and the verification result — and date claims normalised to `YYYY-MM-DD` at the verifier's API boundary. |
+| UAT-014 / P1-06 | One date shape wherever a person reads one, the share view, the shared PDF and the verification result, and date claims normalised to `YYYY-MM-DD` at the verifier's API boundary. |
 | UAT-001, 003, 005–010 | Closed in iteration 1. |
 | UAT-015 | The wallet card carried a line reading "Issued &lt;date&gt;" built from the **graduation** date, and the issuer derived `issue_date` from the graduation too rather than dating a credential to the day it was issued. Both are wrong in the same way: a credential is issued when it is issued. `issue_date` and the academic record's `document_issued_at` are now the day the record is generated, and the card shows the credential's own issue date, with the graduation date left as its own fact. |
 
 ## What the "cannot install" finding actually hid
 
-`ci.yml` was **not valid YAML** — a line in a block scalar was indented short, closing the scalar
+`ci.yml` was **not valid YAML**. A line in a block scalar was indented short, closing the scalar
 early, and `ci-cd.yml` had two `run:` keys in one step. Nothing in either workflow could ever have
 executed, so no other failure had ever been reported. Behind that: three workspaces installed
 separately with `npm ci` in an npm-workspaces monorepo, one of them a directory that does not exist,
@@ -314,7 +314,7 @@ finding referenced but which was never in the repository.
 
 Three further breakages then had to be fixed before a pipeline could mean anything:
 
-- **The production build** (P1-01) — the real cause was two React majors in the tree: React 18.3.1
+- **The production build** (P1-01). The real cause was two React majors in the tree: React 18.3.1
   hoisted to the root for Next's peer requirement, with React 19.2.8/19.3.0 nested per app. Only a
   clean install from a committed lockfile resolves it, which is why it was untestable before.
 - **`lint` failed in every workspace** — `linebreak-style: unix` against a working tree rewritten to
@@ -323,7 +323,7 @@ Three further breakages then had to be fixed before a pipeline could mean anythi
   Express error handlers whose required fourth parameter was flagged) is fixed.
 - **`next lint` no longer exists in Next 16**, so three apps failed with "Invalid project directory
   provided". The JSX apps now run `eslint app`; the two TypeScript apps run `tsc --noEmit`, because
-  ESLint here has no TypeScript parser — a real check rather than a placeholder.
+  ESLint here has no TypeScript parser. A real check rather than a placeholder.
 
 `START_LOCAL_SERVICES.ps1` also claimed "150/150 tests, 100% SUCCESS" without running a single test,
 and named ports 5173/5174 and a deleted directory. It is replaced by a launcher that starts the six

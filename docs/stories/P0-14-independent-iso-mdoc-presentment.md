@@ -1,6 +1,6 @@
 # P0-14: Independent ISO mdoc Digital Credentials Presentment
 
-**Priority:** P0 — protocol-completion prerequisite  
+**Priority:** P0. Protocol-completion prerequisite  
 **Status:** In progress  
 **Components:** Android wallet, independent verifier API, MyJob relying-party website  
 **Protocol:** W3C Digital Credentials API `org-iso-mdoc`; ISO/IEC 18013-5 mdoc
@@ -44,9 +44,9 @@ As a student, I want to approve a MyJob request to share the minimum academic cl
 
 ## Delivery increments
 
-1. **Contract and request-session foundation:** complete — session lifecycle, `org-iso-mdoc` request, frontend flow, API tests, and documentation.
-2. **Conformant verifier cryptography:** complete for decryption/verification — the encrypted `DeviceResponse` path (HPKE, session transcript, device auth, IssuerAuth, claim digests) is implemented via `id-verifier` and covered by an end-to-end test wallet plus negative tests; reader authentication and a pinned issuer certificate for production remain.
-3. **Android holder provider:** implemented — an exported, non-launcher `PresentationActivity` fulfills `org-iso-mdoc` requests via Android Credential Manager, verifies the caller origin, discloses requested claims, requires biometric authentication, filters IssuerSigned fields to the request, builds the device-signed + HPKE-encrypted `DeviceResponse` with the non-exportable Keystore key, and returns only requested claims. Android compilation succeeds. Remaining: physical-device exchange.
+1. **Contract and request-session foundation:** complete. Session lifecycle, `org-iso-mdoc` request, frontend flow, API tests, and documentation.
+2. **Conformant verifier cryptography:** complete for decryption/verification. The encrypted `DeviceResponse` path (HPKE, session transcript, device auth, IssuerAuth, claim digests) is implemented via `id-verifier` and covered by an end-to-end test wallet plus negative tests; reader authentication and a pinned issuer certificate for production remain.
+3. **Android holder provider:** implemented. An exported, non-launcher `PresentationActivity` fulfills `org-iso-mdoc` requests via Android Credential Manager, verifies the caller origin, discloses requested claims, requires biometric authentication, filters IssuerSigned fields to the request, builds the device-signed + HPKE-encrypted `DeviceResponse` with the non-exportable Keystore key, and returns only requested claims. Android compilation succeeds. Remaining: physical-device exchange.
 4. **Compatibility validation:** execute an independent physical-device presentation (Android provider + browser) and record the compatible Android/browser/provider versions.
 
 ## Definition of done

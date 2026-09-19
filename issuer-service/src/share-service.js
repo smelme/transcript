@@ -272,7 +272,7 @@ export class ShareService {
 
   // ── API ──────────────────────────────────────────────────────────────────
   /**
-   * Step 1 — wallet asks to share a credential.
+   * Step 1. Wallet asks to share a credential.
    * @returns {{ success, shareId, deviceRequest, encryptionInfo, origin }}
    */
   async create({ accessToken, credentialId, categories = [], recipientName, recipientEmail, message = '' }) {
@@ -379,7 +379,7 @@ export class ShareService {
   }
 
   /**
-   * Step 2 — wallet returns the encrypted, selectively-disclosed DeviceResponse.
+   * Step 2. Wallet returns the encrypted, selectively-disclosed DeviceResponse.
    */
   async submit({ shareId, accessToken, credential }) {
     const share = this.shares.get(shareId);

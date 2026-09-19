@@ -1,6 +1,6 @@
 # P1-08: A local `.env` silently changes what the demo does
 
-**Priority:** P1 — whether the demo can sign anyone in depends on which machine it runs on
+**Priority:** P1. Whether the demo can sign anyone in depends on which machine it runs on
 **Status:** Open, reproduced (and understood) during the cleanup pass
 **Components:** `issuer-service/.env` (gitignored), `issuer-service/src/email-service.js`,
 `issuer-service/src/wallet-account-service.js`, `START_LOCAL_SERVICES.ps1`, CI
@@ -18,16 +18,16 @@ return { otpSent: sent.success, otp: sent.success || !devOtpAllowed() ? undefine
 `issuer-service/.env` is gitignored, and on a developer machine it normally holds a real
 `BREVO_API_KEY`. `dotenv` loads it, so on that machine the send *succeeds*, `otpSent` is `true`, and
 the code is never in the response. Every script and UI flow that expects to read the code then fails
-at sign-in — with a message that says "email configured + no dev fallback", which is accurate but
+at sign-in. With a message that says "email configured + no dev fallback", which is accurate but
 gives no hint that the cause is a local file.
 
 The same repository therefore behaves differently in three environments:
 
 | Environment | `BREVO_API_KEY` | Code returned? |
 | --- | --- | --- |
-| CI (no `.env`) | empty | yes — the send fails, `otpSent:false` |
-| Developer machine with `.env` | real | no — the code is emailed |
-| Launcher with its placeholder exported | `dev-disabled` | yes — the send is attempted and rejected |
+| CI (no `.env`) | empty | yes. The send fails, `otpSent:false` |
+| Developer machine with `.env` | real | no. The code is emailed |
+| Launcher with its placeholder exported | `dev-disabled` | yes. The send is attempted and rejected |
 
 Cost in this pass: every scenario script in the suite failed, on a freshly reset database, which
 looked like a regression from the cleanup rather than an environment difference.

@@ -31,7 +31,7 @@ app/
 
 ## Pages
 
-- `/` — Single credential issuance (Photo ID) with live mdoc verification.
+- `/`. Single credential issuance (Photo ID) with live mdoc verification.
 
 ## Configuration
 
@@ -42,5 +42,5 @@ app/
 ## Notes
 
 - The mdoc payload returned by the issuer is held in-memory only with a
-  configurable session timeout (default 10 minutes) — retrieve it via
+  configurable session timeout (default 10 minutes). Retrieve it via
   `GET /credentials/:id/mdoc` before it expires.

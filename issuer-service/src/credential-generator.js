@@ -183,7 +183,7 @@ function seedFrom(...parts) {
 function makeRng(seed) {
   let state = seed || 1;
   return () => {
-    // xorshift32 — small, deterministic, good enough for demo data.
+    // xorshift32. Small, deterministic, good enough for demo data.
     state ^= state << 13; state >>>= 0;
     state ^= state >> 17;
     state ^= state << 5; state >>>= 0;

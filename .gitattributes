@@ -3,7 +3,7 @@
 # The repository stores LF. Without this file, a Windows checkout with the common
 # core.autocrlf=true setting rewrites every file to CRLF in the working tree, which made
 # `eslint` report thousands of linebreak-style errors locally while the same code passed on Linux
-# CI — the rule is now off in .eslintrc.json and this file keeps checkouts consistent instead.
+# CI. The rule is now off in .eslintrc.json and this file keeps checkouts consistent instead.
 * text=auto eol=lf
 
 # Windows-only helpers keep CRLF, because PowerShell's own tooling is happier with it.

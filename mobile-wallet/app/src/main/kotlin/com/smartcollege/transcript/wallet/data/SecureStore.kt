@@ -125,7 +125,7 @@ class SecureStore(context: Context) {
         val stored = try {
             MDOC_PREFIX + encryptMdocBody(mdocBase64url)
         } catch (e: Throwable) {
-            // No usable auth-bound key (e.g. device has no lock screen) — keep
+            // No usable auth-bound key (e.g. device has no lock screen). Keep
             // the value in the (still EncryptedSharedPreferences-encrypted) store.
             android.util.Log.w(TAG, "mdoc auth-encrypt unavailable; storing plaintext", e)
             mdocBase64url

@@ -1,7 +1,7 @@
 # P0-22: One academic credential per holder, not one per kind
 
-**Priority:** P0 — this is the shape of the credential itself; later changes to it cost more
-**Status:** **In progress — both decisions resolved 2026-09-18.** Increments 1-3 are implemented
+**Priority:** P0. This is the shape of the credential itself; later changes to it cost more
+**Status:** **In progress. Both decisions resolved 2026-09-18.** Increments 1-3 are implemented
 (generator, issuer, wallet, academy app, portal); the disclosure test (criterion 3) and the
 architecture-note rewrite are outstanding, and the end-to-end scenario suite has not been run
 against the change yet

@@ -1,4 +1,4 @@
-# P0-29 — The scanner understands more than our own QR codes
+# P0-29. The scanner understands more than our own QR codes
 
 **Status:** Done
 **Depends on:** nothing; presentation already works through the system credential manager
@@ -10,7 +10,7 @@ failed with *"Invalid credential offer"*, which is wrong for the most likely oth
 front of a wallet: a **presentation request**.
 
 The Digital Credentials API's cross-device transfer code is a **FIDO URL** (`FIDO:/…`). The phone's
-camera app does not try to read it — it hands it to whichever app registered for that scheme, and
+camera app does not try to read it. It hands it to whichever app registered for that scheme, and
 the system's credential manager takes it from there. Scanning one in our own wallet handed it to a
 claim path that was never going to understand it.
 
@@ -21,7 +21,7 @@ Classify what was scanned, and act on the class rather than assuming:
 | Scanned | Wallet's response |
 | --- | --- |
 | Our offer (`openid-credential-offer://`, an App Link carrying `credential_offer=`, or a bare session id) | claim it, exactly as before |
-| A FIDO URL (`FIDO:/…`) | hand it to the system as the camera app does — no attempt to read it |
+| A FIDO URL (`FIDO:/…`) | hand it to the system as the camera app does. No attempt to read it |
 | Any other link | say plainly that it is a link, and open it only if the holder asks |
 | Anything else | say it is not a credential offer |
 
@@ -31,7 +31,7 @@ and would otherwise be handed to the browser.
 ## Why handing a FIDO URL on is right, and not a shrug
 
 We are not the owner of that code. Opening it delegates to whoever registered the scheme, and the
-credential manager then asks the wallet to answer the request as a **provider** — which is how
+credential manager then asks the wallet to answer the request as a **provider**. Which is how
 `PresentationActivity` is reached for a cross-device presentation. Reading it ourselves would mean
 reimplementing a transport we do not need to own.
 
@@ -48,4 +48,4 @@ reimplementing a transport we do not need to own.
 
 - A QR code on our own verifier page for the cross-device case. Today the browser renders the FIDO
   code for a desktop-initiated request; a self-hosted one is a follow-up.
-- Any issuance over the API. Rolled back deliberately — see P0-27.
+- Any issuance over the API. Rolled back deliberately. See P0-27.

@@ -18,7 +18,7 @@ export default function DigitalCredentialsPage() {
           <p style={{ fontSize: 17, lineHeight: 1.65, color: 'var(--muted)', margin: 0 }}>
             Smart Academy issues its academic records as verifiable digital credentials. Instead of
             a PDF that anyone can alter, you hold a cryptographically signed record on your own
-            device — and you choose how much of it to reveal.
+            device. And you choose how much of it to reveal.
           </p>
         </div>
       </section>

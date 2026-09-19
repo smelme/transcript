@@ -10,7 +10,7 @@ export default function Home() {
           <p className="lede">
             Smart Academy issues your degree and academic transcript as a digital credential that
             lives in your own wallet. Prove your qualifications to employers and institutions
-            without waiting for paper documents — and share only what you choose.
+            without waiting for paper documents, and share only what you choose.
           </p>
           <div className="hero-actions">
             <Link href="/get-credentials" className="btn btn-primary">

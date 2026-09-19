@@ -194,7 +194,7 @@ h3 {
 .stat-number {
   font-size: 28px;
   font-weight: 800;
-  /* Gold cannot be text on white — a gradient number reads as a smudge at the gold end, and the
+  /* Gold cannot be text on white. A gradient number reads as a smudge at the gold end, and the
      number is the information. It is set in ink; the accent is left to the surfaces. */
   color: var(--text);
 }

@@ -1,10 +1,10 @@
-# P0-25 — Wallet detail: the actions, and a readable document
+# P0-25. Wallet detail: the actions, and a readable document
 
 ## Why
 
 Three complaints about the credential detail screen, all correct:
 
-1. **The bottom was a stack of three full-width buttons** — Share, Activity, Delete — with the
+1. **The bottom was a stack of three full-width buttons**, Share, Activity, Delete, with the
    destructive one shoulder-to-shoulder with the primary one, and all of them at the end of a long
    scroll.
 2. **The document was well categorised but a long scroll.** One block per claim meant a credential
@@ -18,10 +18,10 @@ Three complaints about the credential detail screen, all correct:
 - **Destructive actions move out of the way.** "Delete credential" is now behind a *More* overflow
   in the title bar: rare, deliberate, and no longer adjacent to the button a holder came to press.
 - **Activity is a row, not a button, and only when there is something to show.** It states how many
-  disclosures there are and opens the log. No activity, no row — an entry point leading to "nothing
+  disclosures there are and opens the log. No activity, no row. An entry point leading to "nothing
   here" is worse than no entry point.
-- **Every block collapses to a headline.** Each says in one line what it is about — a name, the
-  issue date, the award — and opens when tapped. Courses, the one block that can run long, open
+- **Every block collapses to a headline.** Each says in one line what it is about. A name, the
+  issue date, the award. And opens when tapped. Courses, the one block that can run long, open
   three rows at a time with "Show all N".
 - **The redundant Wallet block is gone.** The header card already shows the credential id, so
   repeating it was a block of scroll for nothing.
@@ -45,4 +45,4 @@ Three complaints about the credential detail screen, all correct:
 ## Remaining
 
 - Device read-through of the new screen at real lengths (a combined credential with twelve courses)
-  — the case the collapse is for.
+ . The case the collapse is for.

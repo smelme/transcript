@@ -4,7 +4,7 @@ const COOKIE = 'quals_session';
 
 /**
  * Gate the portal behind a session. This only checks that a session cookie is
- * present — the actual token is validated by the issuer service on every API
+ * present. The actual token is validated by the issuer service on every API
  * call, so an expired or revoked token still fails closed.
  */
 export function proxy(req: NextRequest) {

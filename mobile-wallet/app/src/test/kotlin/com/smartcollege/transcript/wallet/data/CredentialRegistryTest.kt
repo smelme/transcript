@@ -21,7 +21,7 @@ class CredentialRegistryTest {
     private val qualificationNs = "org.iso.23220.education.qualification.1"
     private val transcriptNs = "org.iso.23220.education.transcript.1"
 
-    /** `fb 400d333333333333` — exactly what the issuer's `new Cbor().f64(3.65)` emits. */
+    /** `fb 400d333333333333`. Exactly what the issuer's `new Cbor().f64(3.65)` emits. */
     private val gpa3_65 = byteArrayOf(
         0xfb.toByte(), 0x40, 0x0d, 0x33, 0x33, 0x33, 0x33, 0x33, 0x33,
     )

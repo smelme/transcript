@@ -1,13 +1,13 @@
 # P1-04: Scaffold directories and stale build output in the tree
 
-**Priority:** P1 — CI names a workspace that does not exist (see P1-02), and onboarding is confusing
-**Status:** Resolved — the directories held nothing but dependency residue and are gone
+**Priority:** P1. CI names a workspace that does not exist (see P1-02), and onboarding is confusing
+**Status:** Resolved. The directories held nothing but dependency residue and are gone
 **Components:** repository root, `verifier-frontend/dist/`
 
 ## What was actually there
 
 Before deleting anything, each directory was inspected. All seven contained **only** `node_modules/`
-and a stray `package-lock.json` — no source file of any kind:
+and a stray `package-lock.json`. No source file of any kind:
 
 | Directory | Reclaimed |
 | --- | --- |

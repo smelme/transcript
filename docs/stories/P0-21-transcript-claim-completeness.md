@@ -1,7 +1,7 @@
 # P0-21: Transcript claim completeness
 
-**Priority:** P0 — the transcript is not interpretable without Tier 1
-**Status:** In progress — Tier 1 is implemented under **US conventions** (see below), because the
+**Priority:** P0. The transcript is not interpretable without Tier 1
+**Status:** In progress. Tier 1 is implemented under **US conventions** (see below), because the
 academy has not supplied its own grading and credit model. Every value the academy owns is a value
 in the generator rather than a structure, so swapping them is a configuration change. Tier 2 is
 still gated on the academy supplying the data
@@ -14,13 +14,13 @@ As a registrar, I want a presented transcript to tell me which programme it belo
 the marks and credits are scaled, when the study happened and what the outcome was, so that I
 can make an admission decision without contacting the issuing institution.
 
-## Scope — Tier 1 (interpretability)
+## Scope. Tier 1 (interpretability)
 
-- **Programme context**: the transcript states the programme it belongs to — title, type
+- **Programme context**: the transcript states the programme it belongs to. Title, type
   (degree programme), field of study (ISCED-F code and label), level with its framework named
   (EQF), and the award it leads to.
-- **Grading scheme**: every mark is accompanied by an identifiable scheme — an id, a
-  human-readable description of the scale, its minimum, maximum and pass mark — and the
+- **Grading scheme**: every mark is accompanied by an identifiable scheme. An id, a
+  human-readable description of the scale, its minimum, maximum and pass mark. And the
   result is reported as a label rather than a bare number.
 - **Credit scheme**: credits and total credits state their scheme (ECTS, or whatever the
   institution uses) and level.
@@ -45,7 +45,7 @@ can make an admission decision without contacting the issuing institution.
 - **Aggregates**: programme, overall result, credit total and scheme travel as their own
   elements so an applicant can disclose a summary without their whole course list (see gap 14).
 
-## Scope — Tier 2 (recognisability), same story, second increment
+## Scope. Tier 2 (recognisability), same story, second increment
 
 **Implemented behind an issuance option, with demo sample values** (see "Recognition details"
 below). It stays a separate increment because it is recognisability rather than interpretability: a
@@ -145,15 +145,15 @@ Decided before implementing, because it changes where every new element goes:
 
 ## Delivery increments
 
-1. **Done** — Tier 1 claim set in the generator and the mdoc builder, with unit tests asserting the
+1. **Done**. Tier 1 claim set in the generator and the mdoc builder, with unit tests asserting the
    scheme accompanies every mark and that the aggregates are separately disclosable.
-2. **Partly** — the share categories request the new elements and Trust University renders them. The
+2. **Partly**. The share categories request the new elements and Trust University renders them. The
    wallet now names the qualification a transcript belongs to, on the tile and in the detail view
    (2026-09-13, below). The portal still shows only the kind: its credentials table has no programme
    column, and the list it reads does not carry one yet.
 3. Tier 2 claim set — **implemented behind the `recognition` option with demo samples**; the
    academy's own values replace `RECOGNITION_SAMPLES` when it supplies them.
-4. Trust University renders the richer transcript (_P0-19_) — done with this story.
+4. Trust University renders the richer transcript (_P0-19_). Done with this story.
 
 ## US conventions used for now
 
@@ -169,18 +169,18 @@ its average so one number is never read two ways.
 
 Acceptance criteria, as implemented:
 
-1. **Met** — the decoded record answers all of it: `programme_title` / `award_title`, institution,
+1. **Met**. The decoded record answers all of it: `programme_title` / `award_title`, institution,
    `enrolment_start` / `enrolment_end`, letter marks with `gradePoints` and a scale id, credits with
    their scheme plus `credits_attempted` / `credits_earned`, a per-result term, and `outcome`.
 2. **Met** — `grading_scale_id`, `_label`, `_minimum`, `_maximum`, `_pass_mark` are elements of the
    transcript and every course repeats `markScaleId`; no scale is left to be assumed.
-3. **Met** — the average carries `average_range_minimum` / `_maximum` and `average_weighting`, so a
+3. **Met**. The average carries `average_range_minimum` / `_maximum` and `average_weighting`, so a
    figure like 2.71 is unambiguously on the 4.00 scale.
 4. **Met** — `total_credits`, `credits_attempted`, `credits_earned`, `overall_mark`,
    `overall_mark_scale_id` and `outcome` are elements beside `courses`, not inside it, so a holder
    can disclose the summary without the module list.
 5. **Met** — `status` is still emitted, and a credential without the new elements still verifies.
-6. **Partly** — the wallet names the qualification a transcript belongs to, and the outcome remains
+6. **Partly**. The wallet names the qualification a transcript belongs to, and the outcome remains
    outstanding there; the portal shows the kind only, so a programme column is still to come. A
    transcript tile previously read "Academic transcript - Tessa Novak · Smart Academy · 5 courses ·
    14 credits", which does not say which qualification the transcript is for - the one thing a
@@ -188,25 +188,25 @@ Acceptance criteria, as implemented:
    Novak · Smart Academy · Bachelor of Psychology · 5 courses · 14 credits", and the detail view
    carries Programme and Award rows. A summary stored before this change is re-read from the mdoc
    once and saved back, so credentials already in a wallet gain it without being claimed again.
-7. **Met** — Trust University renders the institution, programme, award, credits earned, the average
+7. **Met**. Trust University renders the institution, programme, award, credits earned, the average
    with its scale, and the module table, all from verified claims.
-8. **Met** — revocation, status-list and selective-disclosure behaviour are untouched: 73 issuer,
+8. **Met**. Revocation, status-list and selective-disclosure behaviour are untouched: 73 issuer,
    61 verifier and 29 wallet tests pass, with both share smoke tests and the academy flow.
-9. **Met** — every value states its scheme and each total is per scheme: the core names
+9. **Met**. Every value states its scheme and each total is per scheme: the core names
    `credit_scheme`, the supplement names `credit_hours_scheme`, and neither converts.
-10. **Met** — the core is requestable on its own, and the supplement is a separate namespace a
+10. **Met**. The core is requestable on its own, and the supplement is a separate namespace a
     relying party may request with it or not at all.
 
 Findings while implementing:
 
-- **The generator could return fewer courses than it intended** — it drew at random and stopped at
+- **The generator could return fewer courses than it intended**. It drew at random and stopped at
   the first repeat. Courses are now chosen by a seeded shuffle, so a record always holds the number
   it means to.
 - **Terms were not chronological and could end after graduation.** They are now counted back from
   the record's final term, and a test asserts both properties.
 - **The release framing is settled:** `document_status`, `document_completeness`, `document_type`,
-  `document_id` and `document_issued_at` are carried — the record's own identity, separate from the
-  identity document's number — while `issued_to`, `release_method` and `request_reference` are not.
+  `document_id` and `document_issued_at` are carried. The record's own identity, separate from the
+  identity document's number. While `issued_to`, `release_method` and `request_reference` are not.
   A reusable credential is issued once and presented many times, so those belong to the presentation
   the verifier records rather than to the credential.
 

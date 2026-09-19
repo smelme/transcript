@@ -11,7 +11,7 @@ import java.util.Base64
 data class OfferDetails(val sessionId: String, val nonce: String, val issuerId: String)
 
 /**
- * Minimal CBOR (RFC 8949) encoder — just enough for CWT/COSE_Sign1.
+ * Minimal CBOR (RFC 8949) encoder. Just enough for CWT/COSE_Sign1.
  * Only ints, bstr, tstr, arrays and maps are needed here.
  */
 object Cbor {

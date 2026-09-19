@@ -279,7 +279,7 @@ class IssuerService {
         certDer: fs.readFileSync(certPath),
       };
     } catch (e) {
-      console.warn('[issuer] mdoc signing keys not found — mdoc issuance disabled:', e.message);
+      console.warn('[issuer] mdoc signing keys not found. Mdoc issuance disabled:', e.message);
       return null;
     }
   }
@@ -534,7 +534,7 @@ class IssuerService {
       };
 
       // Generate the ISO 18013-5 IssuerSigned mdoc for this credential kind. The mdoc
-      // payload is held in-memory only (session store) — never persisted.
+      // payload is held in-memory only (session store). Never persisted.
       //
       // A credential without an mdoc cannot be presented or status-checked, so a failure
       // here fails the request rather than returning a credential that is dead on arrival.
@@ -651,7 +651,7 @@ class IssuerService {
     }
     const session = this.getMdocSession(credentialId);
     if (!session) {
-      return { success: false, error: 'mdoc session expired — re-issue the credential to retrieve the mdoc' };
+      return { success: false, error: 'mdoc session expired. Re-issue the credential to retrieve the mdoc' };
     }
     const verification = verifyIssuerSigned(session.mdocBase64url);
     return {
@@ -674,8 +674,8 @@ class IssuerService {
   // ── Issuance sessions (invitation-driven, device-bound) ──────────────────
   //
   // An issuance session is created by the institute for a specific student
-  // (studentId). It stays `pending` until the wallet proves — via an access
-  // token whose `sub` is linked to that studentId — that it belongs to the
+  // (studentId). It stays `pending` until the wallet proves. Via an access
+  // token whose `sub` is linked to that studentId. That it belongs to the
   // same person. Only then is the credential issued.
 
   createIssuanceSession({
@@ -911,7 +911,7 @@ class IssuerService {
     if (session.status === 'superseded') {
       return {
         success: false,
-        error: 'This credential was replaced by a newer one — open your latest invitation link',
+        error: 'This credential was replaced by a newer one. Open your latest invitation link',
       };
     }
     if (session.status === 'issued') {
@@ -987,7 +987,7 @@ class IssuerService {
       return {
         success: false,
         status: 409,
-        error: 'This credential was replaced by a newer one — open your latest invitation link',
+        error: 'This credential was replaced by a newer one. Open your latest invitation link',
       };
     }
 
@@ -1276,7 +1276,7 @@ function loadWalletTokenSigner() {
   try {
     return fs.readFileSync(keyPath, 'utf8');
   } catch (e) {
-    console.warn('[issuer] wallet access-token signer key not found — access tokens disabled:', e.message);
+    console.warn('[issuer] wallet access-token signer key not found. Access tokens disabled:', e.message);
     return null;
   }
 }
@@ -1799,8 +1799,8 @@ async function requireAdmin(req, res) {
 
 /**
  * Require a platform administrator: one who is not scoped to a single client
- * organisation. Network-wide data — wallet accounts, sharing, other
- * organisations and administrator records — is only ever visible to them.
+ * organisation. Network-wide data. Wallet accounts, sharing, other
+ * organisations and administrator records. Is only ever visible to them.
  */
 async function requirePlatformAdmin(req, res) {
   if (!(await requireAdmin(req, res))) {return false;}
@@ -2100,10 +2100,10 @@ app.post('/academy/requests', async (req, res) => {
         courseCount: record.display.courseCount ?? null,
       })),
       message: allInWallet
-        ? 'These credentials are already in your wallet, so no new link was emailed — you can issue another copy from here.'
+        ? 'These credentials are already in your wallet, so no new link was emailed. You can issue another copy from here.'
         : sent.success
           ? 'We have emailed you a link to add your credentials to your wallet.'
-          : 'Email delivery is not configured — use the link below to continue.',
+          : 'Email delivery is not configured. Use the link below to continue.',
     });
   } catch (e) {
     res.status(400).json({ success: false, error: e.message });
@@ -2150,7 +2150,7 @@ app.get('/academy/credentials', async (req, res) => {
       })),
     });
   } catch (e) {
-    res.status(401).json({ success: false, error: 'Your session has expired — please sign in again' });
+    res.status(401).json({ success: false, error: 'Your session has expired. Please sign in again' });
   }
 });
 
@@ -2180,7 +2180,7 @@ app.post('/academy/credentials/:sessionId/offer', async (req, res) => {
     if (session.status === 'superseded') {
       return res.status(409).json({
         success: false,
-        error: 'This credential was replaced by a newer one — open your latest invitation link',
+        error: 'This credential was replaced by a newer one. Open your latest invitation link',
       });
     }
 

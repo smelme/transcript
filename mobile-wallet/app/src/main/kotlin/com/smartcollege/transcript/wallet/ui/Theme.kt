@@ -8,7 +8,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.graphics.Color
 import com.smartcollege.transcript.wallet.data.Appearance
 
-// Quals brand palette — green & white with a gold accent.
+// Quals brand palette. Green & white with a gold accent.
 val QualsGold = Color(0xFFFFC400)
 private val QualsGreen = Color(0xFF1B9C5B)
 private val QualsGreenDark = Color(0xFF0E6B3D)

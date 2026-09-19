@@ -1,4 +1,4 @@
-# Trust University — postgraduate admissions
+# Trust University. Postgraduate admissions
 
 A standalone relying-party site. A registrar asks the holder's wallet for their **academic
 transcript** and shows only what the verifier returns.
@@ -17,7 +17,7 @@ a nav or a stylesheet.
 
 No `docType` identifies a transcript: every credential kind is issued as a photo-ID document. The
 **transcript namespace** in the request is what limits it to a transcript credential. The award
-namespace is deliberately *not* requested — a transcript credential does not carry it, and asking
+namespace is deliberately *not* requested. A transcript credential does not carry it, and asking
 would suggest a registrar reads an award from a transcript.
 
 The recognition details (institution identifiers, the recognised programme title, the language of

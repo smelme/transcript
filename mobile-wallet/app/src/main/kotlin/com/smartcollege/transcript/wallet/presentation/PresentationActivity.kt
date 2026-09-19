@@ -282,7 +282,7 @@ class PresentationActivity : FragmentActivity() {
         // Parse the request in parallel with authentication.
         androidx.compose.runtime.LaunchedEffect(Unit) { parseRequest() }
 
-        // Go straight to biometric/PIN — no visible app UI before it.
+        // Go straight to biometric/PIN. No visible app UI before it.
         androidx.compose.runtime.LaunchedEffect(Unit) {
             delay(300)
             authenticateUser(

@@ -1,7 +1,7 @@
 # P1-05: Stale private key material in the working tree
 
-**Priority:** P1 — an unused private key on disk is a liability and an ambiguity
-**Status:** Resolved — the pair was confirmed unused and deleted
+**Priority:** P1. An unused private key on disk is a liability and an ambiguity
+**Status:** Resolved. The pair was confirmed unused and deleted
 **Components:** `archive/keys/signer-key.pem`, `archive/keys/signer-cert.pem`
 
 ## The check that was made first
@@ -13,14 +13,14 @@ files that report the finding itself. The live signing key is `key-management/ke
 and remains gitignored, and every tracked file under `key-management/keys/` is public or metadata.
 
 The archived pair was therefore deleted. If a very old demo credential one day fails to verify, this
-is why — and `npm run db:reset` makes that a non-event.
+is why. And `npm run db:reset` makes that a non-event.
 
 ## Problem
 
 Two key files sit in an untracked `archive/` directory:
 
-- `archive/keys/signer-key.pem` — a private key
-- `archive/keys/signer-cert.pem` — the matching certificate
+- `archive/keys/signer-key.pem`. A private key
+- `archive/keys/signer-cert.pem`. The matching certificate
 
 They are leftovers from an earlier key layout and are **not** the credentials in use: the live
 signing key is `key-management/keys/mdoc-signer.private.pem`, which is correctly gitignored, and the

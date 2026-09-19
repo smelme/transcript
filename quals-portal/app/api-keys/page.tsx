@@ -8,7 +8,7 @@ import { useAdmin } from '../components/session';
 /**
  * API keys belong to a client organisation and are how that organisation's own
  * systems issue credentials. A key is shown once, when it is created: only its
- * hash is stored, so it cannot be displayed again — if it is lost, revoke it and
+ * hash is stored, so it cannot be displayed again. If it is lost, revoke it and
  * create another.
  *
  * The page belongs to the organisation: a key is always created for the
@@ -84,7 +84,7 @@ export default function ApiKeysPage() {
         {createdKey && (
           <div className="notice ok">
             <div>
-              <strong>Copy this key now.</strong> It is shown once and cannot be retrieved again — only
+              <strong>Copy this key now.</strong> It is shown once and cannot be retrieved again. Only
               its hash is stored. If you lose it, revoke it and create another.
             </div>
             <div className="mono" style={{ marginTop: 8, wordBreak: 'break-all' }}>

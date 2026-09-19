@@ -86,7 +86,7 @@ const generated = generateIssuerSigned({
 
 const { issuerSigned, mso, base64url } = generated;
 
-console.log('🎫 ISO 23220 Photo ID mDOC (IssuerSigned) — ISO 18013-5 compliant\n');
+console.log('🎫 ISO 23220 Photo ID mDOC (IssuerSigned). ISO 18013-5 compliant\n');
 console.log('══════════════════════════════════════════════════════════════\n');
 console.log(`CBOR size      : ${issuerSigned.length} bytes`);
 console.log(`Base64URL      : ${base64url.length} chars`);

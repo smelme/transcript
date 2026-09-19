@@ -1,4 +1,4 @@
-# P0-23 — Wallet account panel and sharing activity
+# P0-23. Wallet account panel and sharing activity
 
 ## Why
 
@@ -18,7 +18,7 @@ situation:
   disclosure actually happens, kept in encrypted storage beside the credential it came from, and
   deleted with that credential. Nothing is recorded on a share that fails.
 - **Record the fields, show the values.** The log stores which element identifiers were disclosed
-  per namespace — the request the holder actually answered. The values shown against them are read
+  per namespace. The request the holder actually answered. The values shown against them are read
   from the credential itself, so the holder sees what the document says rather than a copy the
   wallet made.
 - **Both disclosure paths are recorded**, because both are disclosures: the email share flow
@@ -43,7 +43,7 @@ Sign-out moved from the title bar into the account panel, where the account it e
 
 ## Verification
 
-- `:app:testDebugUnitTest` — 47 tests, 0 failures. Six new: round trip, presentment with no
+- `:app:testDebugUnitTest`. 47 tests, 0 failures. Six new: round trip, presentment with no
   recipient name, one damaged record dropped without losing the log, empty/absent/not-JSON input,
   an undated record read as undated rather than 1970, and the newest-first bounded log.
 - Compile-checked wiring for both disclosure paths; APK built and installed.

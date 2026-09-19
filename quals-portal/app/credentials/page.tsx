@@ -192,7 +192,7 @@ export default function CredentialsPage() {
             <h2>Revoke this credential?</h2>
             <p>
               Verifiers will reject <strong>{target.full_name || target.credentialId}</strong> as
-              soon as they check it. This cannot be undone — the holder will need a new credential.
+              soon as they check it. This cannot be undone. The holder will need a new credential.
             </p>
             <label className="muted" htmlFor="reason" style={{ display: 'block', marginBottom: 6 }}>
               Reason (recorded in the audit log)

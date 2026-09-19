@@ -23,7 +23,7 @@ class CborCodecTest {
 
     @Test
     fun `decodes a float64 map value`() {
-        // {"gpa": 3.65} — the exact element value produced for a numeric gpa.
+        // {"gpa": 3.65}. The exact element value produced for a numeric gpa.
         val encoded = bytes(
             0xa1,
             0x63, 0x67, 0x70, 0x61, // "gpa"

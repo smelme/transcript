@@ -54,7 +54,7 @@ const del = await fetch(`${ISSUER}/credentials/${claim.credentialId}`, {
 });
 console.log('revoke status', del.status);
 if (del.status !== 200) {
-  console.log(`FAIL  revoking requires an authenticated administrator — HTTP ${del.status}`);
+  console.log(`FAIL  revoking requires an authenticated administrator. HTTP ${del.status}`);
   process.exit(1);
 }
 
@@ -66,5 +66,5 @@ const share = await post('/shares', {
   recipientEmail: 'r@example.com',
 });
 const rejected = share.status === 400 && /revoked/i.test(share.data.error || '');
-console.log(`${rejected ? 'PASS' : 'FAIL'}  sharing a revoked credential is rejected — HTTP ${share.status}: ${share.data.error || ''}`);
+console.log(`${rejected ? 'PASS' : 'FAIL'}  sharing a revoked credential is rejected. HTTP ${share.status}: ${share.data.error || ''}`);
 process.exit(rejected ? 0 : 1);

@@ -26,9 +26,9 @@ const SURFACES = [
 /** The tells. Each is a pattern over a line of visible text, with why it is one. */
 const TELLS = [
   {
-    // Every dash that is punctuation rather than a range. The en dash is absent on purpose: in
-    // 2020-2021 it carries meaning, which is the one thing a dash is allowed to do here.
-    pattern: /[\u2012\u2014\u2015]/,
+    // Every dash that is punctuation rather than a range. The en dash is allowed only between
+    // digits, where it carries meaning, as in 2020-2021.
+    pattern: /[\u2012\u2014\u2015]|(?<!\d)\u2013|\u2013(?!\d)/,
     why: 'a dash used as punctuation: use a comma, a colon or a full stop instead',
   },
   {

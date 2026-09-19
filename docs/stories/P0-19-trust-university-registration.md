@@ -1,7 +1,7 @@
-# P0-19: Trust University — transcript at registration
+# P0-19: Trust University. Transcript at registration
 
-**Priority:** P0 — the academic relying party this feature exists for
-**Status:** In progress — the session, the relying-party page and the verifier's transcript claim
+**Priority:** P0. The academic relying party this feature exists for
+**Status:** In progress. The session, the relying-party page and the verifier's transcript claim
 mapping are done and verified at the API level, and with P0-21's programme context the page now
 shows the institution, programme, award, credits and average. What remains is a real presentation
 from the Android wallet, which needs P0-20 on a device
@@ -64,17 +64,17 @@ review.
 ## Verification so far
 
 - **Its own site.** `trust-university-frontend` (port 3007) rather than a page inside My Jobs. It
-  has its own origin — which matters because the verifier binds each presentation to the asking
-  page's origin (`http://localhost:3007` here, `http://localhost:3003` for My Jobs) — its own
+  has its own origin. Which matters because the verifier binds each presentation to the asking
+  page's origin (`http://localhost:3007` here, `http://localhost:3003` for My Jobs). Its own
   navigation, its own stylesheet and its own registrar request. The route that used to live in
   `verifier-frontend` is removed, along with its nav entry and the registrar code in that app's
   client.
-- **The request names the transcript and only the transcript** — verified live against a running
+- **The request names the transcript and only the transcript**. Verified live against a running
   verifier: the session's `deviceRequest`, decoded, carries docType `org.iso.23220.photoid.1` and
   exactly two namespaces, `org.iso.23220.photoid.1` and `org.iso.23220.education.transcript.1`,
   with no qualification namespace at all, which is what stops a qualification credential being
   presented for a transcript request.
-- `verifier-service/tests/e2e-presentation.test.js` — the request composition above, a transcript
+- `verifier-service/tests/e2e-presentation.test.js`. The request composition above, a transcript
   presentation that verifies and reports the study rather than an award (`degreeLevel` and
   `graduationDate` come back `null` rather than invented), and a third asserting the registrar
   receives the programme, credits, average with its scale, and the recognition details. 61 verifier
@@ -99,7 +99,7 @@ review.
 - **A device run**: a real presentation from the Android wallet needs P0-20 installed on a phone.
 - **A container image for the new site**: `ci-cd.yml` builds and pushes an image for
   `verifier-frontend` only. The new site installs in CI, but its image and deploy step are not
-  added yet, and neither is a build check — which is blocked on `P1-01`, since `next build` fails
+  added yet, and neither is a build check. Which is blocked on `P1-01`, since `next build` fails
   repo-wide on Next's internal error boundary.
 - The verifier's handling of a non-photoid docType is no longer unproven: the transcript
   presentation above is a photo-ID document carrying only the transcript namespace, and it verifies

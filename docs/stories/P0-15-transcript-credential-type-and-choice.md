@@ -1,7 +1,7 @@
 # P0-15: Transcript credential type and issuance choice
 
-**Priority:** P0 — foundation for every other transcript story
-**Status:** Done — issuer, generator, registry, offer and share session all report the kind,
+**Priority:** P0. Foundation for every other transcript story
+**Status:** Done. Issuer, generator, registry, offer and share session all report the kind,
 verified by the unit suite, `scripts/test-academy-flow.mjs` and
 `scripts/smoke-share-transcript.mjs`. Deliverable pending: none.
 **Components:** Issuer service, credential generator, issuance sessions, share session creation

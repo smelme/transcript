@@ -1,4 +1,4 @@
-# P0-31 — Appearance setting, and the camera under the account
+# P0-31. Appearance setting, and the camera under the account
 
 **Status:** Done
 **Depends on:** P0-30
@@ -14,8 +14,8 @@ Two small things a holder reaches for and could not find:
 
 ## Decision
 
-Both live in the account panel — the expanding panel that already holds the address, what the
-wallet holds, and the way out — because both belong to the wallet rather than to a credential:
+Both live in the account panel. The expanding panel that already holds the address, what the
+wallet holds, and the way out. Because both belong to the wallet rather than to a credential:
 
 - **Appearance**: *Device · Light · Dark*, as chips, with **Device** the default and staying the
   default. The phone already knows a choice the holder has made everywhere else; a wallet that
@@ -34,5 +34,5 @@ wallet holds, and the way out — because both belong to the wallet rather than 
 ## Not here
 
 `Appearance` is a preference, so it is stored with the wallet's other settings rather than with the
-credential material — it is not encrypted, and it does not need to be. The stored values are stable
+credential material. It is not encrypted, and it does not need to be. The stored values are stable
 strings, so a future choice can be added without invalidating what holders have already chosen.
