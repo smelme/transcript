@@ -1,7 +1,12 @@
 package com.smartcollege.transcript.wallet.ui
 
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -15,7 +20,9 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
@@ -39,6 +46,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -48,6 +56,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
@@ -63,6 +72,7 @@ import com.smartcollege.transcript.wallet.data.CredentialSummary
 import com.smartcollege.transcript.wallet.data.ShareActivity
 import com.smartcollege.transcript.wallet.data.ShareActivityCodec
 import com.smartcollege.transcript.wallet.data.WalletRepository
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
 @Composable
@@ -265,7 +275,7 @@ fun CredentialListScreen(
         },
     ) { padding ->
         Column(Modifier.fillMaxSize().padding(padding)) {
-            ProfilePanel(
+            AccountPanel(
                 name = holderName
                     ?: email?.substringBefore('@')?.takeIf { it.isNotBlank() }
                     ?: "Signed in",
@@ -289,10 +299,11 @@ fun CredentialListScreen(
                 }
             } else {
                 LazyColumn(Modifier.fillMaxSize()) {
-                    items(ids) { id ->
+                    itemsIndexed(ids) { index, id ->
                         CredentialCard(
                             credentialId = id,
                             summary = summaries[id],
+                            appearAfterMillis = if (index < 8) index * 45 else -1,
                             onClick = { onOpen(id) },
                             modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
                         )
@@ -308,81 +319,82 @@ private val MonthNames = listOf(
     "July", "August", "September", "October", "November", "December",
 )
 
-private val InstitutionColors = listOf(
-    Color(0xFF1D3557), // navy
-    Color(0xFF1B5E20), // green
-    Color(0xFF6A1B2A), // maroon
-    Color(0xFF4A148C), // purple
-    Color(0xFF006064), // teal
-    Color(0xFF4E342E), // brown
-)
-
 /**
- * Who is signed in, what the wallet holds for them, and the way out.
+ * Who is signed in, folded away until it is asked for.
  *
- * The account is the holder's own, so it is stated plainly rather than left to be inferred from
- * the credentials below it - and signing out belongs here, with the account it ends, rather than
- * in the title bar where it was one tap away from being pressed by accident.
+ * The account is not what a holder opens the wallet for, so it is a line - monogram, name, and the
+ * way in - that opens to show the address it belongs to, what the wallet holds, and the way out.
+ * Signing out belongs here, with the account it ends, rather than in the title bar.
  */
 @Composable
-private fun ProfilePanel(
+private fun AccountPanel(
     name: String,
     email: String?,
     credentialCount: Int,
     onSignOut: () -> Unit,
 ) {
-    Card(
-        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
-        shape = RoundedCornerShape(16.dp),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-        elevation = CardDefaults.cardElevation(defaultElevation = 1.dp),
+    var expanded by remember { mutableStateOf(false) }
+
+    Column(
+        Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp, vertical = 8.dp)
+            .clip(RoundedCornerShape(16.dp))
+            .background(MaterialTheme.colorScheme.surface)
+            .clickable { expanded = !expanded }
+            .padding(16.dp),
     ) {
-        Column(Modifier.padding(16.dp)) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Box(
-                    Modifier
-                        .size(44.dp)
-                        .background(
-                            MaterialTheme.colorScheme.primaryContainer,
-                            RoundedCornerShape(999.dp),
-                        ),
-                    contentAlignment = Alignment.Center,
-                ) {
-                    Text(
-                        initialsOf(name).ifBlank { "ID" },
-                        fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.onPrimaryContainer,
-                    )
-                }
-                Spacer(Modifier.width(12.dp))
-                Column(Modifier.weight(1f)) {
-                    Text(
-                        name,
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.Bold,
-                    )
-                    if (!email.isNullOrBlank()) {
-                        Text(
-                            email,
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
-                    }
-                }
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Box(
+                Modifier
+                    .size(40.dp)
+                    .background(MaterialTheme.colorScheme.primaryContainer, CircleShape),
+                contentAlignment = Alignment.Center,
+            ) {
+                Text(
+                    initialsOf(name).ifBlank { "ID" },
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onPrimaryContainer,
+                )
             }
-            Spacer(Modifier.height(10.dp))
+            Spacer(Modifier.width(12.dp))
             Text(
-                when (credentialCount) {
-                    0 -> "No credentials in this wallet yet"
-                    1 -> "1 credential in this wallet"
-                    else -> "$credentialCount credentials in this wallet"
-                },
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                name,
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.Bold,
+                maxLines = 1,
+                modifier = Modifier.weight(1f),
             )
-            Spacer(Modifier.height(6.dp))
-            TextButton(onClick = onSignOut, modifier = Modifier.align(Alignment.End)) {
-                Text("Sign out")
+            Text(
+                if (expanded) "Less" else "Account",
+                style = MaterialTheme.typography.labelLarge,
+                color = MaterialTheme.colorScheme.primary,
+            )
+        }
+        AnimatedVisibility(visible = expanded) {
+            Column {
+                Spacer(Modifier.height(12.dp))
+                if (!email.isNullOrBlank()) {
+                    Text(
+                        "Signed in as $email",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                    Spacer(Modifier.height(4.dp))
+                }
+                Text(
+                    when (credentialCount) {
+                        0 -> "No credentials in this wallet yet"
+                        1 -> "1 credential in this wallet"
+                        else -> "$credentialCount credentials in this wallet"
+                    },
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                Spacer(Modifier.height(4.dp))
+                TextButton(onClick = onSignOut, modifier = Modifier.align(Alignment.End)) {
+                    Text("Sign out")
+                }
             }
         }
     }
@@ -394,168 +406,80 @@ private fun CredentialCard(
     summary: CredentialSummary?,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
+    appearAfterMillis: Int = 0,
 ) {
     val institution = summary?.institution?.takeIf { it.isNotBlank() } ?: "Smart Academy"
-    // The kind no longer titles the card: there is one kind, and the person's name, the programme
-    // and the figures are what a holder reads.
+    val brand = brandOf(institution)
+    // Cards arrive in order rather than all at once, which is what makes the list feel like a
+    // wallet holding documents instead of rows appearing.
+    //
+    // Only the first screenful is staggered: a card further down is composed when it is scrolled
+    // to, and animating it there would replay the entrance every time it came back into view.
+    var appeared by remember { mutableStateOf(appearAfterMillis < 0) }
+    LaunchedEffect(Unit) {
+        delay(appearAfterMillis.coerceAtLeast(0).toLong())
+        appeared = true
+    }
+    val entrance by animateFloatAsState(
+        targetValue = if (appeared) 1f else 0f,
+        animationSpec = tween(durationMillis = 260),
+        label = "cardEntrance",
+    )
+    // Pressing a card is the one interaction this wallet is built on, so the card answers it: it
+    // scales under the finger instead of rippling, which is what a physical card would do.
+    val interactionSource = remember { MutableInteractionSource() }
+    val pressed by interactionSource.collectIsPressedAsState()
+    val scale by animateFloatAsState(
+        targetValue = if (pressed) 0.975f else 1f,
+        animationSpec = tween(durationMillis = 110),
+        label = "cardPress",
+    )
+
+    CredentialFace(
+        brand = brand,
+        personName = summary?.fullName?.takeIf { it.isNotBlank() } ?: "Credential holder",
+        subtitle = credentialSubtitle(summary),
+        credentialId = credentialId,
+        issuedDate = formatDate(summary?.issueDate),
+        compact = true,
+        modifier = modifier
+            .graphicsLayer {
+                scaleX = scale
+                scaleY = scale
+                alpha = entrance
+                translationY = (1f - entrance) * 24.dp.toPx()
+            }
+            .clickable(
+                interactionSource = interactionSource,
+                indication = null,
+                onClick = onClick,
+            ),
+    )
+}
+
+/**
+ * What the credential is for, in one line: the study a transcript holds, or the award a
+ * qualification carries. A combined credential holds both, so it says both.
+ */
+private fun credentialSubtitle(summary: CredentialSummary?): String? {
     val kind = summary?.kind ?: AcademicNamespaces.KIND_UNKNOWN
-    val isTranscript = kind == AcademicNamespaces.KIND_TRANSCRIPT
-    val isCombined = kind == AcademicNamespaces.KIND_BOTH
-    // A study is named by the qualification it belongs to, then the figures it holds. A combined
-    // credential holds both halves, so the card shows the programme and the study together.
-    val detail = if (isTranscript || isCombined) {
+    val holdsStudy =
+        kind == AcademicNamespaces.KIND_TRANSCRIPT || kind == AcademicNamespaces.KIND_BOTH
+    val parts = if (holdsStudy) {
         listOfNotNull(
             summary?.programmeTitle?.takeIf { it.isNotBlank() }
                 ?: summary?.awardTitle?.takeIf { it.isNotBlank() },
             summary?.courseCount?.takeIf { it > 0 }?.let { "$it courses" },
             summary?.totalCredits?.takeIf { it > 0 }?.let { "$it credits" },
-        ).joinToString(" · ")
+        )
     } else {
         listOfNotNull(
             summary?.degreeLevel?.takeIf { it.isNotBlank() },
             summary?.fieldOfStudy?.takeIf { it.isNotBlank() },
-        ).joinToString(" · ")
-    }
-    // When the credential was signed, which is what "Issued" means. The graduation date is a
-    // different fact and is shown as its own row.
-    val issuedDate = formatDate(summary?.issueDate)
-    val brand = brandOf(institution)
-
-    Card(
-        modifier = modifier.fillMaxWidth().clickable(onClick = onClick),
-        shape = RoundedCornerShape(20.dp),
-        elevation = CardDefaults.cardElevation(defaultElevation = 4.dp),
-        colors = CardDefaults.cardColors(containerColor = brand.color),
-    ) {
-        Column(Modifier.padding(20.dp)) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                InstitutionMark(brand, Modifier.weight(1f))
-                VerifiedPill()
-            }
-            Spacer(Modifier.height(14.dp))
-            Text(
-                summary?.fullName?.takeIf { it.isNotBlank() } ?: "Credential holder",
-                style = MaterialTheme.typography.titleLarge,
-                color = Color.White,
-                fontWeight = FontWeight.Bold,
-            )
-            if (detail.isNotBlank()) {
-                Spacer(Modifier.height(6.dp))
-                Text(
-                    detail,
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = Color.White.copy(alpha = 0.85f),
-                )
-            }
-            if (issuedDate != null) {
-                Spacer(Modifier.height(2.dp))
-                Text(
-                    "Issued $issuedDate",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = Color.White.copy(alpha = 0.7f),
-                )
-            }
-        }
-    }
-}
-
-/**
- * The institution's mark and name, as they appear at the top of a card.
- *
- * The mark stands in for a logo the wallet has no licence to ship. A real deployment swaps it for
- * the institution's own asset, which is the only reason this is a mark and not an image.
- */
-@Composable
-private fun InstitutionMark(brand: InstitutionBrand, modifier: Modifier = Modifier) {
-    Row(modifier = modifier, verticalAlignment = Alignment.CenterVertically) {
-        Box(
-            modifier = Modifier
-                .size(34.dp)
-                .background(Color.White.copy(alpha = 0.16f), RoundedCornerShape(10.dp)),
-            contentAlignment = Alignment.Center,
-        ) {
-            Text(
-                brand.mark,
-                color = Color.White,
-                // A three or four letter mark needs to be smaller to fit the same square.
-                fontSize = if (brand.mark.length > 2) 11.sp else 13.sp,
-                fontWeight = FontWeight.Bold,
-                letterSpacing = 0.5.sp,
-            )
-        }
-        Spacer(Modifier.size(10.dp))
-        Text(
-            brand.title,
-            style = MaterialTheme.typography.labelMedium,
-            color = Color.White.copy(alpha = 0.92f),
-            maxLines = 1,
         )
     }
+    return parts.joinToString(" · ").takeIf { it.isNotBlank() }
 }
-
-@Composable
-private fun VerifiedPill() {
-    Box(
-        modifier = Modifier
-            .background(Color.White.copy(alpha = 0.18f), RoundedCornerShape(999.dp))
-            .padding(horizontal = 12.dp, vertical = 5.dp),
-    ) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Text("\u2713", color = Color.White, fontSize = 12.sp, fontWeight = FontWeight.Bold)
-            Spacer(Modifier.size(4.dp))
-            Text(
-                "VERIFIED",
-                color = Color.White,
-                fontSize = 11.sp,
-                fontWeight = FontWeight.Bold,
-                letterSpacing = 1.sp,
-            )
-        }
-    }
-}
-
-private fun institutionColor(institution: String): Color {
-    val hash = institution.hashCode().let { if (it == Int.MIN_VALUE) 0 else kotlin.math.abs(it) }
-    return InstitutionColors[hash % InstitutionColors.size]
-}
-
-/**
- * How one institution's credential is presented: a short mark and a single brand colour.
- *
- * These are the institutions the wallet is demonstrated with. The mark stands in for a logo the
- * wallet has no licence to ship, and the colours are chosen to be legible on a dark card rather
- * than to reproduce an official palette - a real deployment would take both from the institution's
- * own brand assets, which is why an unknown institution still gets a deliberate-looking card.
- */
-private data class InstitutionBrand(val mark: String, val title: String, val color: Color)
-
-private val InstitutionBrands = mapOf(
-    "smart academy" to InstitutionBrand("SA", "Smart Academy", Color(0xFF1D3557)),
-    "university of auckland" to InstitutionBrand("AU", "University of Auckland", Color(0xFF0B2A4A)),
-    "university of otago" to InstitutionBrand("OU", "University of Otago", Color(0xFF0A4A5E)),
-    "mit" to InstitutionBrand("MIT", "MIT", Color(0xFF6E0B1B)),
-    "aws" to InstitutionBrand("AWS", "AWS", Color(0xFF232F3E)),
-)
-
-private fun brandOf(institution: String): InstitutionBrand {
-    val name = institution.trim().ifBlank { "Smart Academy" }
-    InstitutionBrands[name.lowercase()]?.let { return it }
-    // An institution the wallet has no assets for: initials from the name, and a colour from it,
-    // so the card still looks intentional rather than falling back to a default.
-    return InstitutionBrand(initialsOf(name).ifBlank { "ID" }, name, institutionColor(name))
-}
-
-/** Initials for a panel: "University of Auckland" is "AU", "tessa.novak@example.com" is "TN". */
-private fun initialsOf(name: String): String = name
-    .split(' ', '-', '_', '.', '@')
-    .filter { it.isNotBlank() }
-    .take(4)
-    .map { it.first().uppercaseChar() }
-    .joinToString("")
 
 private fun formatDate(raw: String?): String? {
     if (raw.isNullOrBlank()) return null
@@ -622,6 +546,17 @@ fun CredentialDetailScreen(
                     Box {
                         TextButton(onClick = { menuOpen = true }) { Text("More") }
                         DropdownMenu(expanded = menuOpen, onDismissRequest = { menuOpen = false }) {
+                            // The record of sharing is also here, next to the other thing a holder
+                            // does to a credential rather than to the document itself.
+                            if (activityCount > 0) {
+                                DropdownMenuItem(
+                                    text = { Text("Sharing activity") },
+                                    onClick = {
+                                        menuOpen = false
+                                        onActivity()
+                                    },
+                                )
+                            }
                             DropdownMenuItem(
                                 text = { Text("Delete credential") },
                                 onClick = {
@@ -666,51 +601,22 @@ fun CredentialDetailScreen(
                 Text(it, color = MaterialTheme.colorScheme.error)
                 Spacer(Modifier.height(12.dp))
             }
-            Card(
-                modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(24.dp),
-                elevation = CardDefaults.cardElevation(defaultElevation = 6.dp),
-                colors = CardDefaults.cardColors(containerColor = brand.color),
-            ) {
-                Column(Modifier.padding(22.dp)) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
-                        InstitutionMark(brand, Modifier.weight(1f))
-                        VerifiedPill()
-                    }
-                    Spacer(Modifier.height(18.dp))
-                    Text(
-                        personName,
-                        style = MaterialTheme.typography.headlineMedium,
-                        color = Color.White,
-                        fontWeight = FontWeight.Bold,
-                    )
-                    if (title.isNotBlank()) {
-                        Spacer(Modifier.height(6.dp))
-                        Text(
-                            title,
-                            style = MaterialTheme.typography.titleMedium,
-                            color = Color.White.copy(alpha = 0.9f),
-                        )
-                    }
-                    Spacer(Modifier.height(18.dp))
-                    Text(
-                        credentialId,
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = Color.White.copy(alpha = 0.75f),
-                    )
-                    if (issuedDate != null) {
-                        Text(
-                            "Issued $issuedDate",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = Color.White.copy(alpha = 0.7f),
-                        )
-                    }
-                }
-            }
+            CredentialFace(
+                brand = brand,
+                personName = personName,
+                subtitle = title.takeIf { it.isNotBlank() },
+                credentialId = credentialId,
+                issuedDate = issuedDate,
+                compact = false,
+            )
+            // The card shows the reference the way a printed one does; the whole of it stays on the
+            // screen for anyone who has to quote it.
+            Spacer(Modifier.height(6.dp))
+            Text(
+                "Credential ID $credentialId",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.55f),
+            )
 
             // What this credential has been used to disclose - and only when there is something to
             // show. An entry point that leads to "nothing here" is worse than no entry point.
@@ -841,37 +747,46 @@ private fun ClaimRow(claim: Claim) {
 /** How many courses are listed before the rest are asked for. */
 private const val CoursesShownAtOnce = 3
 
-/** The way into the record of what this credential has disclosed, and how much of it there is. */
+/**
+ * The way into the record of what this credential has disclosed.
+ *
+ * It is deliberately not a card. Dressed as one it read as another document to open, so it is a
+ * quiet strip on the page instead: the credential is the only thing here that looks like a
+ * document, which is what makes the credential recognisable.
+ */
 @Composable
 private fun ActivityRow(count: Int, onOpen: () -> Unit) {
-    Card(
-        modifier = Modifier.fillMaxWidth().clickable { onOpen() },
-        shape = RoundedCornerShape(16.dp),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-        elevation = CardDefaults.cardElevation(defaultElevation = 1.dp),
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(14.dp))
+            .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.55f))
+            .clickable { onOpen() }
+            .padding(horizontal = 16.dp, vertical = 14.dp),
+        verticalAlignment = Alignment.CenterVertically,
     ) {
-        Row(
-            modifier = Modifier.fillMaxWidth().padding(16.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Column(Modifier.weight(1f)) {
-                Text(
-                    "Activity",
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.Bold,
-                )
-                Text(
-                    if (count == 1) "1 disclosure" else "$count disclosures",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            }
+        Column(Modifier.weight(1f)) {
             Text(
-                "View",
+                "Sharing activity",
                 style = MaterialTheme.typography.labelLarge,
-                color = MaterialTheme.colorScheme.primary,
+                fontWeight = FontWeight.SemiBold,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            Text(
+                if (count == 1) {
+                    "Shared once from this credential"
+                } else {
+                    "Shared $count times from this credential"
+                },
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.8f),
             )
         }
+        Text(
+            "View",
+            style = MaterialTheme.typography.labelLarge,
+            color = MaterialTheme.colorScheme.primary,
+        )
     }
 }
 
@@ -928,11 +843,13 @@ private fun ClaimSection(group: ClaimGroup) {
                     color = MaterialTheme.colorScheme.primary,
                 )
             }
-            if (expanded) {
-                for (claim in shown) ClaimRow(claim)
-                if (group.claims.size > shown.size) {
-                    TextButton(onClick = { showAll = true }) {
-                        Text("Show all ${group.claims.size}")
+            AnimatedVisibility(visible = expanded) {
+                Column {
+                    for (claim in shown) ClaimRow(claim)
+                    if (group.claims.size > shown.size) {
+                        TextButton(onClick = { showAll = true }) {
+                            Text("Show all ${group.claims.size}")
+                        }
                     }
                 }
             }
