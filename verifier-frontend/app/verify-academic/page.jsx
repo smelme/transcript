@@ -75,9 +75,7 @@ export default function MyJobVerification() {
         <section className="card" aria-label="Verified academic credential" style={{ marginTop: 20 }}>
           {!hasCompletedQualification ? (
             <p className="alert alert-error" role="status">
-              This credential does not contain a completed qualification. It verified, but it holds
-              study in progress or a transcript on its own, and neither is an awarded
-              qualification. Ask the applicant for the credential for their completed award.
+              Error: the shared credential does not have completed qualification information.
             </p>
           ) : (
             <>
