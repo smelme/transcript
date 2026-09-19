@@ -1,7 +1,7 @@
 :root {
-  --brand: #2563eb;
-  --brand-2: #7c3aed;
-  --grad: linear-gradient(135deg, #2563eb 0%, #7c3aed 100%);
+  --brand: #ffc400;
+  --brand-2: #1b9c5b;
+  --grad: linear-gradient(135deg, #ffc400 0%, #1b9c5b 100%);
   --bg: #ffffff;
   --bg-soft: #f4f6fb;
   --surface: #ffffff;
@@ -14,15 +14,15 @@
 }
 
 [data-theme="dark"] {
-  --brand: #60a5fa;
-  --brand-2: #a78bfa;
-  --grad: linear-gradient(135deg, #1d4ed8 0%, #6d28d9 100%);
-  --bg: #0b1020;
-  --bg-soft: #141a30;
-  --surface: #131a2e;
-  --text: #e2e8f0;
-  --muted: #94a3b8;
-  --border: #26314f;
+  --brand: #ffd633;
+  --brand-2: #5bd496;
+  --grad: linear-gradient(135deg, #ffd633 0%, #5bd496 100%);
+  --bg: #0b0f0c;
+  --bg-soft: #131a16;
+  --surface: #101612;
+  --text: #e6efe9;
+  --muted: #9fb0a7;
+  --border: #26312a;
   --ok: #22c55e;
   --err: #f87171;
   --on-grad: #ffffff;
@@ -194,10 +194,9 @@ h3 {
 .stat-number {
   font-size: 28px;
   font-weight: 800;
-  background: var(--grad);
-  -webkit-background-clip: text;
-  background-clip: text;
-  color: transparent;
+  /* Gold cannot be text on white — a gradient number reads as a smudge at the gold end, and the
+     number is the information. It is set in ink; the accent is left to the surfaces. */
+  color: var(--text);
 }
 
 .stat-label {
@@ -240,7 +239,7 @@ h3 {
 
 .btn-primary {
   background: var(--grad);
-  color: #fff;
+  color: var(--on-grad);
 }
 
 .btn-primary:hover {

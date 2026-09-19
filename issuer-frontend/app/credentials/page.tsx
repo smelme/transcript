@@ -40,7 +40,7 @@ export default function DigitalCredentialsPage() {
             <dt>Transcript</dt>
             <dd>Completed modules, credits awarded and the status of your award</dd>
             <dt>Issuer</dt>
-            <dd>Smart Academy, with a digital signature that proves the record is genuine</dd>
+            <dd>Smart Academy, with a digital signature that proves it is genuine</dd>
           </dl>
         </div>
       </section>

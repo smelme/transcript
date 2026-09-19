@@ -175,7 +175,7 @@ export default function ApplyPage() {
 
           {hasRecognition && (
             <details>
-              <summary>What we matched this record against</summary>
+              <summary>What we checked this record against</summary>
               <dl>
                 {claims?.institutionId && (
                   <>
