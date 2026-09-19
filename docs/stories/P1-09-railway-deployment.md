@@ -1,7 +1,7 @@
 # P1-09: The system runs on Railway
 
 **Priority:** P1. The demo has to be reachable without a laptop running it
-**Status:** Partly done. Six services are deployed; four items remain, listed at the end
+**Status:** Deployed and verified. Four items remain, listed below
 **Components:** `railway.json` (removed), `scripts/prepare-signer-keys.mjs`, `docs/deployment/railway.md`, `.env.example`
 
 ## What was deployed
@@ -21,6 +21,21 @@ makes them different is the command they run.
 
 A volume is mounted at `/data` on the issuer, so the database and the share records outlive a
 redeploy. The verifier keeps no database of its own.
+
+## What was verified on the running deployment
+
+- Every service answers over HTTPS. The issuer and the verifier both return `{"status":"ok"}` from
+  `/health`, and all four sites return 200.
+- The academy's `/api/health` reaches the **issuer** and My Jobs' reaches the **verifier**, which is
+  what proves the two proxy variables are pointing at the right services.
+- The issuer serves `/status-list/quals-1`, so the revocation address written inside a credential
+  resolves to something real.
+- An administrator can sign in through the portal. The session route returns the administrator, the
+  httpOnly cookie opens the proxied admin routes, and the user list shows both seeded accounts.
+- The volume holds. The organisation row written by the first deployment, at 19:00:57, was still
+  there after the redeploy that created the accounts at 19:14:08.
+- `/.well-known/assetlinks.json` answers 404 with its own explanatory message, which is the correct
+  state until the wallet's fingerprint is supplied.
 
 ## Decisions taken, and why
 
@@ -73,10 +88,10 @@ placeholders (`admin@transcript.local`, `registrar@transcript.local`) and the pa
 
 ## Acceptance criteria
 
-- Every service answers over HTTPS from outside the network, and `/health` reports healthy. Done for
-  the issuer; the rest are checked as they finish deploying.
-- A credential claimed at the academy verifies at the verifier and appears in the portal, with email
-  configured. Blocked on item 1.
+- Every service answers over HTTPS from outside the network, and `/health` reports healthy. Met.
 - A redeploy keeps the database: the volume survives and a second deploy does not start from empty.
+  Met, and demonstrated by two rows with timestamps either side of a redeploy.
 - `git grep` finds no private key material, and the prepare step is the only thing that writes keys to
-  disk.
+  disk. Met.
+- A credential claimed at the academy verifies at the verifier and appears in the portal, with email
+  configured. Blocked on item 1, which needs a Brevo key.
