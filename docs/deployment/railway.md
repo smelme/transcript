@@ -16,6 +16,7 @@ Create these six, each from this repository, each with Root Directory left at th
 | `my-jobs` | `npm ci --include=dev && npm run build -w verifier-frontend` | `npm run start:railway -w verifier-frontend` | yes |
 | `portal` | `npm ci --include=dev && npm run build -w quals-portal` | `npm run start:railway -w quals-portal` | yes, administrators use it |
 | `trust-university` | `npm ci --include=dev && npm run build -w trust-university-frontend` | `npm run start:railway -w trust-university-frontend` | yes |
+| `quals` | `npm ci --include=dev && npm run build -w quals-frontend` | `npm run start:railway -w quals-frontend` | yes, this is where a share link opens |
 
 There is deliberately **no `railway.json` in the repository**. Railway applies that file to every
 service built from the repository, so a shared one would force the issuer's start command on the
@@ -43,11 +44,13 @@ The project is at https://railway.com/project/74a6a770-5a74-4132-95f7-a222dcff64
 | `my-jobs` | https://my-jobs-production.up.railway.app |
 | `portal` | https://portal-production-a8a5.up.railway.app |
 | `trust-university` | https://trust-university-production.up.railway.app |
+| `quals` | https://quals-production.up.railway.app |
 
-Two of these are written into things that outlive them. The issuer address is stamped inside every
-credential as the place a verifier checks revocation, and the academy address is baked into the
-wallet at build time. Changing either later means reissuing credentials or rebuilding the wallet,
-so treat them as fixed and attach your own domain in front of them instead.
+Three of these are written into things that outlive them. The issuer address is stamped inside every
+credential as the place a verifier checks revocation, the academy address is baked into the wallet
+at build time, and the Quals address is in every share email already sent. Changing any of them
+later means reissuing credentials, rebuilding the wallet, or breaking links that are sitting in
+someone's inbox, so treat them as fixed and attach your own domain in front of them instead.
 
 Railway supplies `PORT` and both Node services already read it, so do not set it by hand.
 
@@ -138,6 +141,7 @@ puts them back.
 | --- | --- | --- |
 | `SHARE_DATA_DIR` | `/data/shares` | share records are kept in a file, so they need the volume too |
 | `ISSUER_FRONTEND_URL` | `https://<academy-domain>` | the address share links point at |
+| `SHARE_SITE_URL` | `https://<quals-domain>` | where a share is opened, which is its own site |
 | `WALLET_APP_LINK_BASE` | `https://<academy-domain>/offer` | the same offer offered as an Android link |
 | `APP_BASE_URL` | `https://<issuer-domain>` | used by the identity document checks |
 | `VERIFIER_API_URL` | `https://<verifier-domain>` | the issuer names the verifier when it makes a share |

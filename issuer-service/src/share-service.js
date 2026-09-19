@@ -151,7 +151,10 @@ export class ShareService {
     issuerService,
     walletAccounts,
     verifierApiUrl = process.env.VERIFIER_API_URL || 'http://localhost:3001',
-    siteUrl = process.env.ISSUER_FRONTEND_URL || process.env.ISSUER_BASE_URL || 'http://localhost:3002',
+    siteUrl = process.env.SHARE_SITE_URL
+      || process.env.ISSUER_FRONTEND_URL
+      || process.env.ISSUER_BASE_URL
+      || 'http://localhost:3005',
     origin = siteUrl,
     dataDir = process.env.SHARE_DATA_DIR
       || path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../data'),

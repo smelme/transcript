@@ -9,6 +9,7 @@
     "issuer-service",
     "issuer-frontend",
     "quals-portal",
+    "quals-frontend",
     "verifier-service",
     "verifier-frontend",
     "trust-university-frontend"

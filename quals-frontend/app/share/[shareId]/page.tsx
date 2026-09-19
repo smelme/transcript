@@ -18,6 +18,20 @@ type ShareView = {
   error?: string;
 };
 
+/** A course as the credential carries it: one JSON string claim holding an array of these. */
+type Course = {
+  courseCode?: string;
+  course_code?: string;
+  courseName?: string;
+  course_name?: string;
+  term?: string;
+  credits?: number | string;
+  grade?: string | number;
+  gradePoints?: number;
+  workloadHours?: number;
+  grouping?: string;
+};
+
 // Dates reach a shared view as `YYYY-MM-DD` from our own encoder, as `YYYYMMDD` from the wallet's
 // claim set, or as a Date when a decoder expands CBOR tag 1004. A reader wants the same shape for
 // all three, and every other value stays exactly as it was disclosed.
@@ -32,6 +46,28 @@ function formatClaimDate(value: string): string {
   const day = Number(match[3]);
   if (month < 0 || month > 11 || day < 1 || day > 31) return value;
   return `${day} ${MONTH_NAMES[month]} ${match[1]}`;
+}
+
+/**
+ * The course list travels as one JSON string claim. It is read here rather than printed, because a
+ * recipient reading `[{"courseCode":...}]` learns nothing and would reasonably think the page was
+ * broken.
+ */
+function parseCourses(value: unknown): Course[] {
+  if (Array.isArray(value)) return value as Course[];
+  if (typeof value !== 'string' || value.trim() === '') return [];
+  try {
+    const parsed = JSON.parse(value);
+    return Array.isArray(parsed) ? (parsed as Course[]) : [];
+  } catch {
+    return [];
+  }
+}
+
+/** Course fields are camelCase in the credential and snake_case in older claims, so read both. */
+function courseField(course: Course, camel: keyof Course, snake: keyof Course): string {
+  const value = course[camel] ?? course[snake];
+  return value === null || value === undefined || value === '' ? '—' : String(value);
 }
 
 export default function SharePage() {
@@ -140,7 +176,13 @@ export default function SharePage() {
   function formatValue(value: unknown): string {
     if (value === null || value === undefined) return '—';
     if (value instanceof Date) return formatClaimDate(value.toISOString().slice(0, 10));
-    if (typeof value === 'object') return JSON.stringify(value);
+    // A nested object is still a claim the holder disclosed, so it is shown as its parts rather
+    // than as JSON, which reads as a fault in the page.
+    if (typeof value === 'object') {
+      return Object.entries(value as Record<string, unknown>)
+        .map(([key, item]) => `${displayLabel(key)}: ${formatValue(item)}`)
+        .join(' · ');
+    }
     return typeof value === 'string' ? formatClaimDate(value) : String(value);
   }
 
@@ -162,14 +204,18 @@ export default function SharePage() {
     return overrides[key] || key.replace(/_/g, ' ');
   }
 
+  const courses = parseCourses(view?.claims?.courses);
+  const otherClaims = Object.entries(view?.claims || {}).filter(([key]) => key !== 'courses');
+
   return (
-    <div className="card" style={{ maxWidth: 640, margin: '32px auto' }}>
+    <div className="card" style={{ maxWidth: 720, margin: '32px auto' }}>
       <h1>Shared documents</h1>
 
       {stage === 'signin' && (
         <div>
           <p className="muted">
-            Sign in with the email address this share was sent to. You will receive a one-time code.
+            Someone sent you a document through Quals. Sign in with the email address it was sent
+            to, and we will send you a one-time code.
           </p>
           <div className="field" style={{ marginTop: 12 }}>
             <label>Email address</label>
@@ -246,6 +292,12 @@ export default function SharePage() {
               <span className="badge kind">{view.kindLabel}</span>
             </p>
           )}
+          {view.expiresAt && (
+            <p className="muted" style={{ marginTop: 8 }}>
+              This link can be opened until {formatClaimDate(view.expiresAt.slice(0, 10))}. After
+              that, ask the sender to share it again.
+            </p>
+          )}
           {view.message && (
             <blockquote className="result-box" style={{ borderLeft: '4px solid var(--brand)' }}>
               {view.message}
@@ -254,22 +306,58 @@ export default function SharePage() {
           {view.categories && (
             <p className="muted">Sections shared: {view.categories.join(', ')}</p>
           )}
-          <table className="table" style={{ marginTop: 12 }}>
-            <thead>
-              <tr>
-                <th>Field</th>
-                <th>Value</th>
-              </tr>
-            </thead>
-            <tbody>
-              {Object.entries(view.claims || {}).map(([key, value]) => (
-                <tr key={key}>
-                  <td>{displayLabel(key)}</td>
-                  <td>{formatValue(value)}</td>
+
+          {otherClaims.length > 0 && (
+            <table className="table" style={{ marginTop: 12 }}>
+              <thead>
+                <tr>
+                  <th>Field</th>
+                  <th>Value</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody>
+                {otherClaims.map(([key, value]) => (
+                  <tr key={key}>
+                    <td>{displayLabel(key)}</td>
+                    <td>{formatValue(value)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+
+          {courses.length > 0 && (
+            <>
+              <h2 style={{ marginTop: 24, fontSize: 18 }}>Courses</h2>
+              <table className="table" style={{ marginTop: 8 }}>
+                <thead>
+                  <tr>
+                    <th>Module</th>
+                    <th>Title</th>
+                    <th>Term</th>
+                    <th>Credits</th>
+                    <th>Mark</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {courses.map((course, index) => (
+                    <tr key={course.courseCode || course.course_code || index}>
+                      <td>{courseField(course, 'courseCode', 'course_code')}</td>
+                      <td>{courseField(course, 'courseName', 'course_name')}</td>
+                      <td>{courseField(course, 'term', 'term')}</td>
+                      <td>{courseField(course, 'credits', 'credits')}</td>
+                      <td>
+                        {course.grade !== undefined && course.grade !== ''
+                          ? `${course.grade}${course.gradePoints != null ? ` (${course.gradePoints})` : ''}`
+                          : '—'}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </>
+          )}
+
           <button className="btn btn-primary" onClick={downloadPdf} style={{ marginTop: 16 }}>
             Download PDF
           </button>

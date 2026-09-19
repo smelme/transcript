@@ -26,10 +26,23 @@ nothing about whether a route exists.
 | `/get-credentials` | the student flow: email, code, choose what to take, take it |
 | `/claim` | where an emailed link lands, listing what belongs to that address |
 | `/credentials` | what the issuer has prepared |
-| `/share/<shareId>` | the page a share recipient opens |
 | `/.well-known/assetlinks.json` | Android App Link verification, rewritten to `/api/assetlinks` |
 
 Its `/api/*` is proxied to the issuer, so the browser only ever talks to this site.
+It no longer serves a share: that page lives on its own site, below.
+
+## Quals
+
+The site a share link opens on. It is separate from the academy because the recipient has no
+relationship with the institution that issued the document.
+
+| Page | What it is |
+| --- | --- |
+| `/` | what Quals is, for anyone who arrives without a link |
+| `/share/<shareId>` | the document that was shared, opened with the address it was sent to |
+
+Its `/api/*` is proxied to the issuer. The address is in other people's inboxes the moment a share
+is sent, so it is the address to attach a domain to rather than rename.
 
 ## The portal
 

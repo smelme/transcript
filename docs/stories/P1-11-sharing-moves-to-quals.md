@@ -1,8 +1,27 @@
 # P1-11: Sharing belongs to Quals, not to the academy
 
-**Status:** Open. Design agreed, implementation next
-**Components:** a new site, `issuer-frontend/app/share/[shareId]/page.tsx` (removed),
+**Status:** Built and deployed. A real share still to be walked
+**Components:** `quals-frontend` (new), `issuer-frontend/app/share` (removed),
 `issuer-service/src/share-service.js`, `docs/deployment/railway.md`
+
+## What was built
+
+A seventh service, `quals`, at https://quals-production.up.railway.app, serving the page a share
+link opens at `/share/<shareId>`. The academy's copy of that page is gone, so nothing there serves
+or links to a share any more.
+
+The issuer now takes the address from `SHARE_SITE_URL`, which is set on `quals`, rather than from
+the academy site. That single variable is what changes the link in a share email.
+
+The page kept its flow exactly: a one-time code to the address the share was sent to, the terms,
+then the document with a PDF. Two things changed while moving it. Courses are read out of the JSON
+string they travel in and drawn as a table of module, title, term, credits and mark. And nested
+values are shown as their parts rather than as JSON, because a recipient reading an array of
+objects reasonably concludes the page is broken.
+
+The address is the third permanent one in this system, after the issuer's and the academy's, and
+for a different reason: it is already in someone's inbox by the time anyone would want to change
+it.
 
 ## Why
 
@@ -19,10 +38,10 @@ sharing.
 
 | Piece | Change |
 | --- | --- |
-| New site | a Next.js app, its own workspace entry, its own Railway service and address |
-| Share page | moves across, and gains the courses table |
-| Academy | `app/share/[shareId]` is deleted |
-| Issuer | the share link is built from a new `SHARE_SITE_URL`, not from the academy's address |
+| New site | `quals-frontend`, its own workspace entry, its own Railway service and address |
+| Share page | moved across, and gained the courses table |
+| Academy | `app/share/[shareId]` deleted |
+| Issuer | the share link is built from `SHARE_SITE_URL`, not from the academy's address |
 | Email | the share notification links to the new address |
 
 ## The courses table
