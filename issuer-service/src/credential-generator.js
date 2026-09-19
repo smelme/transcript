@@ -32,14 +32,19 @@ const PROGRAMMES = [
   // leads to, and `alt` the title as the institution publishes it in its own second language.
   // All four belong to the institution's programme catalogue; these are the demo's values and
   // the academy's own list replaces them when it supplies one.
-  { level: 'Bachelor', field: 'Computer Science', code: 'BSC-CS', cip: '11.0101', award: 'Bachelor of Science', alt: 'Informatica' },
-  { level: 'Bachelor', field: 'Business Administration', code: 'BSC-BA', cip: '52.0201', award: 'Bachelor of Business Administration', alt: 'Bedrijfskunde' },
-  { level: 'Bachelor', field: 'Mechanical Engineering', code: 'BSC-ME', cip: '14.1901', award: 'Bachelor of Science', alt: 'Werktuigbouwkunde' },
-  { level: 'Bachelor', field: 'Psychology', code: 'BSC-PS', cip: '42.0101', award: 'Bachelor of Arts', alt: 'Psychologie' },
-  { level: 'Master', field: 'Data Science', code: 'MSC-DS', cip: '30.7001', award: 'Master of Science', alt: 'Datawetenschap' },
-  { level: 'Master', field: 'Public Health', code: 'MSC-PH', cip: '51.2201', award: 'Master of Public Health', alt: 'Volksgezondheid' },
-  { level: 'Master', field: 'Finance', code: 'MSC-FI', cip: '52.0801', award: 'Master of Science', alt: 'Financien' },
-  { level: 'Master', field: 'Architecture', code: 'MSC-AR', cip: '04.0201', award: 'Master of Architecture', alt: 'Architectuur' },
+  //
+  // `credentialType` is the one thing that decides the shape of the document, together with how
+  // far the student has got: a certificate has no transcript to speak of, whatever else is true.
+  { level: 'Bachelor', field: 'Computer Science', code: 'BSC-CS', cip: '11.0101', award: 'Bachelor of Science', alt: 'Informatica', credentialType: 'degree' },
+  { level: 'Bachelor', field: 'Business Administration', code: 'BSC-BA', cip: '52.0201', award: 'Bachelor of Business Administration', alt: 'Bedrijfskunde', credentialType: 'degree' },
+  { level: 'Bachelor', field: 'Mechanical Engineering', code: 'BSC-ME', cip: '14.1901', award: 'Bachelor of Science', alt: 'Werktuigbouwkunde', credentialType: 'degree' },
+  { level: 'Bachelor', field: 'Psychology', code: 'BSC-PS', cip: '42.0101', award: 'Bachelor of Arts', alt: 'Psychologie', credentialType: 'degree' },
+  { level: 'Master', field: 'Data Science', code: 'MSC-DS', cip: '30.7001', award: 'Master of Science', alt: 'Datawetenschap', credentialType: 'degree' },
+  { level: 'Master', field: 'Public Health', code: 'MSC-PH', cip: '51.2201', award: 'Master of Public Health', alt: 'Volksgezondheid', credentialType: 'degree' },
+  { level: 'Master', field: 'Finance', code: 'MSC-FI', cip: '52.0801', award: 'Master of Science', alt: 'Financien', credentialType: 'degree' },
+  { level: 'Master', field: 'Architecture', code: 'MSC-AR', cip: '04.0201', award: 'Master of Architecture', alt: 'Architectuur', credentialType: 'degree' },
+  // A six-week programme, which is what a certification looks like: an award and no transcript.
+  { level: 'Certificate', field: 'Web Development', code: 'CERT-WEB', cip: '11.0201', award: 'Certificate in Web Development', alt: 'Certificaat Webontwikkeling', credentialType: 'certification', weeks: 6 },
 ];
 
 /**
@@ -263,20 +268,42 @@ export const CREDENTIAL_KINDS = {
   },
 };
 
+/** The shape the demo issues when a caller asks for one kind by name and nothing else is known. */
 export const DEFAULT_KIND = 'qualification';
 
 /**
- * The kinds a request asks for: `qualification` (the default and historic behaviour),
- * `transcript`, or `both` - one document holding both, which is what a completed programme is
- * issued as. Anything unrecognised is treated as `qualification` rather than rejected here, so a
- * typo cannot silently issue something the holder did not ask for.
+ * The kinds an explicit request asks for: `qualification`, `transcript`, or `both`. This is an
+ * override for callers that know what they want - a test, a fixture, a back-dated record - not a
+ * second way for the academy to decide: the academy's flow asks for nothing and gets the rule.
  */
 export function requestedKinds(include) {
   const value = String(include ?? '').trim().toLowerCase();
   if (value === 'transcript') {return ['transcript'];}
-  if (value === 'both') {return ['academic'];}
+  if (value === 'both') {return ['academic'];};
   return [DEFAULT_KIND];
 }
+
+/**
+ * The rule. What a student is issued follows from where their programme is, not from what they
+ * asked for: a degree that has been completed carries the qualification and the transcript in one
+ * document, a degree still in progress carries the transcript for the terms completed so far, and
+ * a certification carries the qualification alone, there being no transcript to speak of.
+ */
+export function shapeForEnrolment({ credentialType = 'degree', progress = 'completed' } = {}) {
+  if (credentialType === 'certification') {return 'qualification';}
+  return progress === 'completed' ? 'academic' : 'transcript';
+}
+
+/**
+ * What Smart Academy's demo student is on: one student holding three items, so all three shapes
+ * the institution issues can be seen from a single sign-in. A real academy supplies this from its
+ * own records; the academy's own list replaces these.
+ */
+export const DEMO_ENROLMENTS = [
+  { code: 'BSC-CS', credentialType: 'degree', progress: 'completed' },
+  { code: 'MSC-DS', credentialType: 'degree', progress: 'in-progress' },
+  { code: 'CERT-WEB', credentialType: 'certification', progress: 'completed' },
+];
 
 /**
  * The kind a credential carries, decided by the academic namespace it holds rather than
@@ -366,7 +393,8 @@ function pickLetterGrade(rng) {
 }
 
 /**
- * Build the academic record for a student, projected onto the requested kinds.
+ * Build the academic record for one enrolment: the programme the student is on, and how far
+ * through it they are. Those two facts decide what the document carries - see [shapeForEnrolment].
  *
  * `recognition` decides whether the record also carries the recognition details (Tier 2): who
  * the institution is beyond its name, what its codes are codes in, how much work each module
@@ -374,8 +402,9 @@ function pickLetterGrade(rng) {
  * than interpretability - a record without them still reads - and because every element enlarges
  * what a presentation can disclose.
  *
- * @param {{ institution: string, studentId: string, fullName?: string, include?: string,
- *   recognition?: boolean, issueDate?: string }} input
+ * @param {{ institution: string, studentId: string, fullName?: string, programmeCode?: string,
+ *   progress?: 'completed'|'in-progress', include?: string, recognition?: boolean,
+ *   issueDate?: string }} input
  * @returns {{ records: Array<{ kind: string, label: string, docType: string,
  *   academicNamespaces: string[], recognition: boolean, credentialData: object,
  *   display: object }> }}
@@ -384,7 +413,11 @@ export function generateAcademicRecord({
   institution,
   studentId,
   fullName,
-  include = DEFAULT_KIND,
+  programmeCode = null,
+  progress = 'completed',
+  // An explicit override, for a caller that asks for one kind by name. The academy does not send
+  // it: what a student is issued follows from the programme, not from the request.
+  include = null,
   recognition = true,
   // Defaults to the day the record is generated. Only a caller that is generating a record on
   // behalf of another date - a test fixture, or a back-dated record - should pass one.
@@ -395,7 +428,13 @@ export function generateAcademicRecord({
   const given = fullName?.trim().split(/\s+/)[0] || pick(rng, FIRST_NAMES);
   const family = fullName?.trim().split(/\s+/).slice(1).join(' ') || pick(rng, LAST_NAMES);
   const country = pick(rng, COUNTRIES);
-  const programme = pick(rng, PROGRAMMES);
+  // The programme is named by the caller when it is issuing for a known enrolment, and drawn at
+  // random when it is not: the academy's records say which programme a student is on. A random
+  // record is a degree - a certification is issued for a named enrolment, never drawn by chance.
+  const programme =
+    PROGRAMMES.find((entry) => entry.code === programmeCode) ||
+    pick(rng, PROGRAMMES.filter((entry) => entry.credentialType === 'degree'));
+  const inProgress = progress === 'in-progress';
 
   const birthYear = programme.level === 'Master' ? 1994 + Math.floor(rng() * 6) : 1999 + Math.floor(rng() * 5);
   const birthMonth = 1 + Math.floor(rng() * 12);
@@ -413,10 +452,18 @@ export function generateAcademicRecord({
   // ── The study ──────────────────────────────────────────────────────────
   const pool = COURSE_POOL[programme.code] || COURSE_POOL['BSC-CS'];
   const courseCount = Math.min(pool.length, 5 + Math.floor(rng() * 2));
+  // A master's is four terms and a bachelor's six; a certification is a single short course. A
+  // study still in progress has run only as far as the terms completed, and its last term is the
+  // one just finished rather than the one that would have led to an award.
+  const termsTotal =
+    programme.credentialType === 'certification' ? 1 : programme.level === 'Master' ? 4 : 6;
+  const termsCompleted = inProgress ? Math.max(1, Math.round(termsTotal / 2)) : termsTotal;
   // Graduation falls in June or July, which is the end of the academic year that began the
   // previous August, so the final term is that year's Spring.
-  const lastAcademicYear = graduationYear - 1;
-  const terms = usTermsEndingAt(lastAcademicYear, programme.level === 'Master' ? 4 : 6);
+  const lastAcademicYear = inProgress
+    ? new Date(issueDate).getUTCFullYear() - 1
+    : graduationYear - 1;
+  const terms = usTermsEndingAt(lastAcademicYear, termsCompleted);
 
   // Chosen by shuffling the programme's pool with the seeded generator: the same student
   // always gets the same record, and the record always holds the intended number of courses
@@ -499,7 +546,7 @@ export function generateAcademicRecord({
       institution_name: institution,
       degree_level: programme.level,
       field_of_study: programme.field,
-      graduation_date: graduationDate,
+      ...(inProgress ? {} : { graduation_date: graduationDate }),
       gpa,
       // The scale the number is on, stated beside it: the same scheme the transcript's marks
       // use, so it is never read as a mark out of ten or as a percentage.
@@ -528,11 +575,15 @@ export function generateAcademicRecord({
       programme_type: 'degree',
       programme_code: programme.cip,
       programme_code_scheme: 'CIP-2020',
-      programme_level: programme.level === 'Master' ? "Master's degree" : "Bachelor's degree",
+      programme_level: programme.level === 'Master'
+        ? "Master's degree"
+        : programme.level === 'Certificate'
+          ? 'Certificate'
+          : "Bachelor's degree",
       programme_level_framework: 'IPEDS-award-level',
       award_title: programme.award,
       enrolment_start: terms[0].start,
-      enrolment_end: graduationDate,
+      enrolment_end: inProgress ? terms[terms.length - 1].end : graduationDate,
       // How marks and credits are scaled
       grading_scale_id: US_GRADING_SCALE.id,
       grading_scale_label: US_GRADING_SCALE.label,
@@ -543,7 +594,7 @@ export function generateAcademicRecord({
       total_credits: creditsEarned,
       // What was studied, and how it ended
       courses,
-      outcome: 'completed',
+      outcome: inProgress ? 'in-progress' : 'completed',
       outcome_scheme: 'programme-outcome',
       // Aggregates, as their own elements so a summary can be disclosed without the course
       // list - the list is one element and therefore all or nothing.
@@ -552,7 +603,7 @@ export function generateAcademicRecord({
       credits_attempted: creditsAttempted,
       credits_earned: creditsEarned,
       // Kept so a credential issued before the outcome vocabulary existed stays readable.
-      status: 'completed',
+      status: inProgress ? 'in-progress' : 'completed',
       ...(recognition
         ? {
           // Recognition details: who the institution is beyond its name, what its codes are
@@ -617,11 +668,15 @@ export function generateAcademicRecord({
     recognition,
   };
 
-  // One record per kind the request asks for. A request for both produces ONE document holding
-  // the qualification and the transcript, not two: the holder carries a single credential for the
-  // programme, and a relying party that asks for only one of the namespaces still receives only
-  // that - the wallet filters the response to the namespaces and fields that were requested.
-  const records = requestedKinds(include).map((kind) => {
+  // The shape comes from the enrolment. An explicit request overrides it, which is how a fixture
+  // or a back-dated record asks for one thing; but a request for both produces ONE document
+  // holding the qualification and the transcript, not two: the holder carries a single credential
+  // for the programme, and a relying party that asks for only one of the namespaces still
+  // receives only that - the wallet filters the response to the namespaces it was asked for.
+  const shapes = include
+    ? requestedKinds(include)
+    : [shapeForEnrolment({ credentialType: programme.credentialType, progress })];
+  const records = shapes.map((kind) => {
     const spec = CREDENTIAL_KINDS[kind];
     const credentialData = { docType: spec.docType };
     for (const field of IDENTITY_FIELDS) {credentialData[field] = record[field];}
@@ -639,6 +694,8 @@ export function generateAcademicRecord({
         ...display,
         kind,
         label: spec.label,
+        progress,
+        programmeCode: programme.code,
         title:
           kind === 'transcript'
             ? `Academic transcript — ${programme.level} of ${programme.field}`
@@ -650,12 +707,43 @@ export function generateAcademicRecord({
   return { records };
 }
 
+/**
+ * Everything one student holds, ready to be offered: an item per enrolment, each shaped by how
+ * far that programme has got. The academy lists these; the student chooses which to take, never
+ * what is inside them.
+ */
+export function generateStudentItems({
+  institution,
+  studentId,
+  fullName,
+  recognition = true,
+  issueDate = todayIso(),
+}) {
+  return DEMO_ENROLMENTS.flatMap((enrolment) => {
+    const { records } = generateAcademicRecord({
+      institution,
+      studentId,
+      fullName,
+      programmeCode: enrolment.code,
+      progress: enrolment.progress,
+      recognition,
+      issueDate,
+    });
+    return records.map((record) => ({
+      ...record,
+      programmeCode: enrolment.code,
+      progress: enrolment.progress,
+    }));
+  });
+}
+
 export default {
   generateAcademicRecord,
+  generateStudentItems,
   CREDENTIAL_KINDS,
-  DEFAULT_KIND,
+  DEMO_ENROLMENTS,
   PHOTOID_DOCTYPE,
-  requestedKinds,
+  shapeForEnrolment,
   kindOfCredentialData,
   labelOfCredentialData,
   academicNamespacesOf,

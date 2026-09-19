@@ -23,7 +23,14 @@ process.on('exit', () => {
 
 const { IssuerService, sameClaimSet, buildCredentialOfferUrl, isReissueOffer } = await import('../src/index.js');
 const { getDb } = await import('../../db.js');
-const { generateAcademicRecord, kindOfCredentialData, academicNamespacesOf, todayIso } = await import(
+const {
+  generateAcademicRecord,
+  generateStudentItems,
+  shapeForEnrolment,
+  kindOfCredentialData,
+  academicNamespacesOf,
+  todayIso,
+} = await import(
   '../src/credential-generator.js'
 );
 const { verifyIssuerSigned } = await import('../../mdoc-core.js');
@@ -202,8 +209,58 @@ test('Credential kinds - both is ONE credential holding both', () => {
   assert.ok(records[0].credentialData.education_transcript, 'and so does the study');
 });
 
-test('Credential kinds - qualification is the default, even for an unknown choice', () => {
-  for (const include of [undefined, '', 'nonsense']) {
+test('Issuance - the shape follows the programme and how far through it the student is', () => {
+  // The rule, stated once: a completed degree is the qualification and the transcript in one
+  // document; a degree still in progress is the transcript for the terms done; a certification is
+  // the qualification alone, there being no transcript to speak of.
+  assert.strictEqual(
+    shapeForEnrolment({ credentialType: 'degree', progress: 'completed' }),
+    'academic',
+  );
+  assert.strictEqual(
+    shapeForEnrolment({ credentialType: 'degree', progress: 'in-progress' }),
+    'transcript',
+  );
+  assert.strictEqual(
+    shapeForEnrolment({ credentialType: 'certification', progress: 'completed' }),
+    'qualification',
+  );
+});
+
+test('Issuance - what the demo student holds is offered as three items, shaped by the rule', () => {
+  const items = generateStudentItems({
+    institution: 'Smart Academy',
+    studentId: 'SA-RULE-1',
+    fullName: 'Amara Okafor',
+  });
+
+  assert.strictEqual(items.length, 3, 'one item per enrolment');
+
+  const completed = items.find((item) => item.progress === 'completed' && item.kind === 'academic');
+  assert.ok(completed, 'the finished degree is one document holding both');
+  assert.ok(completed.credentialData.education_qualification);
+  assert.ok(completed.credentialData.education_transcript);
+
+  const partway = items.find((item) => item.progress === 'in-progress');
+  assert.ok(partway, 'the study still under way is its own item');
+  assert.strictEqual(partway.kind, 'transcript');
+  assert.strictEqual(partway.credentialData.education_qualification, undefined);
+  assert.strictEqual(partway.credentialData.education_transcript.outcome, 'in-progress');
+  const terms = new Set(
+    partway.credentialData.education_transcript.courses.map((course) => course.term),
+  );
+  assert.ok(terms.size <= 2, `a partway transcript covers the terms done, got ${terms.size}`);
+
+  const certificate = items.find((item) => item.kind === 'qualification');
+  assert.ok(certificate, 'the certification is its own item');
+  assert.ok(certificate.credentialData.education_qualification);
+  assert.strictEqual(certificate.credentialData.education_transcript, undefined);
+});
+
+test('Credential kinds - an explicit request still asks for one kind by name', () => {
+  // Not the academy's route - it asks for nothing and gets the rule above - but a fixture or a
+  // back-dated record may name what it wants. Anything unrecognised means a qualification.
+  for (const include of ['nonsense', 'qualification']) {
     const { records } = generateAcademicRecord({
       institution: 'Smart Academy',
       studentId: 'SA-T3',

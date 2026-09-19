@@ -25,6 +25,7 @@ import { ClientOrgService } from './client-orgs.js';
 import {
   generateAcademicRecord,
   PHOTOID_DOCTYPE,
+  generateStudentItems,
   kindOfCredentialData,
   labelOfCredentialData,
   academicNamespacesOf,
@@ -1963,21 +1964,33 @@ app.post('/academy/requests', async (req, res) => {
       institution: ACADEMY_NAME,
     });
 
-    // The applicant chooses what to hold: a qualification, a transcript, or both. Each
-    // kind becomes its own credential, with its own status index and its own revocation.
+    // The academy knows what the student holds, and the programme's state decides what each item
+    // carries, so the request cannot choose it. A completed degree is one document holding the
+    // qualification and the transcript; one still in progress is the transcript for the terms
+    // completed so far; a certification is the qualification alone.
     //
-    // The recognition details are a second, independent option: a caller that does not want
-    // them (they describe the institution and the module, and enlarge what a presentation can
-    // disclose) passes `recognition: false`. Absent means the demo's default, which is to
-    // include them, so the test sites have a recognisable record to show.
+    // The recognition details are the one remaining option: a caller that does not want them (they
+    // describe the institution and the module, and enlarge what a presentation can disclose)
+    // passes `recognition: false`. Absent means the demo's default, which is to include them, so
+    // the test sites have a recognisable record to show.
     const recognition = req.body?.recognition !== false && req.body?.recognition !== 'false';
-    const { records } = generateAcademicRecord({
-      institution: ACADEMY_NAME,
-      studentId,
-      fullName: req.body?.fullName,
-      include: req.body?.include,
-      recognition,
-    });
+    const requestedKind = req.body?.include;
+    // The academy's own flow asks for nothing and gets the rule; an explicit request for one kind
+    // is honoured for callers that know what they want, and prepares that one item alone.
+    const records = requestedKind
+      ? generateAcademicRecord({
+        institution: ACADEMY_NAME,
+        studentId,
+        fullName: req.body?.fullName,
+        include: requestedKind,
+        recognition,
+      }).records
+      : generateStudentItems({
+        institution: ACADEMY_NAME,
+        studentId,
+        fullName: req.body?.fullName,
+        recognition,
+      });
 
     // One session per requested kind, and only when it is what this request would issue today:
     // a credential prepared under older claims is replaced (it was never claimed, so nothing is
@@ -2019,10 +2032,10 @@ app.post('/academy/requests', async (req, res) => {
       };
     });
 
-    // The link carries what was asked for, so the claiming page shows that rather than every
-    // credential the account happens to hold from earlier requests.
+    // The link carries the address the request was made for, so the claiming page shows the items
+    // belonging to that student rather than every credential the browser happens to have seen.
     const claimParams = new URLSearchParams({ email });
-    if (req.body?.include) {claimParams.set('include', String(req.body.include));}
+    if (requestedKind) {claimParams.set('include', String(requestedKind));}
     if (!recognition) {claimParams.set('recognition', 'false');}
     const claimUrl = `${ACADEMY_SITE_URL}/claim?${claimParams.toString()}`;
     // Only mail a link when something is still claimable: repeating a request the student
