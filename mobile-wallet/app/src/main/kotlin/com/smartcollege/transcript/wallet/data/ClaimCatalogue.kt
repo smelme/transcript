@@ -9,8 +9,13 @@ import kotlinx.serialization.json.contentOrNull
 /** One claim, worded for the person the credential is about. */
 data class Claim(val label: String, val value: String, val detail: String? = null)
 
-/** A titled block of claims. */
-data class ClaimGroup(val title: String, val claims: List<Claim>)
+/**
+ * A block of claims: which part of the document it is, what it is called, and what it holds.
+ *
+ * The id is stable across credentials, so a screen can keep a block's open or closed state on it
+ * rather than on a title whose wording may change.
+ */
+data class ClaimGroup(val id: String, val title: String, val claims: List<Claim>)
 
 /**
  * How the claims of a stored credential are grouped and named for their holder.
@@ -25,7 +30,14 @@ data class ClaimGroup(val title: String, val claims: List<Claim>)
  */
 object ClaimCatalogue {
 
-    private const val COURSES = "courses"
+    /** The blocks this wallet knows. A namespace it does not know is its own block, id and all. */
+    const val SECTION_IDENTITY = "identity"
+    const val SECTION_CREDENTIAL = "credential"
+    const val SECTION_QUALIFICATION = "qualification"
+    const val SECTION_STUDY = "study"
+    const val SECTION_RECORD = "record"
+    const val SECTION_COURSES = "courses"
+
     private const val PORTRAIT = "portrait"
 
     /** Who the credential is about, as opposed to the document that carries it. */
@@ -92,23 +104,78 @@ object ClaimCatalogue {
         val groups = mutableListOf<ClaimGroup>()
         val photoId = namespaces[AcademicNamespaces.PHOTO_ID].orEmpty()
         if (photoId.isNotEmpty()) {
-            groups += block("Identity", photoId.filterKeys { it in identityElements })
-            groups += block("Credential", photoId.filterKeys { it !in identityElements })
+            groups += block(SECTION_IDENTITY, "Identity", photoId.filterKeys { it in identityElements })
+            groups += block(
+                SECTION_CREDENTIAL,
+                "Credential",
+                photoId.filterKeys { it !in identityElements },
+            )
         }
-        groups += block("Qualification", namespaces[AcademicNamespaces.QUALIFICATION].orEmpty())
+        groups += block(
+            SECTION_QUALIFICATION,
+            "Qualification",
+            namespaces[AcademicNamespaces.QUALIFICATION].orEmpty(),
+        )
         // The course list is opened into its own block, so the study block keeps the figures.
         groups += block(
+            SECTION_STUDY,
             "Study",
-            namespaces[AcademicNamespaces.TRANSCRIPT].orEmpty().filterKeys { it != COURSES },
+            namespaces[AcademicNamespaces.TRANSCRIPT].orEmpty().filterKeys { it != SECTION_COURSES },
         )
-        groups += block("Academic record", namespaces[AcademicNamespaces.ACADEMIC_RECORD].orEmpty())
+        groups += block(
+            SECTION_RECORD,
+            "Academic record",
+            namespaces[AcademicNamespaces.ACADEMIC_RECORD].orEmpty(),
+        )
         groups += courseBlock(namespaces[AcademicNamespaces.TRANSCRIPT].orEmpty())
-        // A namespace this wallet has never heard of is still the holder's own claim.
+        // A namespace this wallet has never heard of is still the holder's own claim. It keeps its
+        // own name as its id, which is as stable as anything this wallet could invent for it.
         for ((namespace, elements) in namespaces) {
             if (namespace in knownNamespaces) continue
-            groups += block(titleFor(namespace), elements)
+            groups += block(namespace, titleFor(namespace), elements)
         }
         return groups.filter { it.claims.isNotEmpty() }
+    }
+
+    /**
+     * One line saying what a block is about, for the row that is collapsed.
+     *
+     * The order is what a holder looks for first in that part of a document - their name, when the
+     * document was issued, what was awarded - and the first claim is the fallback, so a block this
+     * wallet has no opinion about still says something true about itself.
+     */
+    fun headlineFor(group: ClaimGroup): String? {
+        // The course block counts its courses in its own title, and its first course says nothing
+        // about the other eleven.
+        if (group.id == SECTION_COURSES) return null
+        // Each entry is one way of saying what the block is about, tried in order: the first that
+        // the credential can answer wins, and a name is the one thing worth saying twice.
+        val preferred = when (group.id) {
+            SECTION_IDENTITY -> listOf(listOf("Given name", "Family name"))
+            SECTION_CREDENTIAL -> listOf(
+                listOf("Issued"),
+                listOf("Document number"),
+                listOf("Issuing authority"),
+            )
+            SECTION_QUALIFICATION -> listOf(
+                listOf("Award"),
+                listOf("Programme"),
+                listOf("Degree level"),
+            )
+            SECTION_STUDY -> listOf(
+                listOf("Status"),
+                listOf("Grade point average"),
+                listOf("Total credits"),
+            )
+            else -> emptyList()
+        }
+        for (candidate in preferred) {
+            val values = candidate.mapNotNull { label ->
+                group.claims.firstOrNull { it.label == label }?.value
+            }
+            if (values.isNotEmpty()) return values.joinToString(" ")
+        }
+        return group.claims.firstOrNull()?.value
     }
 
     /** The label for an element identifier, for a reader rather than for a protocol. */
@@ -136,8 +203,8 @@ object ClaimCatalogue {
         else -> value.toString().trim().takeIf { it.isNotEmpty() }
     }
 
-    private fun block(title: String, elements: Map<String, Any?>): ClaimGroup =
-        ClaimGroup(title, elements.mapNotNull { (identifier, value) -> claim(identifier, value) })
+    private fun block(id: String, title: String, elements: Map<String, Any?>): ClaimGroup =
+        ClaimGroup(id, title, elements.mapNotNull { (identifier, value) -> claim(identifier, value) })
 
     private fun claim(identifier: String, value: Any?): Claim? {
         // A portrait is a claim like any other, but its bytes are not what a holder reads.
@@ -154,10 +221,16 @@ object ClaimCatalogue {
      * signed rather than quietly disappearing.
      */
     private fun courseBlock(transcript: Map<String, Any?>): ClaimGroup {
-        val raw = transcript[COURSES] ?: return ClaimGroup("Courses", emptyList())
+        val raw = transcript[SECTION_COURSES] ?: return ClaimGroup(SECTION_COURSES, "Courses", emptyList())
         val courses = parseCourses(raw)
-        if (courses.isNotEmpty()) return ClaimGroup("Courses (${courses.size})", courses)
-        return ClaimGroup("Courses", listOfNotNull(claim(COURSES, raw)))
+        // The count is in the title, so a holder can see how much study there is without opening
+        // the block - which is the one block that can run to a dozen rows.
+        if (courses.isNotEmpty()) return ClaimGroup(SECTION_COURSES, "Courses (${courses.size})", courses)
+        return ClaimGroup(
+            SECTION_COURSES,
+            "Courses",
+            listOfNotNull(claim(SECTION_COURSES, raw)),
+        )
     }
 
     private fun parseCourses(value: Any?): List<Claim> {

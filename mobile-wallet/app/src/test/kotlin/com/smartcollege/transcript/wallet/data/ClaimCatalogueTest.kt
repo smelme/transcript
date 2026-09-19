@@ -2,6 +2,7 @@ package com.smartcollege.transcript.wallet.data
 
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -57,6 +58,40 @@ class ClaimCatalogueTest {
 
     private fun claimOf(groups: List<ClaimGroup>, title: String, label: String): Claim? =
         groups.firstOrNull { it.title == title }?.claims?.firstOrNull { it.label == label }
+
+    @Test
+    fun `a block says in one line what it is about`() {
+        val groups = ClaimCatalogue.groupsOf(combined())
+        fun headlineFor(id: String): String? =
+            ClaimCatalogue.headlineFor(groups.first { it.id == id })
+
+        // A collapsed block has to earn its place, so the line under it is what a holder looks for
+        // in that part of the document rather than merely the first claim that happened to be signed.
+        assertEquals("Tessa Novak", headlineFor(ClaimCatalogue.SECTION_IDENTITY))
+        assertEquals("2026-09-18", headlineFor(ClaimCatalogue.SECTION_CREDENTIAL))
+        assertEquals("Bachelor of Arts", headlineFor(ClaimCatalogue.SECTION_QUALIFICATION))
+    }
+
+    @Test
+    fun `the course block leaves its headline to its title, which counts the courses`() {
+        val group = ClaimCatalogue.groupsOf(combined())
+            .first { it.id == ClaimCatalogue.SECTION_COURSES }
+
+        assertEquals("Courses (2)", group.title)
+        assertNull(
+            "its first course says nothing about the rest of them",
+            ClaimCatalogue.headlineFor(group),
+        )
+    }
+
+    @Test
+    fun `a block the wallet has no opinion about still has a headline`() {
+        val group = ClaimCatalogue.groupsOf(
+            mapOf(AcademicNamespaces.TRANSCRIPT to linkedMapOf("some_new_element" to "recorded")),
+        ).single()
+
+        assertEquals("recorded", ClaimCatalogue.headlineFor(group))
+    }
 
     @Test
     fun `a credential is grouped by what its claims are about`() {

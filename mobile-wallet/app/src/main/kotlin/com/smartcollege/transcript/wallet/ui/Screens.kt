@@ -27,10 +27,11 @@ import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Checkbox
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Scaffold
@@ -57,6 +58,7 @@ import androidx.compose.ui.unit.sp
 import com.smartcollege.transcript.wallet.data.AcademicNamespaces
 import com.smartcollege.transcript.wallet.data.Claim
 import com.smartcollege.transcript.wallet.data.ClaimCatalogue
+import com.smartcollege.transcript.wallet.data.ClaimGroup
 import com.smartcollege.transcript.wallet.data.CredentialSummary
 import com.smartcollege.transcript.wallet.data.ShareActivity
 import com.smartcollege.transcript.wallet.data.ShareActivityCodec
@@ -581,6 +583,7 @@ fun CredentialDetailScreen(
     val claimGroups = remember(credentialId) { repository.credentialClaims(credentialId) }
     // How many times this credential has been shared, so the way to the record of it can say so.
     val activityCount = remember(credentialId) { repository.activityCount(credentialId) }
+    var menuOpen by remember { mutableStateOf(false) }
     var confirmDelete by remember { mutableStateOf(false) }
     var deleting by remember { mutableStateOf(false) }
     var deleteError by remember { mutableStateOf<String?>(null) }
@@ -613,7 +616,41 @@ fun CredentialDetailScreen(
             TopAppBar(
                 title = { Text("Credential") },
                 navigationIcon = { TextButton(onClick = onBack) { Text("Back") } },
+                actions = {
+                    // Removing a credential is destructive and rare, so it sits behind an overflow
+                    // rather than next to the action a holder actually came here to take.
+                    Box {
+                        TextButton(onClick = { menuOpen = true }) { Text("More") }
+                        DropdownMenu(expanded = menuOpen, onDismissRequest = { menuOpen = false }) {
+                            DropdownMenuItem(
+                                text = { Text("Delete credential") },
+                                onClick = {
+                                    menuOpen = false
+                                    confirmDelete = true
+                                },
+                            )
+                        }
+                    }
+                },
             )
+        },
+        // The one action worth reaching for stays on screen, rather than sitting at the end of a
+        // long scroll with a destructive button stacked against it.
+        bottomBar = {
+            Column(
+                Modifier
+                    .fillMaxWidth()
+                    .background(MaterialTheme.colorScheme.background)
+                    .padding(horizontal = 16.dp, vertical = 12.dp),
+            ) {
+                Button(
+                    onClick = onShare,
+                    modifier = Modifier.fillMaxWidth().height(52.dp),
+                    shape = RoundedCornerShape(14.dp),
+                ) {
+                    Text("Share credential", fontWeight = FontWeight.Bold, fontSize = 16.sp)
+                }
+            }
         },
     ) { padding ->
         Column(
@@ -623,6 +660,12 @@ fun CredentialDetailScreen(
                 .verticalScroll(rememberScrollState())
                 .padding(16.dp),
         ) {
+            // A failed delete is reported at the top, where the menu that triggers it lives and
+            // where it can be seen without scrolling.
+            deleteError?.let {
+                Text(it, color = MaterialTheme.colorScheme.error)
+                Spacer(Modifier.height(12.dp))
+            }
             Card(
                 modifier = Modifier.fillMaxWidth(),
                 shape = RoundedCornerShape(24.dp),
@@ -669,34 +712,20 @@ fun CredentialDetailScreen(
                 }
             }
 
-            // The card above is the headline. This is the whole document: every claim the issuer
-            // signed, grouped by what it is about.
+            // What this credential has been used to disclose - and only when there is something to
+            // show. An entry point that leads to "nothing here" is worse than no entry point.
+            if (activityCount > 0) {
+                Spacer(Modifier.height(16.dp))
+                ActivityRow(activityCount, onActivity)
+            }
+
+            // The document itself, block by block: each says what it is about and opens when it is
+            // asked for, so a credential carrying a dozen courses is still one screen to read.
+            Spacer(Modifier.height(20.dp))
             if (claimGroups.isNotEmpty()) {
-                claimGroups.forEach { group ->
-                    Spacer(Modifier.height(24.dp))
-                    SectionLabel(group.title)
-                    Card(
-                        modifier = Modifier.fillMaxWidth(),
-                        shape = RoundedCornerShape(16.dp),
-                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-                        elevation = CardDefaults.cardElevation(defaultElevation = 1.dp),
-                    ) {
-                        Column(Modifier.padding(vertical = 6.dp)) {
-                            group.claims.forEach { ClaimRow(it) }
-                        }
-                    }
-                }
-                Spacer(Modifier.height(24.dp))
-                SectionLabel("Wallet")
-                Card(
-                    modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(16.dp),
-                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-                    elevation = CardDefaults.cardElevation(defaultElevation = 1.dp),
-                ) {
-                    Column(Modifier.padding(vertical = 6.dp)) {
-                        DetailRow("Credential ID", credentialId)
-                    }
+                for (group in claimGroups) {
+                    ClaimSection(group)
+                    Spacer(Modifier.height(8.dp))
                 }
             } else {
                 // The document is briefly unreadable while the device is locked, so the screen
@@ -730,42 +759,7 @@ fun CredentialDetailScreen(
                 }
             }
 
-            deleteError?.let {
-                Spacer(Modifier.height(12.dp))
-                Text(it, color = MaterialTheme.colorScheme.error)
-            }
             Spacer(Modifier.height(24.dp))
-            Button(
-                onClick = onShare,
-                modifier = Modifier.fillMaxWidth().height(52.dp),
-                shape = RoundedCornerShape(14.dp),
-            ) {
-                Text("Share credential", fontWeight = FontWeight.Bold, fontSize = 16.sp)
-            }
-            Spacer(Modifier.height(12.dp))
-            OutlinedButton(
-                onClick = onActivity,
-                modifier = Modifier.fillMaxWidth().height(52.dp),
-                shape = RoundedCornerShape(14.dp),
-            ) {
-                Text(
-                    if (activityCount == 0) "Activity" else "Activity ($activityCount)",
-                    fontWeight = FontWeight.Bold,
-                    fontSize = 16.sp,
-                )
-            }
-            Spacer(Modifier.height(12.dp))
-            Button(
-                onClick = { confirmDelete = true },
-                enabled = !deleting,
-                modifier = Modifier.fillMaxWidth(),
-                colors = ButtonDefaults.buttonColors(
-                    containerColor = MaterialTheme.colorScheme.errorContainer,
-                    contentColor = MaterialTheme.colorScheme.onErrorContainer,
-                ),
-            ) {
-                Text("Delete credential")
-            }
         }
     }
 
@@ -841,6 +835,108 @@ private fun ClaimRow(claim: Claim) {
             textAlign = TextAlign.End,
             modifier = Modifier.padding(start = 12.dp),
         )
+    }
+}
+
+/** How many courses are listed before the rest are asked for. */
+private const val CoursesShownAtOnce = 3
+
+/** The way into the record of what this credential has disclosed, and how much of it there is. */
+@Composable
+private fun ActivityRow(count: Int, onOpen: () -> Unit) {
+    Card(
+        modifier = Modifier.fillMaxWidth().clickable { onOpen() },
+        shape = RoundedCornerShape(16.dp),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+        elevation = CardDefaults.cardElevation(defaultElevation = 1.dp),
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth().padding(16.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Column(Modifier.weight(1f)) {
+                Text(
+                    "Activity",
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold,
+                )
+                Text(
+                    if (count == 1) "1 disclosure" else "$count disclosures",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+            Text(
+                "View",
+                style = MaterialTheme.typography.labelLarge,
+                color = MaterialTheme.colorScheme.primary,
+            )
+        }
+    }
+}
+
+/**
+ * One block of the document, saying what it is about until it is opened.
+ *
+ * A credential holds more than a holder reads at once - a course list alone can run to a dozen rows
+ * - so each block collapses to a headline and opens when asked. Everything is still there, one tap
+ * away, rather than several screens of rows to scroll past to reach the block that was wanted.
+ */
+@Composable
+private fun ClaimSection(group: ClaimGroup) {
+    var expanded by remember(group.id) { mutableStateOf(false) }
+    var showAll by remember(group.id) { mutableStateOf(false) }
+    // Courses are the one block that can be arbitrarily long, so they open a few rows at a time.
+    val limit = if (group.id == ClaimCatalogue.SECTION_COURSES) CoursesShownAtOnce else Int.MAX_VALUE
+    val shown = if (showAll) group.claims else group.claims.take(limit)
+
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(16.dp),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+        elevation = CardDefaults.cardElevation(defaultElevation = 1.dp),
+    ) {
+        Column {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clickable { expanded = !expanded }
+                    .padding(horizontal = 16.dp, vertical = 14.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Column(Modifier.weight(1f)) {
+                    Text(
+                        group.title,
+                        style = MaterialTheme.typography.titleSmall,
+                        fontWeight = FontWeight.Bold,
+                    )
+                    // The headline is why a collapsed block is still worth reading.
+                    if (!expanded) {
+                        ClaimCatalogue.headlineFor(group)?.let {
+                            Text(
+                                it,
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                maxLines = 1,
+                            )
+                        }
+                    }
+                }
+                Text(
+                    if (expanded) "Hide" else "Show",
+                    style = MaterialTheme.typography.labelLarge,
+                    color = MaterialTheme.colorScheme.primary,
+                )
+            }
+            if (expanded) {
+                for (claim in shown) ClaimRow(claim)
+                if (group.claims.size > shown.size) {
+                    TextButton(onClick = { showAll = true }) {
+                        Text("Show all ${group.claims.size}")
+                    }
+                }
+            }
+        }
     }
 }
 
