@@ -23,6 +23,28 @@ able to tell which surface was written by whom, or that a machine was involved a
 | **A sentence that restates the previous one** | Delete it. |
 | **Explaining the obvious**: "We use cookies to improve your experience" style filler | Either say what actually happens or say nothing. |
 
+## Say it in the reader's words
+
+The second half of this skill, and the one that is easier to get wrong: explain only what the
+reader needs, and in their language rather than the system's.
+
+A note written to reassure an engineer is noise to everyone else. If a sentence describes how
+something works internally, or why the reader should trust it, ask what they need to *do* with it.
+Usually they need nothing, and the sentence can go.
+
+| Written for an engineer | Written for the reader |
+| --- | --- |
+| Every value above was read from the credential's signature and its revocation status at the moment you shared it, not from anything you typed, and not from a copy we held. | These details come from the credential itself, as signed by the institution that issued it. Nothing was typed in, and we keep no copy. |
+| We check the signature and the revocation status before showing anything. | We confirm the credential is genuine and still valid before showing anything. |
+| Credentials issued before the current claim set carry only the modules and the credits. | Older credentials carry only the modules and credits. |
+
+Rules of thumb:
+
+- Name the thing, not the mechanism. "Still valid" rather than "revocation status".
+- One sentence of reassurance is plenty. Two is explaining yourself.
+- Never explain an internal word. If the reader would ask what a "claim set" is, do not use it.
+- If the note exists only for a developer debugging the flow, delete it.
+
 ## Voice
 
 - One idea per sentence. If a sentence needs a dash or a semicolon to hold it together, it is two

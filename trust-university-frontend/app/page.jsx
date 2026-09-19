@@ -79,7 +79,7 @@ export default function ApplyPage() {
         <section className="card" aria-label="Verified transcript">
           <h2>Verified transcript</h2>
           <p className="muted">
-            Signature and revocation status checked · {formatTimestamp(result.verifiedAt)}
+            Verified · {formatTimestamp(result.verifiedAt)}
           </p>
 
           <dl>
@@ -220,19 +220,18 @@ export default function ApplyPage() {
           )}
 
           <p className="muted">
-            Every value above was read from the credential&apos;s signature and its revocation
-            status at the moment you shared it — not from anything you typed, and not from a copy we
-            held.
+            These details come from the credential itself, as signed by the institution that issued
+            it. Nothing was typed in, and we keep no copy.
           </p>
 
           {(!claims?.programmeTitle || !claims?.enrolmentStart || courses.some((c) => !c.term)) && (
             <p className="notice">
-              A field above shows a dash because the credential did not contain it.{' '}
+              A dash means the credential did not include that field.{' '}
               {claims?.programmeTitle
-                ? 'Some credentials carry the modules without the academic terms they were taken in.'
-                : 'Credentials issued before the current claim set carry only the modules and the credits, without the programme, the level or the period of study.'}{' '}
-              Nothing here is inferred: if you need a field that is missing, ask the applicant for a
-              newly issued transcript.
+                ? 'Some credentials list the modules without the terms they were taken in.'
+                : 'Older credentials carry only the modules and credits, without the programme, level or period of study.'}{' '}
+              Nothing is guessed. If a field you need is missing, ask the applicant for a newly
+              issued transcript.
             </p>
           )}
         </section>
@@ -256,10 +255,10 @@ export default function ApplyPage() {
             </p>
           </div>
           <div className="step">
-            <h3>3. We verify, then read</h3>
+            <h3>3. We check it is genuine</h3>
             <p>
-              We check the signature and the revocation status before showing anything, and we
-              record what was verified and when.
+              We confirm the credential is genuine and still valid before showing anything, and we
+              record when we checked.
             </p>
           </div>
         </div>

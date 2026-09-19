@@ -26,10 +26,10 @@ const SURFACES = [
 /** The tells. Each is a pattern over a line of visible text, with why it is one. */
 const TELLS = [
   {
-    // Every em dash, not just the ones hinging a sentence: the character itself is the tell, and
-    // no writer of plain English reaches for it.
-    pattern: /—/,
-    why: 'an em dash: use a comma, a colon or a full stop instead',
+    // Every dash that is punctuation rather than a range. The en dash is absent on purpose: in
+    // 2020-2021 it carries meaning, which is the one thing a dash is allowed to do here.
+    pattern: /[\u2012\u2014\u2015]/,
+    why: 'a dash used as punctuation: use a comma, a colon or a full stop instead',
   },
   {
     pattern: /\w{2,}\s--\s\w{2,}/,

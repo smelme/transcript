@@ -32,9 +32,9 @@ export default function RootLayout({ children }) {
         <footer className="site-footer">
           <div className="container">
             <p>
-              Trust University verifies credentials; it does not contact your institution, and it
-              does not store your credential. Every value shown to us is read from the signature
-              and the revocation status at the moment you share it.
+              Trust University checks credentials. We do not contact your institution, and we do not
+              keep your credential. Everything shown here comes from the credential itself, at the
+              moment you shared it.
             </p>
           </div>
         </footer>
