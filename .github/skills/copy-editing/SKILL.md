@@ -13,7 +13,7 @@ able to tell which surface was written by whom, or that a machine was involved a
 
 | Tell | Do this |
 | --- | --- |
-| **Em dash as a hinge** — the sentence turns on it | End the sentence. Start another. Or use a comma if the aside is short. |
+| **An em dash, anywhere** | Do not use one. A comma for a short aside, a colon before an explanation, a full stop when the sentence has turned. |
 | **Semicolon joining two ideas** | Two sentences. A semicolon is a hedge that hides which idea matters. |
 | **Stacked hyphens** in place of punctuation (`--`, `---`, ` - `) | The same treatment as an em dash. |
 | **En dash in a range** (2020–2021) | Legitimate. Leave it. This is the one dash that carries information. |
@@ -57,8 +57,9 @@ able to tell which surface was written by whom, or that a machine was involved a
 - **Technical terms.** Never simplify a term the reader needs to act correctly (a form label, a
   legal phrase). Do simplify the ones only the machinery needs — see the plain-language pass:
   no `docType`, no `namespace`, no `offer URL` in text a holder reads.
-- **Rewriting is not the goal.** A sentence that is already plain stays exactly as it is, even if it
-  contains a dash. The point is to remove the *habit*, not every mark.
+- **No em dashes at all**, in copy or in the documents that describe this standard. The one dash
+  worth keeping is the en dash in a range such as 2020–2021, where it carries meaning rather than
+  the sound of a sentence turning.
 
 ## Where this applies
 

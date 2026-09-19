@@ -26,8 +26,10 @@ const SURFACES = [
 /** The tells. Each is a pattern over a line of visible text, with why it is one. */
 const TELLS = [
   {
-    pattern: /[a-z)]\s—\s[a-z(]/i,
-    why: 'an em dash hinging a sentence: make it two sentences, or a comma',
+    // Every em dash, not just the ones hinging a sentence: the character itself is the tell, and
+    // no writer of plain English reaches for it.
+    pattern: /—/,
+    why: 'an em dash: use a comma, a colon or a full stop instead',
   },
   {
     pattern: /\w{2,}\s--\s\w{2,}/,
