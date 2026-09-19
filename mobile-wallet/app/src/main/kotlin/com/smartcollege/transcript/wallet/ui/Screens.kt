@@ -40,7 +40,6 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Scaffold
@@ -319,10 +318,10 @@ fun CredentialListScreen(
                 Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                     Column(horizontalAlignment = Alignment.CenterHorizontally) {
                         Text("No credentials yet")
-                        Spacer(Modifier.height(8.dp))
-                        Button(onClick = onScan) { Text("Scan a QR code") }
-                        Spacer(Modifier.height(8.dp))
-                        OutlinedButton(onClick = onAdd) { Text("Add credential from a link") }
+                        Spacer(Modifier.height(12.dp))
+                        // Adding a credential opens the camera itself, so a separate scan button
+                        // here was a second door into the same room.
+                        Button(onClick = onAdd) { Text("Add credential") }
                     }
                 }
             } else {
