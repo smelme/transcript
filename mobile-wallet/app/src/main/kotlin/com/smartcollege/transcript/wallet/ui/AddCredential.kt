@@ -1,7 +1,5 @@
 package com.smartcollege.transcript.wallet.ui
 
-import android.content.ClipboardManager
-import android.content.Context
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
@@ -14,7 +12,6 @@ import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -24,6 +21,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -34,15 +32,18 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.smartcollege.transcript.wallet.data.ScannedCode
 import com.smartcollege.transcript.wallet.data.WalletRepository
+import kotlinx.coroutines.launch
 
 /**
- * Add a credential from a link - the link an institution emailed, or the one the holder's own
- * device opened the wallet with.
+ * Add a credential: the guided way in, for a holder who has been told to scan something.
  *
- * This is the counterpart to the reader: same claim, but reached by reading or pasting a link
- * rather than by pointing a camera at something. A link that is not an offer is named as such
- * before it is sent anywhere, which is a better answer than a claim failing with "invalid
- * credential offer".
+ * It says what to do, offers the one button that does it, and then reports what happened - by name,
+ * since "your credential from Auckland is added" is worth more than "success". The scanning itself
+ * is the same camera the reader uses; the difference is only that here it is an instruction being
+ * carried out, so the screen stays and explains.
+ *
+ * A link the wallet was opened with is claimed on arrival without any of that: the holder has
+ * already followed the instruction by tapping it.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -51,38 +52,61 @@ fun AddCredentialScreen(
     offerUrl: String?,
     onDone: () -> Unit,
     onBack: () -> Unit,
+    onScannerOpenChange: (Boolean) -> Unit = {},
 ) {
-    // The link the wallet was opened with, if any: claimed on arrival, with no typing.
-    var typed by remember { mutableStateOf("") }
-    var pending by remember { mutableStateOf(offerUrl?.takeIf { it.isNotBlank() }) }
     var busy by remember { mutableStateOf(false) }
-    var succeeded by remember { mutableStateOf(false) }
+    var added by remember { mutableStateOf(false) }
+    var addedFrom by remember { mutableStateOf<String?>(null) }
     var error by remember { mutableStateOf<String?>(null) }
     var attempt by remember { mutableStateOf(0) }
     val context = LocalContext.current
+    val scanner = remember(context) { scannerFor(context) }
+    val scope = rememberCoroutineScope()
 
-    fun add(raw: String?) {
-        when (val code = ScannedCode.of(raw)) {
-            is ScannedCode.CredentialOffer -> {
-                error = null
-                pending = code.url
-                attempt += 1
-            }
-            else -> error = "That is a link, not a credential offer."
+    fun claim(url: String) {
+        scope.launch {
+            busy = true
+            error = null
+            repository.claim(url)
+                .onSuccess { stored ->
+                    repository.registerWithSystem(context)
+                    val institution = stored.summary.institution
+                    addedFrom = institution.takeIf { it.isNotBlank() }?.let { brandOf(it).title }
+                    added = true
+                }
+                .onFailure { error = it.message ?: "We could not add this credential." }
+            busy = false
         }
     }
 
-    LaunchedEffect(pending, attempt) {
-        val url = pending ?: return@LaunchedEffect
-        busy = true
+    fun scan() {
         error = null
-        repository.claim(url)
-            .onSuccess {
-                repository.registerWithSystem(context)
-                succeeded = true
+        scanner.read(onScannerOpenChange) { outcome ->
+            when (outcome) {
+                is ScanOutcome.Code -> when (val scanned = ScannedCode.of(outcome.raw)) {
+                    is ScannedCode.CredentialOffer -> claim(scanned.url)
+
+                    // Worth naming: the holder was told to scan an offer, so a link or something
+                    // else entirely is a wrong-turn rather than a failed claim.
+                    is ScannedCode.FidoLink, is ScannedCode.WebLink ->
+                        error = "That QR code is a link, not a credential offer. Scan the code " +
+                            "your institution sent you."
+
+                    is ScannedCode.Unknown ->
+                        error = "That QR code does not contain a credential offer."
+                }
+
+                // Closing the camera leaves the instruction where it was, ready to try again.
+                is ScanOutcome.Cancelled -> Unit
+
+                is ScanOutcome.Failed -> error = outcome.message
             }
-            .onFailure { error = it.message ?: "We could not add this credential." }
-        busy = false
+        }
+    }
+
+    // A link the wallet was opened with needs no scanning and no typing.
+    LaunchedEffect(offerUrl, attempt) {
+        if (!offerUrl.isNullOrBlank()) claim(offerUrl)
     }
 
     val arrivedWithLink = !offerUrl.isNullOrBlank()
@@ -117,15 +141,17 @@ fun AddCredentialScreen(
                     )
                 }
 
-                succeeded -> {
+                added -> {
                     Text(
-                        "Credential added",
+                        addedFrom?.let { "Your credential from $it is successfully added" }
+                            ?: "Your credential is successfully added",
                         style = MaterialTheme.typography.headlineSmall,
                         fontWeight = FontWeight.Bold,
+                        textAlign = TextAlign.Center,
                     )
                     Spacer(Modifier.height(10.dp))
                     Text(
-                        "It is now stored in your wallet and can be shared whenever you need it.",
+                        "It is stored on this device and can be shared whenever you need it.",
                         style = MaterialTheme.typography.bodyMedium,
                         textAlign = TextAlign.Center,
                         color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.75f),
@@ -139,8 +165,9 @@ fun AddCredentialScreen(
                     }
                 }
 
-                // A link the wallet was opened with: it has been tried, and it did not work.
-                arrivedWithLink -> {
+                // A link the wallet was opened with has been tried, and it did not work: there is
+                // no instruction left to return to.
+                arrivedWithLink && error != null -> {
                     Text(
                         "We could not add the credential",
                         style = MaterialTheme.typography.titleLarge,
@@ -172,46 +199,37 @@ fun AddCredentialScreen(
 
                 else -> {
                     Text(
-                        "Paste the link your institution sent you.",
-                        style = MaterialTheme.typography.bodyMedium,
+                        "Add your credential",
+                        style = MaterialTheme.typography.headlineSmall,
+                        fontWeight = FontWeight.Bold,
                         textAlign = TextAlign.Center,
                     )
-                    Spacer(Modifier.height(16.dp))
-                    OutlinedTextField(
-                        value = typed,
-                        onValueChange = {
-                            typed = it
-                            error = null
-                        },
-                        label = { Text("Credential link") },
-                        singleLine = true,
-                        modifier = Modifier.fillMaxWidth(),
+                    Spacer(Modifier.height(10.dp))
+                    Text(
+                        "Scan the QR code from your institution and your credential is added to " +
+                            "this wallet.",
+                        style = MaterialTheme.typography.bodyMedium,
+                        textAlign = TextAlign.Center,
+                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.75f),
                     )
                     error?.let {
-                        Spacer(Modifier.height(8.dp))
-                        Text(it, color = MaterialTheme.colorScheme.error)
+                        Spacer(Modifier.height(16.dp))
+                        Text(
+                            it,
+                            style = MaterialTheme.typography.bodyMedium,
+                            textAlign = TextAlign.Center,
+                            color = MaterialTheme.colorScheme.error,
+                        )
                     }
-                    Spacer(Modifier.height(8.dp))
-                    TextButton(
-                        onClick = { clipboardText(context)?.let { typed = it; error = null } },
-                    ) { Text("Paste from clipboard") }
-                    Spacer(Modifier.height(8.dp))
+                    Spacer(Modifier.height(28.dp))
                     Button(
-                        onClick = { add(typed) },
-                        enabled = typed.isNotBlank(),
+                        onClick = { scan() },
                         modifier = Modifier.fillMaxWidth().height(52.dp),
                     ) {
-                        Text("Add credential", fontSize = 16.sp, fontWeight = FontWeight.Bold)
+                        Text("Scan QR code", fontSize = 16.sp, fontWeight = FontWeight.Bold)
                     }
                 }
             }
         }
     }
-}
-
-/** The clipboard, read only when the holder asks for it by tapping Paste. */
-private fun clipboardText(context: Context): String? {
-    val manager = context.getSystemService(Context.CLIPBOARD_SERVICE) as? ClipboardManager ?: return null
-    val clip = manager.primaryClip?.takeIf { it.itemCount > 0 } ?: return null
-    return clip.getItemAt(0).coerceToText(context)?.toString()?.trim()?.takeIf { it.isNotBlank() }
 }

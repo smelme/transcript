@@ -43,6 +43,8 @@ import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
@@ -257,6 +259,8 @@ fun CredentialListScreen(
     onAdd: () -> Unit,
     onOpen: (String) -> Unit,
     onSignOut: () -> Unit,
+    message: String? = null,
+    onMessageShown: () -> Unit = {},
 ) {
     val ids = remember { repository.credentialIds() }
     val summaries = remember(ids) { ids.associateWith { repository.credentialSummary(it) } }
@@ -267,8 +271,18 @@ fun CredentialListScreen(
     val holderName = remember(summaries) {
         summaries.values.mapNotNull { it?.fullName?.takeIf { name -> name.isNotBlank() } }.firstOrNull()
     }
+    // What the reader had to say travels back with the holder and is said here, rather than on a
+    // page of its own that they would then have to dismiss.
+    val snackbarHostState = remember { SnackbarHostState() }
+    LaunchedEffect(message) {
+        if (!message.isNullOrBlank()) {
+            snackbarHostState.showSnackbar(message)
+            onMessageShown()
+        }
+    }
 
     Scaffold(
+        snackbarHost = { SnackbarHost(snackbarHostState) },
         topBar = {
             TopAppBar(
                 title = { Text("Quals") },

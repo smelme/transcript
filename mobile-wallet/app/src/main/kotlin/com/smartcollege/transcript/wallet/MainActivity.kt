@@ -194,6 +194,11 @@ fun WalletApp(
     var screen by remember {
         mutableStateOf<Screen>(if (signedIn) Screen.List else Screen.SignIn)
     }
+    // Where the reader hands the holder back to, and what it has to say when it does. A scan is
+    // not a place to stand: the wallet returns to the screen the holder came from and reports
+    // there, which is why the reader itself has no page of its own.
+    var screenBeforeScan by remember { mutableStateOf<Screen>(Screen.List) }
+    var scanMessage by remember { mutableStateOf<String?>(null) }
 
     // A deeplink offer (same-device issuance) takes precedence once the wallet
     // is signed in and unlocked; otherwise the user is sent through sign-in
@@ -228,21 +233,24 @@ fun WalletApp(
             Screen.Scan -> ScanScreen(
                 repository,
                 onScannerOpenChange = { scannerOpen = it },
-                onClaimed = {
+                onFinished = { message ->
                     scannerOpen = false
                     hasCredentials = repository.credentialIds().isNotEmpty()
-                    screen = Screen.List
-                },
-                onCancel = {
-                    scannerOpen = false
-                    screen = Screen.List
+                    scanMessage = message
+                    screen = screenBeforeScan
                 },
             )
             Screen.List -> CredentialListScreen(
                 repository,
-                onScan = { screen = Screen.Scan },
+                onScan = {
+                    screenBeforeScan = current
+                    scanMessage = null
+                    screen = Screen.Scan
+                },
                 onAdd = { screen = Screen.Add(null) },
                 onOpen = { screen = Screen.Detail(it) },
+                message = scanMessage,
+                onMessageShown = { scanMessage = null },
                 onSignOut = {
                     val refreshToken = repository.signOut()
                     // Clear the system registry so Chrome can't keep offering
@@ -281,6 +289,7 @@ fun WalletApp(
             is Screen.Add -> AddCredentialScreen(
                 repository = repository,
                 offerUrl = current.offerUrl,
+                onScannerOpenChange = { scannerOpen = it },
                 onDone = {
                     hasCredentials = repository.credentialIds().isNotEmpty()
                     onOfferConsumed()
