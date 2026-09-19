@@ -2005,7 +2005,14 @@ app.post('/academy/requests', async (req, res) => {
         // comparison below, not by this filter.
         academicNamespace: record.academicNamespaces[0],
       });
-      const matching = candidates.find((session) =>
+      // Two items of one student's record can share a namespace - a completed degree holds the
+      // qualification, and the certificate is one - so the programme is part of what tells items
+      // apart. Without it, preparing the second item supersedes the first.
+      const forThisItem = candidates.filter(
+        (session) =>
+          (session.display?.programmeCode || null) === (record.display?.programmeCode || null),
+      );
+      const matching = forThisItem.find((session) =>
         sameClaimSet(session.credentialData, record.credentialData),
       );
       if (matching) {
@@ -2013,7 +2020,7 @@ app.post('/academy/requests', async (req, res) => {
         return { record, session: matching, reused: true, superseded: 0 };
       }
 
-      const stale = candidates.filter((session) => session.status === 'pending');
+      const stale = forThisItem.filter((session) => session.status === 'pending');
       for (const session of stale) {issuer.supersedeIssuanceSession(session.sessionId);}
 
       return {
