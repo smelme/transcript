@@ -66,6 +66,34 @@ one). Two consequences to be aware of:
   ones from the wallet.
 - The portal will look empty until then. That is the honest state, not a regression.
 
+## The flow the academy wants
+
+1. **Sign in with an email one-time code.** The academy then knows who the student is. In a real
+   institution other checks would sit around this; for the demo the OTP *is* the check, and it is
+   the same identity the wallet signs in with, so the academy and the wallet agree on who is asking.
+2. **See what is theirs to be issued** — a list, not a menu:
+   - Bachelor's degree, completed → one item holding the qualification **and** the transcript
+   - Master's degree, partway → one item holding a transcript for the semesters completed
+   - Certificate, completed → one item holding the qualification, with no transcript
+3. **Select one or more items.** The selection is which credentials to take, never what is inside
+   them — that follows from the rule above.
+4. **Take them one at a time**: each selected item gets its own screen with its own offer URL and QR,
+   and moving on to the next until the last, then done.
+
+Each offer is single-use, and the sessions behind unclaimed items persist as `pending`, so a student
+who stops halfway can sign in again and finish. Nothing needs to be re-created for that.
+
+### Nearly all of this exists
+
+| Step | Endpoint today | Change needed |
+| --- | --- | --- |
+| Sign in | `/auth/otp`, `/otp/verify`, `/auth/token` | none — reuse for the academy |
+| What is theirs | `/academy/credentials` | already lists the signed-in account's items with sessionId, status, title, institution, kind, label; add the programme's state so each item can say *why* it is what it is |
+| Prepare them | `/academy/requests` | stop reading `include`; create one item per programme the record supports |
+| Offer per item | `/academy/credentials/:sessionId/offer`, `/issuance-sessions/:id/offer-qr` | none |
+| Claim | `/wallet/issuance` | none |
+| Pages | `get-credentials`, `claim` | become sign-in → list → selection → one offer screen per item, with *Next* |
+
 ## Acceptance criteria
 
 - A completed bachelor's student receives one document holding the qualification and the transcript.
