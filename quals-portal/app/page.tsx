@@ -97,7 +97,7 @@ export default function OverviewPage() {
                   key={kind}
                   label={kindCountLabel(kind)}
                   value={count}
-                  hint={kind === 'credential' ? 'No academic namespace' : 'Active'}
+                  hint={kind === 'credential' ? 'No academic record' : 'Active'}
                 />
               ))}
               <Stat label="Revoked" value={stats?.totalRevoked ?? revoked} hint="No longer valid" />
