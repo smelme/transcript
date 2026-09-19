@@ -38,7 +38,11 @@ export function devOtpAllowed() {
 export async function sendEmail({ to, subject, html }) {
   const config = getBrevoConfig();
   if (!(config.apiKey && config.fromEmail)) {
-    return { success: false, reason: 'Brevo not configured' };
+      // Local development has no provider, so nothing actually leaves the machine. Say so, with
+      // the link the message was carrying: otherwise a share, or a sign-in code, looks broken when
+      // it is only unsent.
+      const link = String(html || '').match(/https?:\/\/[^\s"'<>]+/)?.[0];
+      console.log(`[email] not sent, no provider configured${link ? `: ${link}` : ''}`);
   }
 
   try {
