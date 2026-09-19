@@ -33,6 +33,8 @@ live there. Without the flag the build fails in a way that reads like a code err
 
 ## The addresses this deployment uses
 
+The project is at https://railway.com/project/74a6a770-5a74-4132-95f7-a222dcff64a3.
+
 | Service | Address |
 | --- | --- |
 | `issuer` | https://issuer-production-335e.up.railway.app |
