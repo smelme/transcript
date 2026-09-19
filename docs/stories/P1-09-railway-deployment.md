@@ -65,6 +65,11 @@ placeholders (`admin@transcript.local`, `registrar@transcript.local`) and the pa
 
 1. **Email.** No Brevo key is configured, so sign-in codes and share notifications are not sent. The
    academy flow depends on the one-time code, so it cannot be walked end to end until this is set.
+   Note what that means precisely: a share carries a link, and the issuer logs that link when there
+   is no provider, so a share can still be followed by hand. A sign-in code is sent as text in the
+   body of the message, so nothing in the log recovers it. Local development is unaffected, because
+   with `NODE_ENV` unset the issuer accepts a development code. Production deliberately does not, and
+   should not be changed to: that flag lets anyone sign in as anyone.
 2. **The administrator passwords.** They must be changed from the placeholders, and the addresses to
    real ones. The seeded account is not recreated when the variables change, so a new password is set
    in the portal rather than in the dashboard.
