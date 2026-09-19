@@ -12,16 +12,17 @@ Create these six, each from this repository, each with Root Directory left at th
 | --- | --- | --- | --- |
 | `issuer` | `npm ci` | `node issuer-service/src/index.js` | yes, the wallet talks to it |
 | `verifier` | `npm ci` | `node verifier-service/src/index.js` | yes |
-| `academy` | `npm ci && npm run build -w issuer-frontend` | `npm run start -w issuer-frontend` | yes, students use it |
-| `my-jobs` | `npm ci && npm run build -w verifier-frontend` | see the note below | yes |
-| `portal` | `npm ci && npm run build -w quals-portal` | `npm run start -w quals-portal` | yes, administrators use it |
-| `trust-university` | `npm ci && npm run build -w trust-university-frontend` | see the note below | yes |
+| `academy` | `npm ci && npm run build -w issuer-frontend` | `npm run start:railway -w issuer-frontend` | yes, students use it |
+| `my-jobs` | `npm ci && npm run build -w verifier-frontend` | `npm run start:railway -w verifier-frontend` | yes |
+| `portal` | `npm ci && npm run build -w quals-portal` | `npm run start:railway -w quals-portal` | yes, administrators use it |
+| `trust-university` | `npm ci && npm run build -w trust-university-frontend` | `npm run start:railway -w trust-university-frontend` | yes |
 
-`verifier-frontend` and `trust-university-frontend` are Vite applications: they build to static files
-and need a static server rather than a framework start. If their `package.json` has no `start`
-script, serve the build output with `npx --yes serve -s <workspace>/dist -l $PORT`.
+All four front-ends are Next.js applications. Their `start` scripts pass a fixed port, as in
+`next start -p 3002`, which is right for local work and useless here: Railway assigns a port and
+expects the service to bind it. Each app therefore carries a `start:railway` script that runs plain
+`next start` and lets Next read `PORT`. Use that one on Railway.
 
-Railway supplies `PORT` and both Node services already bind it, so do not set it by hand.
+Railway supplies `PORT` and both Node services already read it, so do not set it by hand.
 
 ## Environment variables
 
@@ -51,6 +52,18 @@ without reissuing.
 
 Without these, shares and sign-in codes are not sent and the flows that depend on them stop. Locally
 this is deliberate; in a deployment it is a misconfiguration.
+
+### On each front-end
+
+Every app proxies `/api/*` to a service and reads that service's address from the environment. Left
+unset, each one proxies to localhost and fails in a way that looks like the service is down.
+
+| Service | Variable | Value |
+| --- | --- | --- |
+| `academy` | `ISSUER_API_URL` | `https://<issuer-domain>` |
+| `portal` | the issuer address, read by its `/api` route handler | `https://<issuer-domain>` |
+| `my-jobs` | `VERIFIER_API_URL` | `https://<verifier-domain>` |
+| `trust-university` | `VERIFIER_API_URL` | `https://<verifier-domain>` |
 
 ### On `issuer` only, for the administrators
 
