@@ -1564,7 +1564,14 @@ app.post('/otp/verify', (req, res) => {
 
 app.post('/auth/otp', async (req, res) => {
   try {
-    res.json(await walletAccounts.requestSignInOtp(req.body || {}));
+    // The academy site says so when it is the one asking, so the message is worded for the site
+    // rather than for the wallet. Absent means the wallet, which is what the app sends.
+    const audience = req.body?.audience === 'academy' ? 'academy' : 'wallet';
+    res.json(await walletAccounts.requestSignInOtp({
+      ...(req.body || {}),
+      audience,
+      institution: ACADEMY_NAME,
+    }));
   } catch (e) {
     res.status(400).json({ success: false, error: e.message });
   }

@@ -54,6 +54,20 @@ export default function ApplyPage() {
       claims?.languageOfInstruction ||
       claims?.institutionNameAlt,
   );
+  // A qualification carries an award and no study at all, so a credential presented for a
+  // transcript can arrive with no modules, no credits and no period of study. That is a fact worth
+  // stating rather than a page of dashes for the registrar to read through.
+  const hasTranscriptInformation = Boolean(
+    claims?.studentId ||
+      claims?.totalCredits != null ||
+      claims?.creditsEarned != null ||
+      claims?.creditsAttempted != null ||
+      claims?.completionStatus ||
+      claims?.enrolmentStart ||
+      claims?.enrolmentEnd ||
+      claims?.gpa != null ||
+      courses.length > 0,
+  );
 
   return (
     <>
@@ -82,7 +96,15 @@ export default function ApplyPage() {
             Verified · {formatTimestamp(result.verifiedAt)}
           </p>
 
-          <dl>
+          {!hasTranscriptInformation ? (
+            <p className="notice err">
+              There is no transcript information in this credential. It is genuine, but it holds no
+              modules, credits or period of study, so there is nothing here for us to assess. Ask
+              the applicant to share their transcript instead.
+            </p>
+          ) : (
+            <>
+              <dl>
             <dt>Applicant</dt>
             <dd>{claims?.name || '—'}</dd>
             <dt>Institution</dt>
@@ -233,6 +255,8 @@ export default function ApplyPage() {
               Nothing is guessed. If a field you need is missing, ask the applicant for a newly
               issued transcript.
             </p>
+          )}
+            </>
           )}
         </section>
       )}

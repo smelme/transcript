@@ -302,15 +302,19 @@ export class WalletAccountService {
     return { success: true, email: normalized };
   }
 
-  /** Wallet sign-in step 1: request a fresh OTP for an invited email. */
-  async requestSignInOtp({ email }) {
+  /** Wallet sign-in step 1: request a fresh OTP for an invited email.
+   *
+   * `audience` decides how the message is worded, because the academy site and the wallet ask for
+   * a code in the same way but are signing the person in to different things.
+   */
+  async requestSignInOtp({ email, audience, institution, siteUrl }) {
     const normalized = this._normalize(email);
     const account = this._accountByEmail(normalized);
     if (!account) {
       throw new Error('No wallet account for this email. An institute must invite you first');
     }
     const otp = this._issueOtp(normalized);
-    const sent = await this._sendOtpEmail(normalized, otp, 'signin');
+    const sent = await this._sendOtpEmail(normalized, otp, 'signin', { audience, institution, siteUrl });
     return {
       success: true,
       otpSent: sent.success,

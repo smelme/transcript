@@ -41,6 +41,14 @@ export default function MyJobVerification() {
     }
   };
 
+  // What an employer checks here is an awarded qualification. A transcript, or study still in
+  // progress, verifies perfectly well and is still not that, so the outcome is stated rather than
+  // left as a row of dashes for a reader to interpret.
+  const claims = result?.claims;
+  const outcome = String(claims?.outcome || claims?.completionStatus || '').toLowerCase();
+  const hasCompletedQualification =
+    Boolean(claims?.degreeLevel && claims?.graduationDate) && !outcome.includes('progress');
+
   return (
     <section aria-labelledby="myjob-title">
       <h1 id="myjob-title">Verify an academic credential</h1>
@@ -65,21 +73,31 @@ export default function MyJobVerification() {
 
       {result?.success && (
         <section className="card" aria-label="Verified academic credential" style={{ marginTop: 20 }}>
-          <h3>Verified academic details</h3>
-          <dl>
-            <dt>Name</dt>
-            <dd>{result.claims?.name || '—'}</dd>
-            <dt>Institution</dt>
-            <dd>{result.claims?.institution || '—'}</dd>
-            <dt>Degree level</dt>
-            <dd>{result.claims?.degreeLevel || '—'}</dd>
-            <dt>Graduation date</dt>
-            <dd>{result.claims?.graduationDate || '—'}</dd>
-            <dt>Status</dt>
-            <dd>{result.status}</dd>
-            <dt>Verified</dt>
-              <dd>{formatTimestamp(result.verifiedAt)}</dd>
-          </dl>
+          {!hasCompletedQualification ? (
+            <p className="alert alert-error" role="status">
+              This credential does not contain a completed qualification. It verified, but it holds
+              study in progress or a transcript on its own, and neither is an awarded
+              qualification. Ask the applicant for the credential for their completed award.
+            </p>
+          ) : (
+            <>
+              <h3>Verified academic details</h3>
+              <dl>
+                <dt>Name</dt>
+                <dd>{result.claims?.name || '—'}</dd>
+                <dt>Institution</dt>
+                <dd>{result.claims?.institution || '—'}</dd>
+                <dt>Degree level</dt>
+                <dd>{result.claims?.degreeLevel || '—'}</dd>
+                <dt>Graduation date</dt>
+                <dd>{result.claims?.graduationDate || '—'}</dd>
+                <dt>Status</dt>
+                <dd>{result.status}</dd>
+                <dt>Verified</dt>
+                <dd>{formatTimestamp(result.verifiedAt)}</dd>
+              </dl>
+            </>
+          )}
         </section>
       )}
     </section>

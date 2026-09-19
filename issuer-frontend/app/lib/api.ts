@@ -208,7 +208,9 @@ export function requestCredentials(payload: {
 }
 
 export function requestSignInOtp(email: string): Promise<{ success: boolean; otp?: string; otpSent?: boolean; error?: string }> {
-  return request('/auth/otp', { method: 'POST', body: JSON.stringify({ email }) });
+  // Saying which site is asking, so the message is worded for this site rather than for the
+  // wallet. The two sign a person in to different things and the code is not interchangeable.
+  return request('/auth/otp', { method: 'POST', body: JSON.stringify({ email, audience: 'academy' }) });
 }
 
 export function exchangeToken(

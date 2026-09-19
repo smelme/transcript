@@ -85,7 +85,7 @@ export async function sendEmail({ to, subject, html }) {
  *
  * @returns {{ success: boolean, messageId?: string|null, reason?: string, error?: string }}
  */
-export async function sendOtpEmail({ email, otp, purpose, institution, siteUrl }) {
+export async function sendOtpEmail({ email, otp, purpose, institution, siteUrl, audience }) {
   const isInvite = purpose === 'invite';
   const institute = institution || 'Your institution';
 
@@ -130,8 +130,15 @@ export async function sendOtpEmail({ email, otp, purpose, institution, siteUrl }
     return sendEmail({ to: email, subject, html });
   }
 
-  // Sign-in one-time code.
-  const subject = 'Your wallet sign-in code';
+  // A sign-in code goes to one of two audiences and they are not the same thing: the academy site
+  // signs a student in to their record, the wallet signs them in to their credentials. The wording
+  // says which one this code is for, so a code that arrives while someone is on the academy site
+  // is not read as a wallet code, and the two are never treated as interchangeable.
+  const forAcademy = audience === 'academy';
+  const subject = forAcademy ? `Your ${institute} sign-in code` : 'Your wallet sign-in code';
+  const intro = forAcademy
+    ? `Use the code below to sign in to ${institute}:`
+    : 'Use the code below to sign in to your wallet:';
   const html = `
 <!DOCTYPE html>
 <html>
@@ -143,9 +150,11 @@ export async function sendOtpEmail({ email, otp, purpose, institution, siteUrl }
   </style>
 </head>
 <body>
-  <p>Use the code below to sign in to your wallet:</p>
+  <p>${intro}</p>
   <p class="code">${otp}</p>
-  <p>This code expires in 10 minutes. If you did not request this, you can safely ignore this email.</p>
+  <p>This code expires in 10 minutes. ${forAcademy
+    ? `It signs you in to ${institute} only. Your wallet has its own separate code.`
+    : 'If you did not request this, you can safely ignore this email.'}</p>
 </body>
 </html>`;
   return sendEmail({ to: email, subject, html });

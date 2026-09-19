@@ -224,7 +224,10 @@ internal fun CredentialFace(
                     maxLines = 1,
                     modifier = Modifier.weight(1f),
                 )
-                if (!compact) VerifiedPill()
+                // The pill sits with the institution rather than down among the fields: on the
+                // list card it shares that row with the date, and two fields plus a badge is one
+                // item too many for the width, which is how the year went missing.
+                VerifiedPill()
             }
             Spacer(Modifier.height(if (compact) 12.dp else 18.dp))
             Text(
@@ -253,7 +256,6 @@ internal fun CredentialFace(
             ) {
                 FaceField("ISSUED", issuedDate ?: "—", Modifier.weight(1f))
                 FaceField("CREDENTIAL NO.", faceReference(credentialId), Modifier.weight(1f))
-                if (compact) VerifiedPill()
             }
             Spacer(Modifier.height(if (compact) 10.dp else 14.dp))
             // The colour band along the foot of a printed card.
