@@ -106,9 +106,9 @@ export default function CredentialsPage() {
           <select
             value={kindFilter}
             onChange={(e) => setKindFilter(e.target.value)}
-            aria-label="Filter by credential kind"
+            aria-label="Filter by what the credential holds"
           >
-            <option value="all">All kinds</option>
+            <option value="all">All credentials</option>
             {CREDENTIAL_KINDS.map((kind) => (
               <option key={kind.value} value={kind.value}>
                 {kind.label}
@@ -136,7 +136,7 @@ export default function CredentialsPage() {
                     <th>Holder</th>
                     <th>Institution</th>
                     <th>Student ID</th>
-                    <th>Kind</th>
+                    <th>Contents</th>
                     <th>Status</th>
                     <th>Issued</th>
                     <th>Credential ID</th>
@@ -151,7 +151,7 @@ export default function CredentialsPage() {
                         <td>{c.full_name || '—'}</td>
                         <td>{c.institution || '—'}</td>
                         <td className="mono">{c.studentId || '—'}</td>
-                        <td title={c.docType || undefined}>
+                        <td>
                           <span className={`badge ${c.kind === 'credential' ? 'neutral' : 'ok'}`}>
                             {credentialKindLabel(c)}
                           </span>

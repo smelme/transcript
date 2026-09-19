@@ -536,7 +536,7 @@ function ClaimFlow() {
                 {offer.qrDataUrl && (
                   <div className="qr-wrap">
                     {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img src={offer.qrDataUrl} alt="Credential offer QR code" />
+                    <img src={offer.qrDataUrl} alt="QR code to add this credential to your wallet" />
                     <div className="qr-caption">Smart Academy · Quals wallet</div>
                   </div>
                 )}

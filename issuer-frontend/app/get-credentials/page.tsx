@@ -125,6 +125,9 @@ export default function GetCredentialsPage() {
   }
 
   const current = offers[offerIndex];
+  // The offer itself carries only machine names, so what the holder is shown comes from the item
+  // they chose: its own title and what it holds, in words.
+  const currentItem = items.find((item) => item.sessionId === current?.sessionId);
 
   return (
     <section className="section" style={{ minHeight: '62vh' }}>
@@ -145,7 +148,7 @@ export default function GetCredentialsPage() {
             {current?.qrDataUrl && (
               <div className="qr-wrap">
                 {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src={current.qrDataUrl} alt="Credential offer QR code" />
+                <img src={current.qrDataUrl} alt="QR code to add this credential to your wallet" />
                 <div className="qr-caption">Smart Academy · Quals wallet</div>
               </div>
             )}
@@ -167,9 +170,9 @@ export default function GetCredentialsPage() {
               )}
             </div>
 
-            {current && (
+            {currentItem && (
               <p className="muted" style={{ marginTop: 16 }}>
-                This offer is for: {current.docType ? current.docType.replace(/^org\.iso\.23220\./, '') : 'your credential'}
+                You are adding: {currentItem.title} — {currentItem.label}
               </p>
             )}
           </>

@@ -520,7 +520,7 @@ private fun MissingCredentialScreen(onClose: () -> Unit) {
     ) {
         Text("No credential to share", style = MaterialTheme.typography.headlineSmall)
         Spacer(Modifier.height(16.dp))
-        Text("Add an academic credential to this wallet before verifying with a relying party.")
+        Text("Add an academic credential to this wallet before you can share it.")
         Spacer(Modifier.height(32.dp))
         Button(onClick = onClose) { Text("Close") }
     }

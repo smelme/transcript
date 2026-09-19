@@ -183,7 +183,7 @@ export default function OverviewPage() {
                           <td>{c.full_name || '—'}</td>
                           <td>{c.institution || '—'}</td>
                           <td className="mono">{c.studentId || '—'}</td>
-                          <td title={c.docType || undefined}>{credentialKindLabel(c)}</td>
+                          <td>{credentialKindLabel(c)}</td>
                           <td>
                             <StatusBadge status={c.status} />
                           </td>
