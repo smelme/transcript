@@ -308,53 +308,57 @@ export default function SharePage() {
           )}
 
           {otherClaims.length > 0 && (
-            <table className="table" style={{ marginTop: 12 }}>
-              <thead>
-                <tr>
-                  <th>Field</th>
-                  <th>Value</th>
-                </tr>
-              </thead>
-              <tbody>
-                {otherClaims.map(([key, value]) => (
-                  <tr key={key}>
-                    <td>{displayLabel(key)}</td>
-                    <td>{formatValue(value)}</td>
+            <div className="table-scroll">
+              <table className="table" style={{ marginTop: 12 }}>
+                <thead>
+                  <tr>
+                    <th>Field</th>
+                    <th>Value</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
+                <tbody>
+                  {otherClaims.map(([key, value]) => (
+                    <tr key={key}>
+                      <td>{displayLabel(key)}</td>
+                      <td>{formatValue(value)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           )}
 
           {courses.length > 0 && (
             <>
               <h2 style={{ marginTop: 24, fontSize: 18 }}>Courses</h2>
-              <table className="table" style={{ marginTop: 8 }}>
-                <thead>
-                  <tr>
-                    <th>Module</th>
-                    <th>Title</th>
-                    <th>Term</th>
-                    <th>Credits</th>
-                    <th>Mark</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {courses.map((course, index) => (
-                    <tr key={course.courseCode || course.course_code || index}>
-                      <td>{courseField(course, 'courseCode', 'course_code')}</td>
-                      <td>{courseField(course, 'courseName', 'course_name')}</td>
-                      <td>{courseField(course, 'term', 'term')}</td>
-                      <td>{courseField(course, 'credits', 'credits')}</td>
-                      <td>
-                        {course.grade !== undefined && course.grade !== ''
-                          ? `${course.grade}${course.gradePoints != null ? ` (${course.gradePoints})` : ''}`
-                          : '—'}
-                      </td>
+              <div className="table-scroll">
+                <table className="table" style={{ marginTop: 8 }}>
+                  <thead>
+                    <tr>
+                      <th>Module</th>
+                      <th>Title</th>
+                      <th>Term</th>
+                      <th>Credits</th>
+                      <th>Mark</th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
+                  </thead>
+                  <tbody>
+                    {courses.map((course, index) => (
+                      <tr key={course.courseCode || course.course_code || index}>
+                        <td>{courseField(course, 'courseCode', 'course_code')}</td>
+                        <td>{courseField(course, 'courseName', 'course_name')}</td>
+                        <td>{courseField(course, 'term', 'term')}</td>
+                        <td>{courseField(course, 'credits', 'credits')}</td>
+                        <td>
+                          {course.grade !== undefined && course.grade !== ''
+                            ? `${course.grade}${course.gradePoints != null ? ` (${course.gradePoints})` : ''}`
+                            : '—'}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
             </>
           )}
 

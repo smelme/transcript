@@ -68,14 +68,18 @@ a:hover {
   text-decoration: underline;
 }
 
+/* The bar wraps rather than holding one line. A brand, a menu and a button do not fit across a
+   phone, and forcing them onto one 66px line is what pushed the menu off the screen. */
 .navbar {
   display: flex;
   align-items: center;
   justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 10px 20px;
   background: var(--ink);
   color: #fff;
-  padding: 0 28px;
-  height: 66px;
+  padding: 12px 28px;
+  min-height: 66px;
   position: sticky;
   top: 0;
   z-index: 20;
@@ -144,20 +148,20 @@ a:hover {
 .container {
   max-width: var(--maxw);
   margin: 0 auto;
-  padding: 0 24px;
+  padding: 0 clamp(16px, 4vw, 24px);
 }
 
 .container-narrow {
   max-width: 760px;
   margin: 0 auto;
-  padding: 0 24px;
+  padding: 0 clamp(16px, 4vw, 24px);
 }
 
 .card {
   background: var(--surface);
   border: 1px solid var(--border);
   border-radius: 10px;
-  padding: 20px 24px;
+  padding: clamp(16px, 4vw, 20px) clamp(16px, 4vw, 24px);
   margin-bottom: 20px;
   box-shadow: 0 1px 2px rgba(16, 24, 40, 0.05);
 }
@@ -169,9 +173,10 @@ a:hover {
   font-weight: 600;
 }
 
+/* Two columns while there is room for two fields, one column when there is not. */
 .grid {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
   gap: 12px 16px;
 }
 
@@ -304,9 +309,27 @@ button:disabled {
   flex-wrap: wrap;
 }
 
+img,
+svg,
+video {
+  max-width: 100%;
+}
+
 table {
   width: 100%;
   border-collapse: collapse;
+}
+
+/* A table with more columns than the screen has room for scrolls inside this box, so the page
+   itself never scrolls sideways. */
+.table-scroll {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  max-width: 100%;
+}
+
+.table-scroll table {
+  min-width: 540px;
 }
 
 th,
@@ -315,6 +338,7 @@ td {
   padding: 8px 10px;
   border-bottom: 1px solid var(--border);
   font-size: 13px;
+  vertical-align: top;
 }
 
 th {
@@ -379,12 +403,12 @@ hr {
 .hero {
   background: linear-gradient(160deg, #0d0d0d 0%, #1c1f26 55%, #262300 100%);
   color: #fff;
-  padding: 76px 0 84px;
+  padding: clamp(40px, 8vw, 76px) 0 clamp(44px, 9vw, 84px);
   border-bottom: 4px solid var(--brand);
 }
 
 .hero h1 {
-  font-size: 44px;
+  font-size: clamp(28px, 6vw, 44px);
   line-height: 1.12;
   letter-spacing: -0.02em;
   margin: 0 0 18px;
@@ -392,7 +416,7 @@ hr {
 }
 
 .hero p.lede {
-  font-size: 18px;
+  font-size: clamp(16px, 2.4vw, 18px);
   line-height: 1.6;
   color: rgba(255, 255, 255, 0.78);
   max-width: 640px;
@@ -416,7 +440,7 @@ hr {
 }
 
 .section {
-  padding: 60px 0;
+  padding: clamp(36px, 7vw, 60px) 0;
   border-bottom: 1px solid var(--border);
 }
 
@@ -430,7 +454,7 @@ hr {
 }
 
 .section-head h2 {
-  font-size: 28px;
+  font-size: clamp(22px, 4.5vw, 28px);
   letter-spacing: -0.01em;
   margin: 0 0 12px;
 }
@@ -661,17 +685,21 @@ hr {
 
 .qr-wrap {
   text-align: center;
-  padding: 22px;
+  padding: clamp(14px, 4vw, 22px);
   background: #fff;
   border-radius: var(--radius);
   border: 1px solid var(--border);
   display: inline-block;
+  max-width: 100%;
 }
 
+/* A QR code has to stay square and readable, and a fixed 240px box does not fit a small phone. */
 .qr-wrap img {
   display: block;
-  width: 240px;
-  height: 240px;
+  width: min(240px, 100%);
+  height: auto;
+  aspect-ratio: 1 / 1;
+  margin: 0 auto;
 }
 
 .qr-wrap .qr-caption {
@@ -715,19 +743,116 @@ hr {
   font-weight: 500;
 }
 
+/* ─── Widths ───────────────────────────────────────────────────────────────
+   One set of breakpoints across all five sites, so a page does not change shape
+   depending on which site it happens to be on: 900 tablet portrait, 720 phone,
+   560 phone single column, 400 small phone. Type and spacing that can scale
+   linearly do it with clamp() above instead of here. */
+
+@media (max-width: 900px) {
+  .section {
+    padding: clamp(32px, 6vw, 48px) 0;
+  }
+}
+
 @media (max-width: 720px) {
-  .hero h1 {
-    font-size: 32px;
+  .navbar {
+    padding: 12px 16px;
   }
+
+  /* The menu takes its own row and scrolls sideways, rather than being clipped. */
   .nav-links {
-    gap: 14px;
+    order: 3;
+    width: 100%;
+    gap: 18px;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    padding-bottom: 2px;
   }
+
+  .nav-links a {
+    white-space: nowrap;
+  }
+
+  .grid {
+    grid-template-columns: 1fr;
+  }
+
   .definition-list {
     grid-template-columns: 1fr;
     gap: 2px 0;
   }
+
   .definition-list dd {
     margin-bottom: 10px;
+  }
+
+  .stat-grid {
+    grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  }
+
+  th,
+  td {
+    padding: 8px;
+  }
+}
+
+@media (max-width: 560px) {
+  .brand {
+    font-size: 16px;
+  }
+
+  .hero-actions {
+    gap: 10px;
+  }
+
+  .hero-actions .btn {
+    flex: 1 1 auto;
+    justify-content: center;
+  }
+
+  .site-footer {
+    padding: 28px 0;
+  }
+
+  .site-footer .footer-inner {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 8px;
+  }
+
+  .card h1,
+  .card h2 {
+    font-size: 17px;
+  }
+}
+
+@media (max-width: 400px) {
+  .nav-links {
+    gap: 14px;
+  }
+}
+
+/* On a touch screen every control is big enough to hit. */
+@media (hover: none), (pointer: coarse) {
+  button,
+  .btn,
+  input,
+  select,
+  .nav-links a,
+  .nav-cta {
+    min-height: 44px;
+  }
+
+  /* 16px stops iOS zooming the page in when a field takes focus. */
+  input,
+  select {
+    font-size: 16px;
+  }
+
+  .theme-toggle {
+    width: 44px;
+    height: 44px;
   }
 }
 

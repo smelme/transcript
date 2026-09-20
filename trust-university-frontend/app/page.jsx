@@ -159,36 +159,38 @@ export default function ApplyPage() {
           </dl>
 
           {courses.length > 0 ? (
-            <table>
-              <caption className="muted">Modules verified in this transcript</caption>
-              <thead>
-                <tr>
-                  <th scope="col">Module</th>
-                  <th scope="col">Title</th>
-                  <th scope="col">Term</th>
-                  <th scope="col">Credits</th>
-                  <th scope="col">Mark</th>
-                  <th scope="col">Workload</th>
-                  <th scope="col">Required</th>
-                </tr>
-              </thead>
-              <tbody>
-                {courses.map((course, index) => (
-                  <tr key={course.courseCode || index}>
-                    <td>{course.courseCode || '—'}</td>
-                    <td>{course.courseName || '—'}</td>
-                    <td>{course.term || '—'}</td>
-                    <td>{course.credits ?? '—'}</td>
-                    <td>
-                      {course.grade ?? '—'}
-                      {course.gradePoints != null ? ` (${course.gradePoints})` : ''}
-                    </td>
-                    <td>{course.workloadHours != null ? `${course.workloadHours} h` : '—'}</td>
-                    <td>{course.grouping || '—'}</td>
+            <div className="table-scroll">
+              <table>
+                <caption className="muted">Modules verified in this transcript</caption>
+                <thead>
+                  <tr>
+                    <th scope="col">Module</th>
+                    <th scope="col">Title</th>
+                    <th scope="col">Term</th>
+                    <th scope="col">Credits</th>
+                    <th scope="col">Mark</th>
+                    <th scope="col">Workload</th>
+                    <th scope="col">Required</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
+                <tbody>
+                  {courses.map((course, index) => (
+                    <tr key={course.courseCode || index}>
+                      <td>{course.courseCode || '—'}</td>
+                      <td>{course.courseName || '—'}</td>
+                      <td>{course.term || '—'}</td>
+                      <td>{course.credits ?? '—'}</td>
+                      <td>
+                        {course.grade ?? '—'}
+                        {course.gradePoints != null ? ` (${course.gradePoints})` : ''}
+                      </td>
+                      <td>{course.workloadHours != null ? `${course.workloadHours} h` : '—'}</td>
+                      <td>{course.grouping || '—'}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           ) : (
             <p className="muted">
               The transcript was verified, but no module list was disclosed.

@@ -523,6 +523,16 @@ dl dd {
   font-weight: 600;
 }
 
+/* ─── Widths ───────────────────────────────────────────────────────────────
+   The same breakpoints the other sites use: 900 tablet portrait, 720 phone,
+   560 phone single column. */
+
+@media (max-width: 900px) {
+  .container {
+    padding: 24px 18px;
+  }
+}
+
 @media (max-width: 720px) {
   .navbar {
     flex-wrap: wrap;
@@ -530,14 +540,105 @@ dl dd {
     padding: 12px 16px;
   }
 
+  /* The menu takes its own row and scrolls sideways, rather than being clipped. */
   .nav {
     order: 3;
     width: 100%;
     overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .nav a {
+    white-space: nowrap;
   }
 
   dl {
     grid-template-columns: 1fr;
+  }
+
+  /* Label above value: side by side they become two unreadable columns. */
+  .detail-item {
+    flex-direction: column;
+    gap: 2px;
+  }
+
+  .detail-item span {
+    text-align: left;
+  }
+
+  .issuer-header {
+    flex-wrap: wrap;
+  }
+
+  .issuer-actions {
+    flex-wrap: wrap;
+  }
+
+  .issuer-actions .btn {
+    flex: 1 1 auto;
+    justify-content: center;
+  }
+
+  .filter-bar {
+    flex-wrap: wrap;
+  }
+
+  .result-card {
+    padding: 20px;
+  }
+
+  .result-icon {
+    font-size: 34px;
+  }
+
+  .result-status {
+    font-size: 19px;
+  }
+
+  .camera-feed {
+    min-height: 220px;
+  }
+}
+
+@media (max-width: 560px) {
+  .container {
+    padding: 20px 14px;
+  }
+
+  .card {
+    padding: 18px;
+  }
+
+  .stat-number {
+    font-size: 24px;
+  }
+
+  .stats-grid {
+    grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  }
+}
+
+/* On a touch screen every control is big enough to hit. */
+@media (hover: none), (pointer: coarse) {
+  .btn,
+  button,
+  .nav a,
+  input,
+  select,
+  textarea {
+    min-height: 44px;
+  }
+
+  /* 16px stops iOS zooming the page in when a field takes focus. */
+  input,
+  select,
+  textarea {
+    font-size: 16px;
+  }
+
+  .theme-toggle {
+    width: 44px;
+    height: 44px;
   }
 }
 

@@ -69,7 +69,9 @@ h3 {
 /* ── App shell ─────────────────────────────────────────────────────────── */
 .shell {
   display: grid;
-  grid-template-columns: var(--sidebar-w) 1fr;
+  /* minmax(0, 1fr) rather than 1fr: a plain 1fr keeps an automatic minimum, so a wide table
+     inside the content column widens the whole page instead of scrolling in its own box. */
+  grid-template-columns: var(--sidebar-w) minmax(0, 1fr);
   min-height: 100vh;
 }
 
@@ -191,6 +193,7 @@ h3 {
 .content {
   padding: 28px 32px 56px;
   max-width: 1280px;
+  min-width: 0;
 }
 
 /* ── Cards ─────────────────────────────────────────────────────────────── */
@@ -199,6 +202,7 @@ h3 {
   border: 1px solid var(--border);
   border-radius: var(--radius);
   box-shadow: var(--shadow-sm);
+  min-width: 0;
 }
 
 .card-pad {
@@ -628,18 +632,163 @@ select:focus {
   line-height: 1.5;
 }
 
+/* ─── Widths ───────────────────────────────────────────────────────────────
+   The same breakpoints the other sites use: 1024 tablet, 900 tablet portrait,
+   720 phone, 560 phone single column.
+
+   The portal used to stack its 248px sidebar above the content on a small screen,
+   which put a screenful of menu in front of every page. It becomes a bar instead. */
+
+@media (max-width: 1024px) {
+  .content {
+    max-width: 100%;
+  }
+}
+
 @media (max-width: 900px) {
   .shell {
-    grid-template-columns: 1fr;
+    grid-template-columns: minmax(0, 1fr);
   }
+
   .sidebar {
     position: static;
     height: auto;
+    padding: 14px 16px;
+    gap: 12px;
   }
-  .content,
+
+  .sidebar .logo {
+    padding: 0;
+  }
+
+  /* The menu scrolls sideways on one line, so it costs one row rather than a screen. */
+  .nav-group {
+    flex-direction: row;
+    align-items: center;
+    gap: 6px;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .nav-group .nav-label {
+    padding: 0 4px 0 0;
+  }
+
+  .nav-item {
+    white-space: nowrap;
+  }
+
+  .sidebar-footer {
+    margin-top: 0;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 10px;
+    padding: 0;
+  }
+
+  .session-box {
+    margin: 0;
+  }
+
+  .signout {
+    width: auto;
+  }
+
+  .sidebar-note {
+    flex-basis: 100%;
+    margin: 0 0 4px;
+  }
+
   .topbar {
-    padding-left: 18px;
-    padding-right: 18px;
+    flex-wrap: wrap;
+    padding: 16px 18px;
+  }
+
+  .card-head {
+    flex-wrap: wrap;
+    gap: 10px;
+    padding: 14px 18px;
+  }
+
+  .card-pad {
+    padding: 16px 18px;
+  }
+
+  .content {
+    padding: 20px 18px 40px;
+  }
+
+  /* A table with more columns than the screen has room for scrolls inside its own box,
+     so the page itself never scrolls sideways. */
+  .table-wrap table {
+    min-width: 620px;
+  }
+
+  th,
+  td {
+    padding: 10px 14px;
+  }
+
+  .definition-list {
+    grid-template-columns: 1fr;
+    gap: 2px 0;
+  }
+
+  .definition-list dd {
+    margin-bottom: 10px;
+  }
+}
+
+@media (max-width: 560px) {
+  .login-card {
+    padding: 24px 20px;
+  }
+
+  .backdrop {
+    padding: 14px;
+  }
+
+  .modal {
+    padding: 20px;
+  }
+
+  .modal-actions {
+    flex-wrap: wrap;
+  }
+
+  .modal-actions .btn {
+    flex: 1 1 auto;
+    justify-content: center;
+  }
+
+  .stat .value {
+    font-size: 26px;
+  }
+
+  .truncate {
+    max-width: 150px;
+  }
+
+  .topbar h1 {
+    font-size: 18px;
+  }
+}
+
+/* On a touch screen every control is big enough to hit. */
+@media (hover: none), (pointer: coarse) {
+  button,
+  .btn,
+  .nav-item,
+  input,
+  select {
+    min-height: 44px;
+  }
+
+  /* 16px stops iOS zooming the page in when a field takes focus. */
+  input,
+  select {
+    font-size: 16px;
   }
 }
 

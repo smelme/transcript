@@ -40,5 +40,8 @@
   "license": "ISC",
   "dependencies": {
     "better-sqlite3": "^11.10.0"
+  },
+  "devDependencies": {
+    "playwright": "^1.59.1"
   }
 }

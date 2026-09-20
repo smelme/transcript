@@ -49,8 +49,8 @@ body {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 20px;
-  padding: 14px 20px;
+  gap: 12px 20px;
+  padding: 14px 0;
   flex-wrap: wrap;
 }
 
@@ -90,7 +90,7 @@ body {
 }
 
 .site-footer {
-  margin-top: 56px;
+  margin-top: clamp(32px, 7vw, 56px);
   border-top: 1px solid var(--border);
   background: var(--surface);
 }
@@ -104,11 +104,11 @@ body {
 /* ── Page furniture ───────────────────────────────────────────────────── */
 
 main {
-  padding-top: 32px;
+  padding-top: clamp(20px, 5vw, 32px);
 }
 
 h1 {
-  font-size: 30px;
+  font-size: clamp(24px, 6vw, 30px);
   letter-spacing: -0.02em;
   margin: 0 0 12px;
 }
@@ -124,7 +124,7 @@ h3 {
 }
 
 .lede {
-  font-size: 17px;
+  font-size: clamp(15px, 2.6vw, 17px);
   color: var(--muted);
   margin: 0 0 24px;
 }
@@ -137,7 +137,7 @@ h3 {
   background: var(--surface);
   border: 1px solid var(--border);
   border-radius: var(--radius);
-  padding: 20px;
+  padding: clamp(16px, 4vw, 20px);
   margin: 20px 0;
 }
 
@@ -257,6 +257,18 @@ thead th {
   border-bottom-color: var(--border-strong);
 }
 
+/* Seven columns do not fit a phone. The table scrolls inside this box, so the page itself
+   never scrolls sideways. */
+.table-scroll {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  max-width: 100%;
+}
+
+.table-scroll table {
+  min-width: 620px;
+}
+
 details {
   border-top: 1px solid var(--border);
   padding-top: 12px;
@@ -289,7 +301,7 @@ summary {
   font-size: 14px;
 }
 
-@media (max-width: 560px) {
+@media (max-width: 720px) {
   dl {
     grid-template-columns: 1fr;
     gap: 2px 0;
@@ -297,6 +309,51 @@ summary {
 
   dd {
     margin-bottom: 10px;
+  }
+
+  th,
+  td {
+    padding: 8px;
+  }
+
+  .brand {
+    font-size: 16px;
+  }
+
+  .steps {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 560px) {
+  .container {
+    padding: 0 14px;
+  }
+
+  .nav {
+    gap: 14px;
+    width: 100%;
+  }
+
+  .site-footer p {
+    margin: 14px 0;
+  }
+}
+
+/* On a touch screen every control is big enough to hit. */
+@media (hover: none), (pointer: coarse) {
+  .btn,
+  input,
+  select,
+  .nav a {
+    min-height: 44px;
+  }
+
+  /* 16px stops iOS zooming the page in when a field takes focus. */
+  input,
+  select,
+  textarea {
+    font-size: 16px;
   }
 }
 
