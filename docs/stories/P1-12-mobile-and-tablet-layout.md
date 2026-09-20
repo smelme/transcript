@@ -1,6 +1,6 @@
 # P1-12: Every site is usable on a phone and a tablet
 
-**Status:** In progress
+**Status:** Built, checked at four widths, deployed
 **Components:** `issuer-frontend`, `quals-frontend`, `quals-portal`, `verifier-frontend`,
 `trust-university-frontend`
 
@@ -64,9 +64,28 @@ One set, used by all five sites, so a page does not change shape depending on wh
 ## Verification
 
 - All five sites build and lint.
-- A scripted check opens each site at the four widths above in a real browser and reports, per page,
-  whether the body overflows horizontally, which elements are wider than the viewport, and whether
-  any control is under 44px.
+- `scripts/check-responsive.mjs` opens every page a person can reach, at 360x740, 390x844,
+  768x1024 and 1024x768, and reports whether the body scrolls sideways, which elements are wider
+  than the screen without being in a scrolling box, and which controls are under 44px. It refuses to
+  report success if it has nothing to check, and with `SELFTEST` set it fails unless it detects a
+  deliberately uncontained 3000px element, so a green result means the checks can fail.
+- Measured: 72 checks over five sites, including the portal while signed in. All pass.
+
+The first run of that script covered 48 checks on the public pages and was green, which was not
+worth much: it was checking the pages that were already fine. Signing in to the portal and checking
+its six admin pages found three real faults at 1024px, the width where the sidebar and a wide table
+together have least room. The content column was a plain `1fr` grid track, which keeps an automatic
+minimum, so a wide table widened the whole page by 146 to 244px instead of scrolling in its own box.
+Fixed by making the track `minmax(0, 1fr)`, which is the fault the earlier green result was hiding.
+
+## What the check does not cover
+
+- Pages behind a wallet presentation: the Quals share page after a holder opens it, and Trust
+  University's transcript table. Both are covered for layout only, by putting a seven column table
+  into those pages and confirming it scrolls in its own box.
+- The wallet app, which is native and has its own layout rules.
+- Readability judgements: contrast, wording length and whether a heading wraps well are not
+  measurable this way and were reviewed by eye.
 
 ## Not in this story
 

@@ -84,11 +84,29 @@ tables only appear once a credential has been presented, and it refuses to repor
 nothing to check. With `SELFTEST` set it inserts an uncontained 3000px element and fails unless that
 is reported, so a green result means the checks can fail.
 
+The portal's signed-in pages are included when `PORTAL_EMAIL` and `PORTAL_PASSWORD` are set, so the
+admin surface is measured rather than assumed. The credentials are read from the environment and are
+not written down anywhere in the repository.
+
 ```
 $env:SITES = '{"academy":"http://127.0.0.1:3002","quals":"http://127.0.0.1:3005","portal":"http://127.0.0.1:3004","myJobs":"http://127.0.0.1:3003","trustUniversity":"http://127.0.0.1:3007"}'
 node scripts/check-responsive.mjs
 ```
 
-The portal's signed-in pages are included when `PORTAL_EMAIL` and `PORTAL_PASSWORD` are set, so the
-admin surface is measured rather than assumed. The credentials are read from the environment and are
-not written down anywhere in the repository.
+## What the first green result was hiding
+
+The public-page run was 48 checks and all green, and that was worth very little: those were the pages
+that were already fine. Covering the portal's six admin pages as well took it to 72 checks and found
+three faults, all at 1024px, the width where a 248px sidebar and a wide table have least room.
+
+| Page | Fault |
+| --- | --- |
+| Credentials | page scrolled sideways by 228px |
+| Sharing | page scrolled sideways by 244px |
+| Wallet accounts | page scrolled sideways by 146px |
+
+No single element was wider than the screen, which is what made it worth measuring rather than
+guessing: the content column was `1fr` in the shell grid, and `1fr` keeps an automatic minimum, so
+the wider the table got the wider the whole column got. `minmax(0, 1fr)` lets the column shrink, and
+the table then scrolls inside its box, which is what the box was for. Treating a green result as
+proof of quality is the mistake this section records.
