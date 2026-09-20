@@ -23,6 +23,16 @@ The address is the third permanent one in this system, after the issuer's and th
 for a different reason: it is already in someone's inbox by the time anyone would want to change
 it.
 
+## Why the link did not move the first time
+
+Setting `SHARE_SITE_URL` changed nothing, and the share emails kept pointing at the academy. The
+share service takes a `siteUrl` and an `origin`, and `index.js` passes both explicitly when it
+constructs the service. A default inside the service is only consulted when the option is absent,
+so the new variable was never read. Changing the construction site fixed it.
+
+The lesson generalises to every address this system learns to take from the environment: find where
+the value is *passed*, not only where it is defaulted, or the change looks applied and is not.
+
 ## Why
 
 A shared credential is a Quals document. It is issued by the academy, held in the Quals wallet, and
