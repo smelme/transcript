@@ -1,0 +1,253 @@
+/* The document a share opens.
+   Its own stylesheet rather than the site's, so the document keeps its shape while the site around
+   it changes. Tokens come from globals.css, which this page also loads. */
+
+.doc {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-sm);
+  padding: 34px 38px 30px;
+  max-width: 780px;
+  margin: 24px auto 0;
+}
+
+/* ── Masthead ──────────────────────────────────────────────────────────── */
+
+.doc-head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding-bottom: 14px;
+  border-bottom: 2px solid var(--ink);
+}
+
+.doc-mark {
+  width: 34px;
+  height: 34px;
+  flex: 0 0 auto;
+}
+
+.doc-brand {
+  display: flex;
+  flex-direction: column;
+  line-height: 1.25;
+}
+
+.doc-brand b {
+  font-size: 15px;
+}
+
+.doc-brand span {
+  font-size: 11px;
+  color: var(--muted);
+}
+
+.doc-kind {
+  margin-left: auto;
+  text-align: right;
+  font-size: 12px;
+  font-weight: 600;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.doc-kind small {
+  font-weight: 400;
+  font-size: 11px;
+  color: var(--muted);
+}
+
+/* ── Title ─────────────────────────────────────────────────────────────── */
+
+.doc h1 {
+  font-size: 24px;
+  letter-spacing: -0.01em;
+  margin: 22px 0 6px;
+}
+
+.doc-subtitle {
+  font-size: 14px;
+  font-weight: 600;
+  margin: 0 0 14px;
+}
+
+.doc-lede {
+  font-size: 13px;
+  color: var(--muted);
+  line-height: 1.6;
+  margin: 0;
+}
+
+/* ── Sections ──────────────────────────────────────────────────────────── */
+
+.doc-section {
+  margin-top: 26px;
+}
+
+.doc-section h2 {
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--muted);
+  margin: 0 0 10px;
+  padding-bottom: 6px;
+  border-bottom: 1px solid var(--border);
+}
+
+.doc dl {
+  display: grid;
+  grid-template-columns: 148px 1fr;
+  gap: 6px 16px;
+  margin: 0;
+}
+
+.doc dt {
+  font-size: 13px;
+  color: var(--muted);
+}
+
+.doc dd {
+  margin: 0;
+  font-size: 14px;
+}
+
+.doc-caption {
+  font-size: 12px;
+  color: var(--muted);
+  margin: 0 0 8px;
+}
+
+/* ── Module table ──────────────────────────────────────────────────────── */
+
+.doc table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.doc th {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--muted);
+  text-align: left;
+  padding: 6px 8px;
+  border-bottom: 1px solid var(--border-strong);
+  white-space: nowrap;
+}
+
+.doc td {
+  font-size: 13px;
+  padding: 7px 8px;
+  border-bottom: 1px solid var(--border);
+  vertical-align: top;
+}
+
+/* A module code is an identifier: wrapping it in half reads as two modules. */
+.doc td:first-child {
+  white-space: nowrap;
+}
+
+/* ── Message, checks, provenance ───────────────────────────────────────── */
+
+.doc-message {
+  margin: 14px 0 0;
+  padding: 12px 14px;
+  background: var(--bg-soft);
+  border-left: 3px solid var(--brand);
+  border-radius: 6px;
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+.doc-checks {
+  margin: 0;
+  padding-left: 18px;
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.7;
+}
+
+.doc-foot {
+  margin-top: 26px;
+  padding-top: 12px;
+  border-top: 1px solid var(--border);
+  font-size: 11px;
+  color: var(--muted);
+  line-height: 1.6;
+}
+
+/* ── Actions ───────────────────────────────────────────────────────────── */
+
+.doc-actions {
+  max-width: 780px;
+  margin: 16px auto 48px;
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+@media (max-width: 560px) {
+  .doc {
+    padding: 22px 18px;
+    margin: 12px auto 0;
+  }
+
+  .doc-head {
+    flex-wrap: wrap;
+  }
+
+  .doc-kind {
+    margin-left: 0;
+    text-align: left;
+    width: 100%;
+  }
+
+  .doc h1 {
+    font-size: 20px;
+  }
+
+  .doc dl {
+    grid-template-columns: 1fr;
+    gap: 2px 0;
+  }
+
+  .doc dd {
+    margin-bottom: 8px;
+  }
+
+  .doc-actions {
+    margin-bottom: 32px;
+  }
+
+  .doc-actions .btn {
+    flex: 1 1 auto;
+    justify-content: center;
+  }
+}
+
+/* A printed share should look like the PDF it accompanies. */
+@media print {
+  .doc {
+    border: none;
+    box-shadow: none;
+    padding: 0;
+    margin: 0;
+    max-width: none;
+  }
+
+  .doc-actions,
+  .navbar,
+  .site-footer,
+  .skip-link {
+    display: none;
+  }
+
+  .doc-section,
+  .doc-foot {
+    break-inside: avoid;
+  }
+}

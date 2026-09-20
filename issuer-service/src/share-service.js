@@ -3,6 +3,7 @@ import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { renderSharePdf } from './pdf.js';
+import { buildShareDocument } from './share-document.js';
 import { devOtpAllowed } from './email-service.js';
 import { PHOTOID_DOCTYPE, kindOfCredentialData, labelOfCredentialData } from './credential-generator.js';
 
@@ -25,22 +26,6 @@ import { PHOTOID_DOCTYPE, kindOfCredentialData, labelOfCredentialData } from './
  *      views the shared fields and may download a PDF. Views/downloads notify
  *      the sender. Expired shares are deleted.
  */
-
-// Dates reach a share as `YYYY-MM-DD` from our own encoder, as `YYYYMMDD` from the wallet's claim
-// set, or as a Date when a decoder expands CBOR tag 1004. They are the same fact to a reader, so a
-// shared document renders them one way - and leaves every other value exactly as disclosed.
-const MONTH_NAMES = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-
-function formatClaimValue(value) {
-  const iso = value.match(/^(\d{4})-(\d{2})-(\d{2})(?:[T ].*)?$/);
-  const compact = iso ? null : value.match(/^(\d{4})(\d{2})(\d{2})$/);
-  const match = iso || compact;
-  if (!match) { return value; }
-  const month = Number(match[2]) - 1;
-  const day = Number(match[3]);
-  if (month < 0 || month > 11 || day < 1 || day > 31) { return value; }
-  return `${day} ${MONTH_NAMES[month]} ${match[1]}`;
-}
 
 const SHARE_CATEGORIES = {
   personal: {
@@ -522,36 +507,29 @@ export class ShareService {
       // sections of it were disclosed.
       kind: share.kind || null,
       kindLabel: share.kindLabel || null,
-      categories: share.categories.map((c) => SHARE_CATEGORIES[c]?.label || c),
+      categories: this._categoryLabels(share),
       claims: share.claims || {},
+      // The document the page draws. It is built here so that the page and the PDF are rendered
+      // from one object and cannot disagree about what the recipient was shown.
+      document: buildShareDocument(share, { categoryLabels: this._categoryLabels(share) }),
       sharedAt: share.createdAt,
       expiresAt: share.expiresAt,
     };
   }
 
-  /** Recipient downloads a PDF of the shared claims. */
+  /** Recipient downloads a PDF of the shared document. */
   pdf({ shareId, recipientToken }) {
     const share = this._requireRecipientAccess(shareId, recipientToken);
     if (!share.termsAccepted) {throw new Error('Terms must be accepted before downloading');}
-    const rows = Object.entries(share.claims || {}).map(([k, v]) => {
-      const value = typeof v === 'object' ? JSON.stringify(v) : formatClaimValue(String(v));
-      return [k, value];
-    });
-    const pdf = renderSharePdf({
-      // Named by kind where the share recorded one; a share created before this was
-      // recorded keeps the neutral title rather than being given a guess.
-      title: share.kindLabel || 'Shared credential information',
-      subtitle: `Shared by ${share.senderEmail || 'a verified holder'} with ${share.recipientName}`,
-      rows: rows.length ? rows : [['Message', 'No fields disclosed']],
-      footer: `Share ID ${share.shareId} · Generated ${new Date().toISOString()}`,
-    });
+    const document = buildShareDocument(share, { categoryLabels: this._categoryLabels(share) });
+    const pdf = renderSharePdf(document);
     if (!share.downloadedAt) {
       share.downloadedAt = new Date().toISOString();
       this.persist();
       this.audit('share_downloaded', share);
       this._notifySender(share, 'downloaded').catch((e) => console.error(e.message));
     }
-    return { success: true, pdf, filename: `shared-${share.shareId}.pdf` };
+    return { success: true, pdf, filename: `${filenameFor(document.title)}-${share.shareId}.pdf` };
   }
 
   /** Revoke (delete) a share. Used by the management portal. */
@@ -589,6 +567,11 @@ export class ShareService {
     }));
   }
 
+  /** The sections the holder released, in the words the recipient is shown. */
+  _categoryLabels(share) {
+    return (share.categories || []).map((c) => SHARE_CATEGORIES[c]?.label || c);
+  }
+
   _requireRecipientAccess(shareId, recipientToken) {
     const share = this.shares.get(shareId);
     if (!share) {throw new Error('Share not found or expired');}
@@ -607,6 +590,15 @@ export class ShareService {
 export default ShareService;
 
 // ── Email templates ────────────────────────────────────────────────────────
+
+/** A file named after what it holds reads better in a downloads folder than `shared-<uuid>`. */
+function filenameFor(title) {
+  const slug = String(title || '')
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-|-$/g, '');
+  return slug || 'shared-credential';
+}
 function renderRecipientHtml(share, link) {
   const shared = share.kindLabel ? ` ${escapeHtml(share.kindLabel.toLowerCase())}` : ' documents';
   return `

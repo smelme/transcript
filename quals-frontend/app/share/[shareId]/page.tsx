@@ -1,73 +1,86 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { Fragment, useEffect, useState } from 'react';
 import { useParams } from 'next/navigation';
+import '../share.css';
+
+/** A section of the shared document, as the issuer built it. */
+type ShareSection = {
+  id: string;
+  heading: string;
+  rows: [string, string][];
+};
+
+/**
+ * The document the issuer built from the shared credential. This page draws it, and the PDF is
+ * rendered from the same object, so what a recipient reads here and what they download cannot
+ * disagree. The page decides nothing about the content: headings, order and wording all arrive.
+ */
+type ShareDocument = {
+  title: string;
+  subtitle?: string | null;
+  kindLabel?: string | null;
+  lede?: string;
+  sections: ShareSection[];
+  courses?: { caption: string; columns: string[]; rows: string[][] } | null;
+  share: {
+    reference: string;
+    sharedBy: string;
+    sharedWith?: string | null;
+    message?: string | null;
+    sharedOn?: string | null;
+    accessUntil?: string | null;
+    disclosedSections?: string[];
+    checks?: string[];
+  };
+  provenance?: string;
+};
 
 type ShareView = {
   success: boolean;
   senderEmail?: string;
   recipientName?: string;
   message?: string;
-  /** Which credential was shared. Both kinds share a docType, so this is the label. */
   kind?: string | null;
   kindLabel?: string | null;
   categories?: string[];
   claims?: Record<string, unknown>;
+  document?: ShareDocument | null;
   sharedAt?: string;
   expiresAt?: string;
   error?: string;
 };
 
-/** A course as the credential carries it: one JSON string claim holding an array of these. */
-type Course = {
-  courseCode?: string;
-  course_code?: string;
-  courseName?: string;
-  course_name?: string;
-  term?: string;
-  credits?: number | string;
-  grade?: string | number;
-  gradePoints?: number;
-  workloadHours?: number;
-  grouping?: string;
-};
-
-// Dates reach a shared view as `YYYY-MM-DD` from our own encoder, as `YYYYMMDD` from the wallet's
-// claim set, or as a Date when a decoder expands CBOR tag 1004. A reader wants the same shape for
-// all three, and every other value stays exactly as it was disclosed.
-const MONTH_NAMES = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-
-function formatClaimDate(value: string): string {
-  const iso = value.match(/^(\d{4})-(\d{2})-(\d{2})(?:[T ].*)?$/);
-  const compact = iso ? null : value.match(/^(\d{4})(\d{2})(\d{2})$/);
-  const match = iso || compact;
-  if (!match) return value;
-  const month = Number(match[2]) - 1;
-  const day = Number(match[3]);
-  if (month < 0 || month > 11 || day < 1 || day > 31) return value;
-  return `${day} ${MONTH_NAMES[month]} ${match[1]}`;
+function Masthead({ kindLabel, sharedOn }: { kindLabel?: string | null; sharedOn?: string | null }) {
+  return (
+    <header className="doc-head">
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img className="doc-mark" src="/quals-mark.svg" alt="" width={34} height={34} />
+      <div className="doc-brand">
+        <b>Quals</b>
+        <span>Verifiable credentials</span>
+      </div>
+      {kindLabel && (
+        <div className="doc-kind">
+          {kindLabel}
+          {sharedOn && <small>Shared {sharedOn}</small>}
+        </div>
+      )}
+    </header>
+  );
 }
 
-/**
- * The course list travels as one JSON string claim. It is read here rather than printed, because a
- * recipient reading `[{"courseCode":...}]` learns nothing and would reasonably think the page was
- * broken.
- */
-function parseCourses(value: unknown): Course[] {
-  if (Array.isArray(value)) return value as Course[];
-  if (typeof value !== 'string' || value.trim() === '') return [];
-  try {
-    const parsed = JSON.parse(value);
-    return Array.isArray(parsed) ? (parsed as Course[]) : [];
-  } catch {
-    return [];
-  }
-}
-
-/** Course fields are camelCase in the credential and snake_case in older claims, so read both. */
-function courseField(course: Course, camel: keyof Course, snake: keyof Course): string {
-  const value = course[camel] ?? course[snake];
-  return value === null || value === undefined || value === '' ? '—' : String(value);
+function Rows({ rows }: { rows: [string, string][] }) {
+  return (
+    <dl>
+      {rows.map(([label, value]) => (
+        <Fragment key={label}>
+          <dt>{label}</dt>
+          <dd>{value}</dd>
+        </Fragment>
+      ))}
+    </dl>
+  );
 }
 
 export default function SharePage() {
@@ -173,207 +186,221 @@ export default function SharePage() {
     window.open(`/api/shares/${shareId}/pdf?token=${encodeURIComponent(recipientToken)}`, '_blank');
   }
 
-  function formatValue(value: unknown): string {
-    if (value === null || value === undefined) return '—';
-    if (value instanceof Date) return formatClaimDate(value.toISOString().slice(0, 10));
-    // A nested object is still a claim the holder disclosed, so it is shown as its parts rather
-    // than as JSON, which reads as a fault in the page.
-    if (typeof value === 'object') {
-      return Object.entries(value as Record<string, unknown>)
-        .map(([key, item]) => `${displayLabel(key)}: ${formatValue(item)}`)
-        .join(' · ');
-    }
-    return typeof value === 'string' ? formatClaimDate(value) : String(value);
-  }
+  const shared = view?.document || null;
+  const courses = shared?.courses || null;
+  // An issuer older than this page would return claims without a document. Rather than showing a
+  // recipient nothing, the disclosed fields are listed plainly.
+  const fallbackRows: [string, string][] = Object.entries(view?.claims || {})
+    .filter(([key, value]) => key !== 'courses' && typeof value !== 'object')
+    .map(([key, value]) => [
+      key
+        .replace(/([a-z0-9])([A-Z])/g, '$1 $2')
+        .replace(/_/g, ' ')
+        .replace(/^./, (c) => c.toUpperCase()),
+      String(value),
+    ]);
 
-  function displayLabel(key: string): string {
-    const overrides: Record<string, string> = {
-      given_name: 'Given name',
-      family_name: 'Family name',
-      birth_date: 'Date of birth',
-      institution_name: 'Institution',
-      degree_level: 'Degree level',
-      field_of_study: 'Field of study',
-      graduation_date: 'Graduation date',
-      gpa: 'GPA',
-      student_id: 'Student ID',
-      courses: 'Courses',
-      total_credits: 'Total credits',
-      status: 'Status',
-    };
-    return overrides[key] || key.replace(/_/g, ' ');
-  }
-
-  const courses = parseCourses(view?.claims?.courses);
-  const otherClaims = Object.entries(view?.claims || {}).filter(([key]) => key !== 'courses');
+  const shareRows: [string, string][] = shared
+    ? [
+        ['Shared by', shared.share.sharedBy],
+        ...(shared.share.sharedWith
+          ? ([['Shared with', shared.share.sharedWith]] as [string, string][])
+          : []),
+        ...(shared.share.sharedOn ? ([['Shared on', shared.share.sharedOn]] as [string, string][]) : []),
+        ...(shared.share.accessUntil
+          ? ([['Access until', shared.share.accessUntil]] as [string, string][])
+          : []),
+        ...(shared.share.disclosedSections?.length
+          ? ([['Sections released', shared.share.disclosedSections.join(', ')]] as [string, string][])
+          : []),
+        ['Reference', shared.share.reference],
+      ]
+    : [];
 
   return (
-    <div className="card" style={{ maxWidth: 720, margin: '32px auto' }}>
-      <h1>Shared documents</h1>
+    <>
+      <div className="doc">
+        <Masthead kindLabel={shared?.kindLabel} sharedOn={shared?.share.sharedOn} />
 
-      {stage === 'signin' && (
-        <div>
-          <p className="muted">
-            Someone sent you a document through Quals. Sign in with the email address it was sent
-            to, and we will send you a one-time code.
-          </p>
-          <div className="field" style={{ marginTop: 12 }}>
-            <label>Email address</label>
-            <input
-              type="email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              placeholder="you@example.com"
-              autoComplete="email"
-            />
-          </div>
-          {!otpSent ? (
-            <button className="btn btn-primary" onClick={requestOtp} disabled={busy || !email} style={{ marginTop: 12 }}>
-              {busy ? 'Sending…' : 'Send code'}
-            </button>
-          ) : (
-            <div>
-              <div className="field" style={{ marginTop: 12 }}>
-                <label>One-time code</label>
-                <input value={otp} onChange={(e) => setOtp(e.target.value)} inputMode="numeric" />
-              </div>
-              {devOtp && (
-                <p className="muted" style={{ marginTop: 6 }}>
-                  Dev code (email not configured): <b>{devOtp}</b>
-                </p>
-              )}
-              <button className="btn btn-primary" onClick={verifyOtp} disabled={busy || !otp} style={{ marginTop: 12 }}>
-                {busy ? 'Verifying…' : 'Verify and continue'}
-              </button>
-              <button className="btn" onClick={requestOtp} disabled={busy} style={{ marginTop: 8 }}>
-                Resend code
-              </button>
+        {stage === 'signin' && (
+          <section className="doc-section">
+            <h1>Shared documents</h1>
+            <p className="doc-lede">
+              Someone sent you a document through Quals. Sign in with the email address it was sent
+              to, and we will send you a one-time code.
+            </p>
+            <div className="field" style={{ marginTop: 16 }}>
+              <label>Email address</label>
+              <input
+                type="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                placeholder="you@example.com"
+                autoComplete="email"
+              />
             </div>
-          )}
-        </div>
-      )}
+            {!otpSent ? (
+              <button
+                className="btn btn-primary"
+                onClick={requestOtp}
+                disabled={busy || !email}
+                style={{ marginTop: 14 }}
+              >
+                {busy ? 'Sending…' : 'Send code'}
+              </button>
+            ) : (
+              <div>
+                <div className="field" style={{ marginTop: 14 }}>
+                  <label>One-time code</label>
+                  <input value={otp} onChange={(e) => setOtp(e.target.value)} inputMode="numeric" />
+                </div>
+                {devOtp && (
+                  <p className="muted" style={{ marginTop: 6 }}>
+                    Dev code (email not configured): <b>{devOtp}</b>
+                  </p>
+                )}
+                <button
+                  className="btn btn-primary"
+                  onClick={verifyOtp}
+                  disabled={busy || !otp}
+                  style={{ marginTop: 14 }}
+                >
+                  {busy ? 'Verifying…' : 'Verify and continue'}
+                </button>
+                <button className="btn" onClick={requestOtp} disabled={busy} style={{ marginTop: 8 }}>
+                  Resend code
+                </button>
+              </div>
+            )}
+          </section>
+        )}
 
-      {stage === 'terms' && (
-        <div>
-          <p>Before viewing, please review and accept the terms and conditions.</p>
-          <div className="result-box" style={{ marginTop: 12 }}>
-            <p>
+        {stage === 'terms' && (
+          <section className="doc-section">
+            <h1>Before you view this document</h1>
+            <p className="doc-lede">Please review and accept the terms and conditions.</p>
+            <div className="doc-message">
               By accepting, you agree that you are the intended recipient of this share and that the
               information will only be used for the purpose for which it was shared. The sender is
               notified when you view or download these documents.
-            </p>
-          </div>
-          <label style={{ display: 'flex', gap: 8, alignItems: 'center', marginTop: 12 }}>
-            <input
-              type="checkbox"
-              checked={termsAccepted}
-              onChange={(e) => setTermsAccepted(e.target.checked)}
-            />
-            I acknowledge and agree to the terms and conditions
-          </label>
-          <button
-            className="btn btn-primary"
-            onClick={acceptTerms}
-            disabled={busy || !termsAccepted}
-            style={{ marginTop: 12 }}
-          >
-            {busy ? 'Loading…' : 'Continue'}
-          </button>
-        </div>
-      )}
-
-      {stage === 'view' && view && (
-        <div>
-          <p className="muted">
-            Shared by <b>{view.senderEmail || 'a verified holder'}</b> with {view.recipientName}.
-          </p>
-          {view.kindLabel && (
-            <p style={{ marginTop: 8 }}>
-              <span className="badge kind">{view.kindLabel}</span>
-            </p>
-          )}
-          {view.expiresAt && (
-            <p className="muted" style={{ marginTop: 8 }}>
-              This link can be opened until {formatClaimDate(view.expiresAt.slice(0, 10))}. After
-              that, ask the sender to share it again.
-            </p>
-          )}
-          {view.message && (
-            <blockquote className="result-box" style={{ borderLeft: '4px solid var(--brand)' }}>
-              {view.message}
-            </blockquote>
-          )}
-          {view.categories && (
-            <p className="muted">Sections shared: {view.categories.join(', ')}</p>
-          )}
-
-          {otherClaims.length > 0 && (
-            <div className="table-scroll">
-              <table className="table" style={{ marginTop: 12 }}>
-                <thead>
-                  <tr>
-                    <th>Field</th>
-                    <th>Value</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {otherClaims.map(([key, value]) => (
-                    <tr key={key}>
-                      <td>{displayLabel(key)}</td>
-                      <td>{formatValue(value)}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
             </div>
-          )}
+            <label style={{ display: 'flex', gap: 8, alignItems: 'center', marginTop: 16 }}>
+              <input
+                type="checkbox"
+                checked={termsAccepted}
+                onChange={(e) => setTermsAccepted(e.target.checked)}
+              />
+              I acknowledge and agree to the terms and conditions
+            </label>
+            <button
+              className="btn btn-primary"
+              onClick={acceptTerms}
+              disabled={busy || !termsAccepted}
+              style={{ marginTop: 14 }}
+            >
+              {busy ? 'Loading…' : 'Show the document'}
+            </button>
+          </section>
+        )}
 
-          {courses.length > 0 && (
-            <>
-              <h2 style={{ marginTop: 24, fontSize: 18 }}>Courses</h2>
-              <div className="table-scroll">
-                <table className="table" style={{ marginTop: 8 }}>
-                  <thead>
-                    <tr>
-                      <th>Module</th>
-                      <th>Title</th>
-                      <th>Term</th>
-                      <th>Credits</th>
-                      <th>Mark</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {courses.map((course, index) => (
-                      <tr key={course.courseCode || course.course_code || index}>
-                        <td>{courseField(course, 'courseCode', 'course_code')}</td>
-                        <td>{courseField(course, 'courseName', 'course_name')}</td>
-                        <td>{courseField(course, 'term', 'term')}</td>
-                        <td>{courseField(course, 'credits', 'credits')}</td>
-                        <td>
-                          {course.grade !== undefined && course.grade !== ''
-                            ? `${course.grade}${course.gradePoints != null ? ` (${course.gradePoints})` : ''}`
-                            : '—'}
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </>
-          )}
+        {stage === 'view' && view && (
+          <>
+            <h1>{shared?.title || 'Shared credential'}</h1>
+            {shared?.subtitle && <p className="doc-subtitle">{shared.subtitle}</p>}
+            {shared?.lede && <p className="doc-lede">{shared.lede}</p>}
 
-          <button className="btn btn-primary" onClick={downloadPdf} style={{ marginTop: 16 }}>
+            {shared ? (
+              <>
+                {shared.sections.map((section) => (
+                  <section className="doc-section" key={section.id}>
+                    <h2>{section.heading}</h2>
+                    <Rows rows={section.rows} />
+                  </section>
+                ))}
+
+                {courses && courses.rows.length > 0 && (
+                  <section className="doc-section">
+                    <h2>Modules</h2>
+                    <p className="doc-caption">{courses.caption}</p>
+                    <div className="table-scroll">
+                      <table>
+                        <thead>
+                          <tr>
+                            {courses.columns.map((column) => (
+                              <th key={column} scope="col">
+                                {column}
+                              </th>
+                            ))}
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {courses.rows.map((row, index) => (
+                            <tr key={`${row[0]}-${index}`}>
+                              {row.map((cell, cellIndex) => (
+                                <td key={courses.columns[cellIndex]}>{cell}</td>
+                              ))}
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </section>
+                )}
+
+                <section className="doc-section">
+                  <h2>About this share</h2>
+                  <Rows rows={shareRows} />
+                  {shared.share.message && (
+                    <blockquote className="doc-message">{shared.share.message}</blockquote>
+                  )}
+                  {shared.share.accessUntil && (
+                    <p className="doc-caption" style={{ marginTop: 12 }}>
+                      This link can be opened until {shared.share.accessUntil}. After that, ask the
+                      sender to share it again.
+                    </p>
+                  )}
+                </section>
+
+                {shared.share.checks && shared.share.checks.length > 0 && (
+                  <section className="doc-section">
+                    <h2>What Quals checked</h2>
+                    <ul className="doc-checks">
+                      {shared.share.checks.map((check) => (
+                        <li key={check}>{check}</li>
+                      ))}
+                    </ul>
+                  </section>
+                )}
+
+                {shared.provenance && <footer className="doc-foot">{shared.provenance}</footer>}
+              </>
+            ) : (
+              <section className="doc-section">
+                <h2>Disclosed details</h2>
+                <Rows rows={fallbackRows} />
+              </section>
+            )}
+          </>
+        )}
+
+        {error && (
+          <section className="doc-section">
+            <span className="badge err">Error</span>{' '}
+            <span className="mono" style={{ marginLeft: 8 }}>
+              {error}
+            </span>
+          </section>
+        )}
+      </div>
+
+      {/* Outside the document, so a printed page carries no button. */}
+      {stage === 'view' && view && (
+        <div className="doc-actions">
+          <button className="btn btn-primary" onClick={downloadPdf} disabled={busy}>
             Download PDF
           </button>
         </div>
       )}
-
-      {error && (
-        <div className="result-box" style={{ marginTop: 12 }}>
-          <span className="badge err">Error</span>
-          <div className="mono">{error}</div>
-        </div>
-      )}
-    </div>
+    </>
   );
 }
