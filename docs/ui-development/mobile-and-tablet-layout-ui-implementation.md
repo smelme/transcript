@@ -88,6 +88,16 @@ The portal's signed-in pages are included when `PORTAL_EMAIL` and `PORTAL_PASSWO
 admin surface is measured rather than assumed. The credentials are read from the environment and are
 not written down anywhere in the repository.
 
+Playwright is deliberately **not** a dependency of the sites. Every service builds with
+`npm ci --include=dev` at the workspace root, so a devDependency there makes every deploy download a
+browser no deployed service will ever use. Install it once, locally, before running the check:
+
+```
+npm install --no-save --no-package-lock playwright@1.59.1
+```
+
+The check says this itself if Playwright is missing.
+
 ```
 $env:SITES = '{"academy":"http://127.0.0.1:3002","quals":"http://127.0.0.1:3005","portal":"http://127.0.0.1:3004","myJobs":"http://127.0.0.1:3003","trustUniversity":"http://127.0.0.1:3007"}'
 node scripts/check-responsive.mjs
