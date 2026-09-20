@@ -17,7 +17,19 @@
  * Each site is listed with the pages a person can open; a page that is not reachable is reported
  * as skipped rather than failed, because a site being partly unavailable is not a layout fault.
  */
-import { chromium } from 'playwright';
+/**
+ * Playwright is installed on demand. It is deliberately not a dependency of the sites: it downloads
+ * a browser on install, and no deployed service runs this check.
+ */
+let chromium;
+try {
+  ({ chromium } = await import('playwright'));
+} catch {
+  console.error('This check needs Playwright, which is not a dependency of the sites.');
+  console.error('Install it once with:');
+  console.error('  npm install --no-save --no-package-lock playwright@1.59.1');
+  process.exit(2);
+}
 
 const SITES = JSON.parse(process.env.SITES || '{}');
 
