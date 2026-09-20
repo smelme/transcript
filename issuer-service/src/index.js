@@ -1304,12 +1304,20 @@ const adminAuth = new AdminAuthService({
 });
 
 // Selective-disclosure "share" flow (alternative to DCAPI integration).
+//
+// The address a share is opened on is its own site, not the academy's: the recipient has no
+// relationship with the institution that issued the document. It is set here explicitly rather
+// than left to the service's own default, because an option passed in wins over that default, and
+// a share link already sits in someone's inbox by the time anyone notices the difference.
+const SHARE_SITE_URL =
+  process.env.SHARE_SITE_URL || process.env.ISSUER_FRONTEND_URL || process.env.ISSUER_BASE_URL || 'http://localhost:3005';
+
 const shareService = new ShareService({
   issuerService: issuer,
   walletAccounts,
   verifierApiUrl: process.env.VERIFIER_API_URL || 'http://localhost:3001',
-  siteUrl: process.env.ISSUER_FRONTEND_URL || process.env.ISSUER_BASE_URL || 'http://localhost:3002',
-  origin: process.env.ISSUER_FRONTEND_URL || process.env.ISSUER_BASE_URL || 'http://localhost:3002',
+  siteUrl: SHARE_SITE_URL,
+  origin: SHARE_SITE_URL,
   emailSender: emailService.sendEmail,
 });
 
