@@ -70,6 +70,8 @@ One set, used by all five sites, so a page does not change shape depending on wh
   report success if it has nothing to check, and with `SELFTEST` set it fails unless it detects a
   deliberately uncontained 3000px element, so a green result means the checks can fail.
 - Measured: 72 checks over five sites, including the portal while signed in. All pass.
+- Every page in that set is also reachable without scrolling sideways at 360px on the deployed
+  sites, measured after deploying rather than before, so the check covers what is actually served.
 
 The first run of that script covered 48 checks on the public pages and was green, which was not
 worth much: it was checking the pages that were already fine. Signing in to the portal and checking
