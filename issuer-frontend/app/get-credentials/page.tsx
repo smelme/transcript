@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import Link from 'next/link';
 import { requestCredentials } from '../lib/api';
 
@@ -21,29 +21,26 @@ import { requestCredentials } from '../lib/api';
 const ISSUE_SITE_URL =
   process.env.NEXT_PUBLIC_ISSUE_SITE_URL || 'https://quals-production.up.railway.app';
 
-const REDIRECT_AFTER_MS = 5000;
+/** Dates arrive as ISO; a reader wants the day, not the millisecond. */
+function formatDay(value?: string | null): string | null {
+  if (!value) {return null;}
+  const match = String(value).match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if (!match) {return null;}
+  const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+  const month = Number(match[2]) - 1;
+  if (month < 0 || month > 11) {return null;}
+  return `${Number(match[3])} ${months[month]} ${match[1]}`;
+}
 
 export default function GetCredentialsPage() {
   const [email, setEmail] = useState('');
   const [published, setPublished] = useState(false);
+  const [expiresAt, setExpiresAt] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [secondsLeft, setSecondsLeft] = useState(Math.round(REDIRECT_AFTER_MS / 1000));
 
   const issueUrl = `${ISSUE_SITE_URL}/issue?email=${encodeURIComponent(email.trim())}`;
-
-  // A countdown, so the hand-over is something the holder can see rather than a page that vanishes.
-  useEffect(() => {
-    if (!published) {return;}
-    const tick = setInterval(() => setSecondsLeft((s) => (s > 0 ? s - 1 : 0)), 1000);
-    const go = setTimeout(() => {
-      window.location.href = issueUrl;
-    }, REDIRECT_AFTER_MS);
-    return () => {
-      clearInterval(tick);
-      clearTimeout(go);
-    };
-  }, [published, issueUrl]);
+  const expiry = formatDay(expiresAt);
 
   async function publish(event: React.FormEvent) {
     event.preventDefault();
@@ -53,11 +50,12 @@ export default function GetCredentialsPage() {
       // Publishing is what puts the credential where it can be collected, and the email carries the
       // holder their own copy of the same link.
       const result = (await requestCredentials({ email: email.trim() })) as
-        | { success?: boolean; error?: string }
+        | { success?: boolean; error?: string; expiresAt?: string }
         | undefined;
       if (result && result.success === false) {
         throw new Error(result.error || 'We could not prepare your credentials.');
       }
+      setExpiresAt(result?.expiresAt || null);
       setPublished(true);
     } catch (err) {
       setError((err as Error).message);
@@ -96,7 +94,12 @@ export default function GetCredentialsPage() {
                 </a>
               </div>
               <p className="muted" style={{ marginTop: 14 }}>
-                Taking you there in {secondsLeft} {secondsLeft === 1 ? 'second' : 'seconds'}…
+                {expiry
+                  ? `These are held for you until ${expiry}. Collect them before then, or they are cancelled and Smart Academy has to publish them again.`
+                  : 'These are held for a limited time. Collect them soon, or they are cancelled and Smart Academy has to publish them again.'}
+              </p>
+              <p className="muted" style={{ marginTop: 8 }}>
+                Once a credential is in your wallet it stays there, and nobody has to ask for it again.
               </p>
             </div>
 

@@ -2233,6 +2233,17 @@ app.post('/academy/requests', async (req, res) => {
     // The holder collects on Quals, so this points there. It carries the address only: the issuing
     // page still asks for a code to the address before showing anything, because a published
     // credential must not be readable by whoever happens to hold the link.
+    //
+    // The invitation recorded alongside is what gives an uncollected credential an end date. It is
+    // recorded rather than created, because this flow prepares its own sessions; the point of
+    // recording it is that the holder is told the same thing whichever door they came through, and
+    // that an abandoned credential stops being claimable instead of waiting for ever.
+    const invitation = invitationService.record({
+      institution: ACADEMY_NAME,
+      holderEmail: email,
+      holderName: req.body?.fullName || null,
+      studentId,
+    });
     const claimUrl = `${ISSUE_SITE_URL}/issue?${claimParams.toString()}`;
     // Only mail a link when something is still claimable: repeating a request the student
     // has already acted on must not send them a second "your credentials are ready".
@@ -2259,6 +2270,9 @@ app.post('/academy/requests', async (req, res) => {
       email,
       studentId,
       claimUrl,
+      // When an uncollected credential stops being claimable, so the page that hands the holder
+      // over can say so rather than leaving them to find out.
+      expiresAt: invitation.expiresAt,
       emailSent: sent.success,
       // The first credential, for callers written before the choice existed, plus the
       // complete list of what was created or reused.

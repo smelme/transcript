@@ -241,6 +241,52 @@ export class InvitationService {
   }
 
   /**
+   * Record an invitation for credentials that were prepared elsewhere.
+   *
+   * The academy's own flow generates its record and creates its sessions itself, but a holder
+   * should still be told when an uncollected credential stops being available, and that needs the
+   * same expiry as a published one. This writes the invitation without creating anything, so both
+   * paths run out at the same time.
+   *
+   * @returns {{invitationId: string, inviteUrl: string, expiresAt: string}}
+   */
+  record({ institution, apiKeyId = null, holderEmail, holderName = null, studentId }) {
+    const email = String(holderEmail || '').trim().toLowerCase();
+    if (!isEmail(email)) {throw new Error('A valid holder email address is required');}
+    if (!institution) {throw new Error('An institution is required');}
+
+    const now = new Date();
+    const expiresAt = new Date(now.getTime() + this.ttlDays * 24 * 60 * 60 * 1000).toISOString();
+    const token = crypto.randomBytes(32).toString('base64url');
+    const invitationId = crypto.randomUUID();
+
+    getDb()
+      .prepare(
+        `INSERT INTO invitations
+           (invitation_id, institution, holder_email, holder_name, student_id, token_hash, status,
+            api_key_id, created_at, expires_at)
+         VALUES (?, ?, ?, ?, ?, ?, 'pending', ?, ?, ?)`,
+      )
+      .run(
+        invitationId,
+        institution,
+        email,
+        holderName ? String(holderName) : null,
+        String(studentId || '').trim() || studentIdFor(email),
+        sha256Hex(token),
+        apiKeyId,
+        now.toISOString(),
+        expiresAt,
+      );
+
+    return {
+      invitationId,
+      expiresAt,
+      inviteUrl: `${this.siteUrl}/issue?invitation=${encodeURIComponent(invitationId)}&token=${encodeURIComponent(token)}`,
+    };
+  }
+
+  /**
    * The invitation behind a link, with what is waiting for that holder.
    *
    * The token proves the holder was given the link; it is not a sign-in. Everything after this
