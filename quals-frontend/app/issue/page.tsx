@@ -73,11 +73,13 @@ export default function IssuePage() {
   const [devOtp, setDevOtp] = useState<string | null>(null);
   const [accessToken, setAccessToken] = useState<string | null>(null);
   const [items, setItems] = useState<Item[]>([]);
-  const [offer, setOffer] = useState<Offer | null>(null);
+  const [selected, setSelected] = useState<string[]>([]);
+  const [offers, setOffers] = useState<Offer[]>([]);
+  const [offerIndex, setOfferIndex] = useState(0);
   const [termsAccepted, setTermsAccepted] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [stage, setStage] = useState<'loading' | 'signin' | 'code' | 'ready' | 'issued'>('loading');
+  const [stage, setStage] = useState<'loading' | 'signin' | 'code' | 'ready' | 'collecting'>('loading');
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
@@ -177,19 +179,40 @@ export default function IssuePage() {
     setItems(data.credentials || []);
   }
 
-  async function takeOffer(sessionId: string) {
-    if (!accessToken) return;
+  function toggle(sessionId: string) {
+    setSelected((current) =>
+      current.includes(sessionId)
+        ? current.filter((id) => id !== sessionId)
+        : [...current, sessionId],
+    );
+  }
+
+  /**
+   * One offer per chosen credential, made in turn.
+   *
+   * The holder chooses once and accepts the terms once, but a credential arrives in a wallet on its
+   * own offer, so the codes come one at a time on the next screen rather than all at once.
+   */
+  async function collectSelected() {
+    if (!accessToken || selected.length === 0) {return;}
     setBusy(true);
     setError(null);
     try {
-      const res = await fetch(`/api/issuance/items/${encodeURIComponent(sessionId)}/offer`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${accessToken}` },
-        body: JSON.stringify({ termsAccepted: true }),
-      });
-      const data = await res.json();
-      if (!res.ok || !data.success) throw new Error(data.error || 'We could not prepare the credential');
-      setOffer(data);
+      const made: Offer[] = [];
+      for (const sessionId of selected) {
+        const res = await fetch(`/api/issuance/items/${encodeURIComponent(sessionId)}/offer`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${accessToken}` },
+          body: JSON.stringify({ termsAccepted: true }),
+        });
+        const data = await res.json();
+        if (!res.ok || !data.success) {
+          throw new Error(data.error || 'We could not prepare one of these credentials');
+        }
+        made.push(data);
+      }
+      setOffers(made);
+      setOfferIndex(0);
       if (invitationId) {
         await fetch(`/api/issuance/invitations/${encodeURIComponent(invitationId)}/claimed`, {
           method: 'POST',
@@ -197,13 +220,17 @@ export default function IssuePage() {
         }).catch(() => undefined);
       }
       await loadItems(accessToken).catch(() => undefined);
-      setStage('issued');
+      setStage('collecting');
     } catch (e) {
       setError((e as Error).message);
     } finally {
       setBusy(false);
     }
   }
+
+  const current = offers[offerIndex];
+  // The offer carries machine names, so what the holder is shown comes from the item they chose.
+  const currentItem = items.find((item) => item.sessionId === current?.sessionId);
 
   const subtitleFor = (item: Item) => {
     const parts: string[] = [];
@@ -297,8 +324,8 @@ export default function IssuePage() {
         <>
           <h1>{items.length === 1 ? 'Your credential is ready' : 'Your credentials are ready'}</h1>
           <p className="issue-lede">
-            They stay in your wallet, signed by the institution that issued them. Adding one does not
-            send it anywhere.
+            Choose the ones you would like in your wallet. They stay there, signed by the institution
+            that issued them, and adding one does not send it anywhere.
           </p>
           {items.length === 0 && (
             <p className="issue-note">
@@ -306,58 +333,110 @@ export default function IssuePage() {
               your institution used this address, or ask them to publish again.
             </p>
           )}
-          <ul className="issue-list">
-            {items.map((item) => (
-              <li key={item.sessionId} className="issue-item">
-                <div className="issue-item-head">
-                  <h2>{item.title}</h2>
-                  {item.label && <span className="badge kind">{item.label}</span>}
-                  {item.inWallet && <span className="badge ok">In your wallet</span>}
-                </div>
-                {subtitleFor(item) && <p className="issue-item-sub">{subtitleFor(item)}</p>}
-                {item.holderName && <p className="issue-item-sub">Issued to {item.holderName}</p>}
-                <label className="issue-terms">
-                  <input
-                    type="checkbox"
-                    checked={termsAccepted}
-                    onChange={(e) => setTermsAccepted(e.target.checked)}
-                  />
-                  I agree to hold this credential in my wallet and to the terms of issue.
-                </label>
+          {items.length > 0 && (
+            <>
+              <ul className="issue-list">
+                {items.map((item) => (
+                  <li key={item.sessionId} className="issue-item">
+                    <label className="issue-choice">
+                      <input
+                        type="checkbox"
+                        checked={selected.includes(item.sessionId)}
+                        onChange={() => toggle(item.sessionId)}
+                      />
+                      <span>
+                        <span className="issue-item-head">
+                          <strong>{item.title}</strong>
+                          {item.label && <span className="badge kind">{item.label}</span>}
+                          {item.inWallet && <span className="badge ok">In your wallet</span>}
+                        </span>
+                        {subtitleFor(item) && (
+                          <span className="issue-item-sub">{subtitleFor(item)}</span>
+                        )}
+                        {item.holderName && (
+                          <span className="issue-item-sub">Issued to {item.holderName}</span>
+                        )}
+                      </span>
+                    </label>
+                  </li>
+                ))}
+              </ul>
+
+              <label className="issue-terms">
+                <input
+                  type="checkbox"
+                  checked={termsAccepted}
+                  onChange={(e) => setTermsAccepted(e.target.checked)}
+                />
+                I agree to hold these credentials in my wallet and to the terms of issue.
+              </label>
+
+              <div className="issue-actions">
                 <button
                   className="btn btn-primary"
-                  onClick={() => takeOffer(item.sessionId)}
-                  disabled={busy || !termsAccepted}
+                  onClick={collectSelected}
+                  disabled={busy || !termsAccepted || selected.length === 0}
                 >
-                  {item.inWallet ? 'Add another copy' : 'Add to my wallet'}
+                  {busy
+                    ? 'Preparing…'
+                    : selected.length === 1
+                      ? 'Add to wallet'
+                      : `Add ${selected.length} to wallet`}
                 </button>
-              </li>
-            ))}
-          </ul>
+                <button
+                  className="btn"
+                  onClick={() => setSelected(items.map((item) => item.sessionId))}
+                  disabled={busy || selected.length === items.length}
+                >
+                  Select all
+                </button>
+              </div>
+            </>
+          )}
         </>
       )}
 
-      {stage === 'issued' && offer && (
+      {stage === 'collecting' && current && (
         <>
-          <h1>{offer.reissued ? 'Add another copy' : 'Add it to your wallet'}</h1>
+          <span className="issue-eyebrow">
+            Credential {offerIndex + 1} of {offers.length}
+          </span>
+          <h1>{current.reissued ? 'Add another copy' : 'Add it to your wallet'}</h1>
           <p className="issue-lede">
             Scan this with your Quals wallet, or open it directly if the wallet is on this device. The
             code expires quickly, so use it now.
           </p>
           <div className="issue-qr">
             {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src={offer.qrDataUrl} alt="QR code for the credential offer" width={240} height={240} />
+            <img
+              src={current.qrDataUrl}
+              alt="QR code for the credential offer"
+              width={240}
+              height={240}
+            />
           </div>
           <div className="issue-actions">
-            {offer.appLinkUrl && (
-              <a className="btn btn-primary" href={offer.appLinkUrl}>
+            {current.appLinkUrl && (
+              <a className="btn btn-primary" href={current.appLinkUrl}>
                 Open in the Quals wallet
               </a>
             )}
-            <button className="btn" onClick={() => setStage('ready')}>
-              Back to my credentials
-            </button>
+            {offerIndex + 1 < offers.length ? (
+              <button className="btn" onClick={() => setOfferIndex(offerIndex + 1)}>
+                Next credential ({offerIndex + 2} of {offers.length})
+              </button>
+            ) : (
+              <button className="btn" onClick={() => setStage('ready')}>
+                Done
+              </button>
+            )}
           </div>
+          {currentItem && (
+            <p className="issue-note">
+              You are adding: {currentItem.title}
+              {currentItem.label ? ` · ${currentItem.label}` : ''}
+            </p>
+          )}
           <p className="issue-note">
             Nothing was shared with anybody by adding this. Sharing is a separate step you take later,
             from the wallet.

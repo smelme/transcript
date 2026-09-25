@@ -100,6 +100,31 @@
   flex-wrap: wrap;
 }
 
+/* A whole row is the choice, so the tap target is the credential rather than the box. */
+.issue-choice {
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+  cursor: pointer;
+}
+
+.issue-choice input {
+  margin-top: 3px;
+  flex: 0 0 auto;
+  width: 18px;
+  height: 18px;
+  accent-color: var(--ink);
+}
+
+.issue-eyebrow {
+  display: inline-block;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
 .issue-item-head h2 {
   font-size: 16px;
   margin: 0;
