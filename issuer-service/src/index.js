@@ -7,6 +7,7 @@ import { v4 as uuidv4 } from 'uuid';
 import Ajv from 'ajv';
 import addFormats from 'ajv-formats';
 import QRCode from 'qrcode';
+import { InvitationService } from './invitations.js';
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath, pathToFileURL } from 'url';
@@ -1321,6 +1322,21 @@ const shareService = new ShareService({
   emailSender: emailService.sendEmail,
 });
 
+// The issuing page is a Quals surface too, for the same reason: the wallet and the credential
+// belong to Quals, and the institution only publishes. The address is in an email the moment a
+// credential is published, so it is decided here, once.
+const ISSUE_SITE_URL =
+  process.env.ISSUE_SITE_URL || SHARE_SITE_URL || process.env.ISSUER_FRONTEND_URL || 'http://localhost:3005';
+
+// Institution publishing: an API key says which institution is publishing, and the claims are
+// stored as sent rather than invented here.
+const invitationService = new InvitationService({
+  issuer,
+  walletAccounts,
+  emailSender: emailService.sendCredentialsReadyEmail,
+  siteUrl: ISSUE_SITE_URL,
+});
+
 // Build an OpenID4VCI credential-offer URL that references an issuance session.
 //
 // A re-issue is marked inside the offer itself, because the offer is what travels to the wallet.
@@ -1961,6 +1977,161 @@ function bearerToken(req) {
   return header.startsWith('Bearer ') ? header.slice(7) : null;
 }
 
+// ── Institution publishing (API key) ──────────────────────────────────────
+// The institution's own systems publish a holder's credentials here. The API key decides which
+// institution is publishing, so a caller cannot issue under another institution's name, and the
+// issuer stores the claims it was given rather than inventing a record as the demo did.
+app.post('/issuance/invitations', async (req, res) => {
+  try {
+    if (!(await requireApiKey(req, res))) {return;}
+    const result = await invitationService.create({
+      institution: req.clientOrg.institution,
+      apiKeyId: req.clientOrg.keyId || null,
+      holderEmail: req.body?.holderEmail,
+      holderName: req.body?.holderName,
+      studentId: req.body?.studentId,
+      credentials: req.body?.credentials,
+    });
+    res.status(201).json({
+      success: true,
+      message: result.emailSent
+        ? 'We have emailed the holder a link to collect their credentials.'
+        : 'Published. We could not email the holder, so send them the link.',
+      ...result,
+    });
+  } catch (e) {
+    res.status(400).json({ success: false, error: e.message });
+  }
+});
+
+// What the holder is about to collect, before they sign in. The address is masked: the page is
+// public until a code is entered, and all it needs to do is confirm which mailbox to expect.
+app.get('/issuance/invitations/:id', (req, res) => {
+  try {
+    res.json({
+      success: true,
+      ...invitationService.preview({ invitationId: req.params.id, token: req.query?.token }),
+    });
+  } catch (e) {
+    res.status(404).json({ success: false, error: e.message });
+  }
+});
+
+// Send the holder a code, to the address the institution published for. The invitation token is
+// what authorises the send, so this cannot be used to post codes at arbitrary addresses.
+app.post('/issuance/invitations/:id/otp', async (req, res) => {
+  try {
+    const row = invitationService.resolveForCode({ invitationId: req.params.id, token: req.body?.token });
+    const sent = await walletAccounts.requestSignInOtp({
+      email: row.holder_email,
+      audience: 'academy',
+      institution: row.institution,
+      siteUrl: ISSUE_SITE_URL,
+    });
+    res.json({ success: true, email: row.holder_email, ...sent });
+  } catch (e) {
+    res.status(400).json({ success: false, error: e.message });
+  }
+});
+
+// What is held for the signed-in holder.
+app.get('/issuance/invitations/:id/items', async (req, res) => {
+  try {
+    const token = bearerToken(req);
+    if (!token) {return res.status(401).json({ success: false, error: 'Sign in required' });}
+    const holder = await walletAccounts.verifyAccessToken(token);
+    const items = invitationService.items({ invitationId: req.params.id, email: holder.email });
+    res.json({
+      success: true,
+      credentials: items.map((session) => ({
+        sessionId: session.sessionId,
+        status: session.status,
+        inWallet: session.status === 'issued',
+        kind: kindOf(session),
+        label: kindLabel(session),
+        title: session.display?.title || 'Academic credential',
+        institution: session.display?.institution || session.institution,
+        degreeLevel: session.display?.degreeLevel || null,
+        fieldOfStudy: session.display?.fieldOfStudy || null,
+        graduationDate: session.display?.graduationDate || null,
+        totalCredits: session.display?.totalCredits || null,
+        courseCount: session.display?.courseCount || null,
+        holderName: session.credentialData?.full_name || null,
+      })),
+    });
+  } catch (e) {
+    res.status(400).json({ success: false, error: e.message });
+  }
+});
+
+app.post('/issuance/invitations/:id/claimed', async (req, res) => {
+  try {
+    const token = bearerToken(req);
+    if (!token) {return res.status(401).json({ success: false, error: 'Sign in required' });}
+    await walletAccounts.verifyAccessToken(token);
+    invitationService.markClaimed(req.params.id);
+    res.json({ success: true });
+  } catch (e) {
+    res.status(400).json({ success: false, error: e.message });
+  }
+});
+
+// The offer for one prepared credential, which is where issuing actually happens. Same rules as
+// the route it replaces: the holder must own the credential, a superseded one is refused, and
+// asking again issues another copy rather than a second identity.
+app.post('/issuance/items/:sessionId/offer', async (req, res) => {
+  try {
+    const token = bearerToken(req);
+    if (!token) {return res.status(401).json({ success: false, error: 'Sign in required' });}
+    const holder = await walletAccounts.verifyAccessToken(token);
+    const session = issuer.getIssuanceSession(req.params.sessionId);
+    if (!session) {return res.status(404).json({ success: false, error: 'Credential not found' });}
+
+    const links = walletAccounts.getLinks(holder.sub);
+    const owns =
+      session.sub === holder.sub ||
+      links.some((l) => l.institution === session.institution && l.studentId === session.studentId);
+    if (!owns) {return res.status(403).json({ success: false, error: 'This credential belongs to another account' });}
+    if (session.status === 'superseded') {
+      return res.status(409).json({
+        success: false,
+        error: 'This credential was replaced by a newer one. Ask your institution to publish again',
+      });
+    }
+
+    const reissue = session.status === 'issued';
+    if (session.termsRequired && !session.termsAcceptedAt) {issuer.acceptTerms(session.sessionId);}
+    const offerUrl = buildCredentialOfferUrl(session, { reissue });
+    const qrDataUrl = await QRCode.toDataURL(offerUrl, {
+      errorCorrectionLevel: 'M',
+      type: 'image/png',
+      width: 320,
+      margin: 1,
+    });
+
+    res.json({
+      success: true,
+      sessionId: session.sessionId,
+      docType: docTypeOf(session),
+      kind: kindOf(session),
+      label: kindLabel(session),
+      offerUrl,
+      reissued: reissue,
+      appLinkUrl: buildAppLinkOfferUrl(offerUrl),
+      qrDataUrl,
+    });
+  } catch (e) {
+    res.status(400).json({ success: false, error: e.message });
+  }
+});
+
+// Invitations for the management portal, scoped to an administrator's organisation.
+app.get('/issuance/invitations', async (req, res) => {
+  if (!(await requireAdmin(req, res))) {return;}
+  const scoped = req.admin.institution || null;
+  res.json({ success: true, invitations: invitationService.list({ institution: scoped }) });
+});
+
 app.post('/academy/requests', async (req, res) => {
   try {
     const email = String(req.body?.email || '').trim().toLowerCase();
@@ -2059,7 +2230,10 @@ app.post('/academy/requests', async (req, res) => {
     const claimParams = new URLSearchParams({ email });
     if (requestedKind) {claimParams.set('include', String(requestedKind));}
     if (!recognition) {claimParams.set('recognition', 'false');}
-    const claimUrl = `${ACADEMY_SITE_URL}/claim?${claimParams.toString()}`;
+    // The holder collects on Quals, so this points there. It carries the address only: the issuing
+    // page still asks for a code to the address before showing anything, because a published
+    // credential must not be readable by whoever happens to hold the link.
+    const claimUrl = `${ISSUE_SITE_URL}/issue?${claimParams.toString()}`;
     // Only mail a link when something is still claimable: repeating a request the student
     // has already acted on must not send them a second "your credentials are ready".
     const claimable = issued.some(({ session }) => session.status !== 'issued');

@@ -127,6 +127,26 @@ function migrate(database) {
     );
 
     CREATE INDEX IF NOT EXISTS idx_api_keys_institution ON api_keys (institution);
+
+    -- What an institution publishes to a holder: the credentials it wants issued, held until the
+    -- holder claims them or the invitation expires. The token is stored as a hash because it
+    -- arrives in a link, and a database read must not yield a usable one.
+    CREATE TABLE IF NOT EXISTS invitations (
+      invitation_id TEXT PRIMARY KEY,
+      institution   TEXT NOT NULL,
+      holder_email  TEXT NOT NULL,
+      holder_name   TEXT,
+      student_id    TEXT NOT NULL,
+      token_hash    TEXT NOT NULL,
+      status        TEXT NOT NULL DEFAULT 'pending',
+      api_key_id    TEXT,
+      created_at    TEXT NOT NULL,
+      expires_at    TEXT NOT NULL,
+      claimed_at    TEXT
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_invitations_email ON invitations (holder_email);
+    CREATE INDEX IF NOT EXISTS idx_invitations_institution ON invitations (institution);
   `);
 
   // Administrators belong to a client organisation; NULL means a platform

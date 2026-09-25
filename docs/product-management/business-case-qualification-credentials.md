@@ -382,19 +382,20 @@ $$R = N_I \cdot S + N_I \cdot G \cdot k \cdot p_i + N_I \cdot G \cdot k \cdot u 
 
 $$R = 5(15{,}000) + 5(4{,}000)(1.3)(1.50) + 5(4{,}000)(1.3)(0.15)(2.5)(2.50) \approx £75{,}000 + £39{,}000 + £24{,}375 \approx £138{,}000$$
 
-**Scenarios.** (Same price assumptions; only the adoption drivers move.)
+**Scenarios.** (Same price assumptions; only the adoption drivers move. Graduates are per
+institution.)
 
-| Scenario | $N_I$ | Graduates | $u$ | Verifications | Revenue |
+| Scenario | $N_I$ | Graduates/institution | $u$ | Verifications | Revenue |
 | --- | --- | --- | --- | --- | --- |
-| Bear | 2 | 1,500 | 5% | ~490 | ~£33,700 |
+| Bear | 2 | 1,500 | 5% | ~488 | ~£37,100 |
 | Base | 5 | 4,000 | 15% | ~9,750 | ~£138,400 |
-| Bull | 20 | 5,000 | 30% | ~97,500 | ~£674,000 |
+| Bull | 20 | 5,000 | 30% | ~97,500 | ~£738,800 |
 
 **What the model says — and this is the useful conclusion.**
 
 1. **Revenue is dominated by how many institutions sign and how much relying-party volume exists,
-   not by price.** Doubling prices moves the base case by roughly £63k; going from 5 to 20
-   institutions moves it by ~£536k. **Distribution beats pricing. Spend on partnerships and
+   not by price.** Doubling every price moves the base case by roughly £63k; going from 5 to 20
+   institutions moves it by ~£600k. **Distribution beats pricing. Spend on partnerships and
    integration, not on price optimisation.**
 2. **Subscription revenue is 54% of the base case with only 5 institutions**, which is why the
    institution sale must be led by the platform value (handling cost, alumni revenue, fraud) rather

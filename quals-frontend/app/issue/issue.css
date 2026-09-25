@@ -1,0 +1,191 @@
+/* The issuing page. Its own stylesheet, for the same reason the share document has one: it is a
+   Quals surface that keeps its shape while the site around it changes. Tokens come from
+   globals.css, which this page also loads. */
+
+.issue {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-sm);
+  padding: 34px 38px 30px;
+  max-width: 720px;
+  margin: 24px auto;
+}
+
+.issue-head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding-bottom: 14px;
+  border-bottom: 2px solid var(--ink);
+}
+
+.issue-mark {
+  width: 34px;
+  height: 34px;
+  flex: 0 0 auto;
+}
+
+.issue-brand {
+  display: flex;
+  flex-direction: column;
+  line-height: 1.25;
+}
+
+.issue-brand b {
+  font-size: 15px;
+}
+
+.issue-brand span {
+  font-size: 11px;
+  color: var(--muted);
+}
+
+.issue-from {
+  margin-left: auto;
+  text-align: right;
+  font-size: 12px;
+  font-weight: 600;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.issue-from small {
+  font-weight: 400;
+  font-size: 11px;
+  color: var(--muted);
+}
+
+.issue h1 {
+  font-size: 22px;
+  letter-spacing: -0.01em;
+  margin: 22px 0 8px;
+}
+
+.issue-lede {
+  font-size: 13px;
+  color: var(--muted);
+  line-height: 1.6;
+  margin: 0 0 16px;
+}
+
+.issue-note {
+  font-size: 12px;
+  color: var(--muted);
+  line-height: 1.6;
+  margin: 12px 0 0;
+}
+
+/* ── Credentials waiting ───────────────────────────────────────────────── */
+
+.issue-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 14px;
+}
+
+.issue-item {
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 16px 18px;
+}
+
+.issue-item-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.issue-item-head h2 {
+  font-size: 16px;
+  margin: 0;
+}
+
+.issue-item-sub {
+  font-size: 12px;
+  color: var(--muted);
+  margin: 6px 0 0;
+}
+
+.issue-terms {
+  display: flex;
+  gap: 8px;
+  align-items: flex-start;
+  font-size: 13px;
+  color: var(--muted);
+  margin: 14px 0 12px;
+  line-height: 1.5;
+}
+
+/* ── The offer ─────────────────────────────────────────────────────────── */
+
+.issue-qr {
+  display: inline-block;
+  padding: 16px;
+  background: #fff;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  max-width: 100%;
+}
+
+.issue-qr img {
+  display: block;
+  width: min(240px, 100%);
+  height: auto;
+  aspect-ratio: 1 / 1;
+  margin: 0 auto;
+}
+
+.issue-actions {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  flex-wrap: wrap;
+  margin-top: 16px;
+}
+
+.issue-error {
+  margin-top: 20px;
+  padding: 12px 14px;
+  border: 1px solid #f0c2c2;
+  background: #fdecea;
+  border-radius: var(--radius-sm);
+  font-size: 13px;
+}
+
+.issue .field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin: 14px 0;
+}
+
+@media (max-width: 560px) {
+  .issue {
+    padding: 22px 18px;
+    margin: 12px auto;
+  }
+
+  .issue-head {
+    flex-wrap: wrap;
+  }
+
+  .issue-from {
+    margin-left: 0;
+    text-align: left;
+    width: 100%;
+  }
+
+  .issue h1 {
+    font-size: 19px;
+  }
+
+  .issue-actions .btn {
+    flex: 1 1 auto;
+    justify-content: center;
+  }
+}
