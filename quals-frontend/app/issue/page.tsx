@@ -65,6 +65,7 @@ function formatDate(value?: string | null): string {
 export default function IssuePage() {
   const [invitationId, setInvitationId] = useState('');
   const [token, setToken] = useState('');
+  const [emailFromLink, setEmailFromLink] = useState('');
   const [preview, setPreview] = useState<Preview | null>(null);
   const [email, setEmail] = useState<string | null>(null);
   const [otpSent, setOtpSent] = useState(false);
@@ -82,6 +83,9 @@ export default function IssuePage() {
     const params = new URLSearchParams(window.location.search);
     setInvitationId(params.get('invitation') || '');
     setToken(params.get('token') || '');
+    // An institution may redirect somebody here with the address it holds, instead of sending a
+    // link. That is the same journey, so it works here rather than on a second page.
+    setEmailFromLink(params.get('email') || '');
   }, []);
 
   const loadPreview = useCallback(async () => {
@@ -115,14 +119,23 @@ export default function IssuePage() {
     setBusy(true);
     setError(null);
     try {
-      const res = await fetch(`/api/issuance/invitations/${encodeURIComponent(invitationId)}/otp`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ token }),
-      });
+      // With an invitation the token authorises the send and the address is the one the
+      // institution published for. Without one, the address came in the link and the code is what
+      // proves the holder controls it, which is the same proof either way.
+      const res = invitationId
+        ? await fetch(`/api/issuance/invitations/${encodeURIComponent(invitationId)}/otp`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ token }),
+          })
+        : await fetch('/api/auth/otp', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ email: emailFromLink, audience: 'academy' }),
+          });
       const data = await res.json();
       if (!res.ok || !data.success) throw new Error(data.error || 'We could not send the code');
-      setEmail(data.email);
+      setEmail(data.email || emailFromLink);
       setDevOtp(data.otp || null);
       setOtpSent(true);
       setStage('code');
@@ -233,7 +246,16 @@ export default function IssuePage() {
               The code goes to <b>{preview.holderEmail}</b>.
             </p>
           )}
-          <button className="btn btn-primary" onClick={sendCode} disabled={busy || !invitationId}>
+          {!preview && emailFromLink && (
+            <p className="issue-note">
+              The code goes to <b>{emailFromLink}</b>.
+            </p>
+          )}
+          <button
+            className="btn btn-primary"
+            onClick={sendCode}
+            disabled={busy || !(invitationId || emailFromLink)}
+          >
             {busy ? 'Sending…' : 'Send me a code'}
           </button>
         </>
@@ -279,7 +301,10 @@ export default function IssuePage() {
             send it anywhere.
           </p>
           {items.length === 0 && (
-            <p className="issue-note">Nothing is waiting for this address. Ask your institution to publish again.</p>
+            <p className="issue-note">
+              Nothing is waiting for this address. If you were expecting a credential, check that
+              your institution used this address, or ask them to publish again.
+            </p>
           )}
           <ul className="issue-list">
             {items.map((item) => (
