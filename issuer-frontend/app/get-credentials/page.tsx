@@ -1,257 +1,104 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import Link from 'next/link';
-import {
-  createAcademyOffer,
-  exchangeToken,
-  listAcademyCredentials,
-  requestCredentials,
-  requestSignInOtp,
-  type AcademyCredential,
-  type AcademyOfferResult,
-} from '../lib/api';
+import { requestCredentials } from '../lib/api';
 
 /**
  * Get your credentials.
  *
- * The academy knows who you are from your email address, so this is a sign-in and then a list -
- * not a form that asks you what you would like. What each credential contains is decided by the
- * programme you are on and how far through it you are, and the list says so in the credential's
- * own name: a completed degree is one credential holding the qualification and the transcript, a
- * study still under way is a transcript for the terms so far, and a certification is the award
- * alone.
+ * The academy's part in issuing is one thing: it knows who you are from the address it holds, and
+ * publishing your record is what happens here. Everything after that belongs to Quals, where the
+ * credential is collected into the wallet, so this page hands over rather than running a flow of
+ * its own: the holder is told what is waiting and sent to where they can collect it.
  *
- * You choose which of them to take, one at a time, because each arrives in your wallet on its own
- * offer. Nothing is prepared twice: signing in again shows the same items, and the ones already in
- * your wallet are marked rather than offered again.
+ * It hands over with the address, not with an identity. The issuing page still sends a code to the
+ * address the institution published for, which is the thing that proves the holder controls it.
+ *
+ * The address is passed on rather than looked up, so the hand-over works even if the holder is not
+ * signed in here, which they no longer need to be: signing in is Quals' job now.
  */
-type Step = 'identify' | 'code' | 'choosing' | 'offering';
+const ISSUE_SITE_URL =
+  process.env.NEXT_PUBLIC_ISSUE_SITE_URL || 'https://quals-production.up.railway.app';
 
-/** What a credential carries, said plainly: the label is the explanation. */
-function describes(credential: AcademyCredential): string {
-  const parts = [credential.label];
-  if (credential.degreeLevel) parts.push(credential.degreeLevel);
-  if (credential.fieldOfStudy) parts.push(credential.fieldOfStudy);
-  return parts.filter(Boolean).join(' · ');
-}
+const REDIRECT_AFTER_MS = 5000;
 
 export default function GetCredentialsPage() {
-  const [step, setStep] = useState<Step>('identify');
   const [email, setEmail] = useState('');
-  const [code, setCode] = useState('');
-  const [token, setToken] = useState<string | null>(null);
-  const [devCode, setDevCode] = useState<string | null>(null);
-  const [items, setItems] = useState<AcademyCredential[]>([]);
-  const [selected, setSelected] = useState<string[]>([]);
-  const [offers, setOffers] = useState<AcademyOfferResult[]>([]);
-  const [offerIndex, setOfferIndex] = useState(0);
+  const [published, setPublished] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [secondsLeft, setSecondsLeft] = useState(Math.round(REDIRECT_AFTER_MS / 1000));
 
-  function toggle(sessionId: string) {
-    setSelected((current) =>
-      current.includes(sessionId)
-        ? current.filter((id) => id !== sessionId)
-        : [...current, sessionId],
-    );
-  }
+  const issueUrl = `${ISSUE_SITE_URL}/issue?email=${encodeURIComponent(email.trim())}`;
 
-  /** Send the code, and say where it went. */
-  async function sendCode(event: React.FormEvent) {
+  // A countdown, so the hand-over is something the holder can see rather than a page that vanishes.
+  useEffect(() => {
+    if (!published) {return;}
+    const tick = setInterval(() => setSecondsLeft((s) => (s > 0 ? s - 1 : 0)), 1000);
+    const go = setTimeout(() => {
+      window.location.href = issueUrl;
+    }, REDIRECT_AFTER_MS);
+    return () => {
+      clearInterval(tick);
+      clearTimeout(go);
+    };
+  }, [published, issueUrl]);
+
+  async function publish(event: React.FormEvent) {
     event.preventDefault();
     setBusy(true);
     setError(null);
     try {
-      // The academy has to know the address before it can be signed in with: this is the record
-      // check, and the record is also what ties the address to the student it belongs to. It
-      // prepares what that student holds at the same time, since the record is right here.
-      await requestCredentials({ email: email.trim() });
-
-      const r = await requestSignInOtp(email.trim());
-      if (!r.success) throw new Error(r.error || 'We could not send a code to that address.');
-      // Email delivery is off in the demo, so the code comes back in the response instead.
-      setDevCode(r.otp || null);
-      setStep('code');
-    } catch (err) {
-      setError((err as Error).message);
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  /** Sign in, then ask what this student holds. */
-  async function signIn(event: React.FormEvent) {
-    event.preventDefault();
-    setBusy(true);
-    setError(null);
-    try {
-      const signedIn = await exchangeToken(email.trim(), code.trim());
-      const accessToken = signedIn.accessToken;
-      if (!accessToken) throw new Error(signedIn.error || 'That code was not accepted.');
-      setToken(accessToken);
-
-      const listed = await listAcademyCredentials(accessToken);
-      if (!listed.success) throw new Error(listed.error || 'We could not read your record.');
-      setItems(listed.credentials || []);
-      setStep('choosing');
-    } catch (err) {
-      setError((err as Error).message);
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  /** One offer per chosen credential, taken in turn. */
-  async function startOffers() {
-    if (!token || selected.length === 0) return;
-    setBusy(true);
-    setError(null);
-    try {
-      const made: AcademyOfferResult[] = [];
-      for (const sessionId of selected) {
-        const offer = await createAcademyOffer(sessionId, token);
-        if (!offer.success) throw new Error(offer.error || 'We could not prepare that credential.');
-        made.push(offer);
+      // Publishing is what puts the credential where it can be collected, and the email carries the
+      // holder their own copy of the same link.
+      const result = (await requestCredentials({ email: email.trim() })) as
+        | { success?: boolean; error?: string }
+        | undefined;
+      if (result && result.success === false) {
+        throw new Error(result.error || 'We could not prepare your credentials.');
       }
-      setOffers(made);
-      setOfferIndex(0);
-      setStep('offering');
+      setPublished(true);
     } catch (err) {
       setError((err as Error).message);
     } finally {
       setBusy(false);
     }
   }
-
-  const current = offers[offerIndex];
-  // The offer itself carries only machine names, so what the holder is shown comes from the item
-  // they chose: its own title and what it holds, in words.
-  const currentItem = items.find((item) => item.sessionId === current?.sessionId);
 
   return (
     <section className="section" style={{ minHeight: '62vh' }}>
       <div className="container-narrow">
-        {step === 'offering' ? (
+        {published ? (
           <>
             <span className="eyebrow" style={{ color: 'var(--link)' }}>
-              Step {offerIndex + 1} of {offers.length}
-            </span>
-            <h1 style={{ fontSize: 32, letterSpacing: '-0.02em', margin: '14px 0 12px' }}>
-              Add your credential
-            </h1>
-            <p style={{ fontSize: 16, lineHeight: 1.65, color: 'var(--muted)', marginBottom: 24 }}>
-              Open the Quals wallet on your phone and scan this code, or use the button if you are
-              reading this on the phone itself.
-            </p>
-
-            {current?.qrDataUrl && (
-              <div className="qr-wrap">
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src={current.qrDataUrl} alt="QR code to add this credential to your wallet" />
-                <div className="qr-caption">Smart Academy · Quals wallet</div>
-              </div>
-            )}
-
-            <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', marginTop: 20 }}>
-              {current?.appLinkUrl || current?.offerUrl ? (
-                <a href={current.appLinkUrl || current.offerUrl} className="btn btn-dark">
-                  Add to your wallet
-                </a>
-              ) : null}
-              {offerIndex + 1 < offers.length ? (
-                <button type="button" className="btn btn-primary" onClick={() => setOfferIndex(offerIndex + 1)}>
-                  Next credential ({offerIndex + 2} of {offers.length})
-                </button>
-              ) : (
-                <Link href="/credentials" className="btn btn-primary">
-                  Finish
-                </Link>
-              )}
-            </div>
-
-            {currentItem && (
-              <p className="muted" style={{ marginTop: 16 }}>
-                You are adding: {currentItem.title} — {currentItem.label}
-              </p>
-            )}
-          </>
-        ) : step === 'choosing' ? (
-          <>
-            <span className="eyebrow" style={{ color: 'var(--link)' }}>
-              Step 2 of 3
+              Issued by Quals
             </span>
             <h1 style={{ fontSize: 32, letterSpacing: '-0.02em', margin: '14px 0 12px' }}>
               Your credentials are ready
             </h1>
             <p style={{ fontSize: 16, lineHeight: 1.65, color: 'var(--muted)', marginBottom: 24 }}>
-              Everything Smart Academy holds for you. Choose the ones you would like in your wallet;
-              you can add the rest whenever you like.
+              They are waiting for you on Quals, where you can add them to your wallet. We have also
+              emailed you the same link.
             </p>
 
-            {items.length === 0 ? (
-              <div className="panel">
-                <p>We have no credentials recorded for {email}.</p>
-                <p className="muted">
-                  If that is unexpected, contact the registry and quote the address you signed in
-                  with.
-                </p>
+            <div className="card">
+              <p style={{ marginTop: 0 }}>
+                <strong>Collect them from Quals</strong>
+              </p>
+              <p className="muted" style={{ marginTop: 6 }}>
+                You will sign in with a code to <strong>{email.trim()}</strong>, the address Smart
+                Academy holds for you.
+              </p>
+              <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', marginTop: 18 }}>
+                <a className="btn btn-primary" href={issueUrl}>
+                  Go to Quals now
+                </a>
               </div>
-            ) : (
-              <div className="panel">
-                {items.map((credential) => (
-                  <label
-                    key={credential.sessionId}
-                    style={{
-                      display: 'flex',
-                      gap: 12,
-                      alignItems: 'flex-start',
-                      padding: '12px 0',
-                      borderBottom: '1px solid var(--border)',
-                      cursor: 'pointer',
-                    }}
-                  >
-                    <input
-                      type="checkbox"
-                      checked={selected.includes(credential.sessionId)}
-                      onChange={() => toggle(credential.sessionId)}
-                      style={{ marginTop: 4 }}
-                    />
-                    <span>
-                      <strong>{credential.title}</strong>
-                      <br />
-                      <span className="muted" style={{ fontSize: 14 }}>
-                        {describes(credential)}
-                      </span>
-                      {credential.inWallet && (
-                        <>
-                          <br />
-                          <span className="badge ok" style={{ marginTop: 6, display: 'inline-block' }}>
-                            In your wallet · you can add it again
-                          </span>
-                        </>
-                      )}
-                    </span>
-                  </label>
-                ))}
-
-                {error && <p style={{ color: 'var(--err)', marginTop: 14 }}>{error}</p>}
-
-                <button
-                  type="button"
-                  className="btn btn-primary"
-                  style={{ marginTop: 20 }}
-                  disabled={busy || selected.length === 0}
-                  onClick={startOffers}
-                >
-                  {busy
-                    ? 'Preparing…'
-                    : selected.length === 1
-                      ? 'Continue with 1 credential'
-                      : `Continue with ${selected.length} credentials`}
-                </button>
-              </div>
-            )}
+              <p className="muted" style={{ marginTop: 14 }}>
+                Taking you there in {secondsLeft} {secondsLeft === 1 ? 'second' : 'seconds'}…
+              </p>
+            </div>
 
             <p className="muted" style={{ marginTop: 18 }}>
               <Link href="/">Back to Smart Academy</Link>
@@ -260,62 +107,42 @@ export default function GetCredentialsPage() {
         ) : (
           <>
             <span className="eyebrow" style={{ color: 'var(--link)' }}>
-              Step 1 of 3
+              Smart Academy
             </span>
             <h1 style={{ fontSize: 32, letterSpacing: '-0.02em', margin: '14px 0 12px' }}>
               Get your credentials
             </h1>
             <p style={{ fontSize: 16, lineHeight: 1.65, color: 'var(--muted)', marginBottom: 30 }}>
-              {step === 'identify'
-                ? 'Sign in with the email address Smart Academy holds for you, and we will show you what is ready to be added to your wallet.'
-                : `We have sent a six-digit code to ${email}.`}
+              Sign in with the email address Smart Academy holds for you. We will prepare what you
+              hold and send you straight to Quals, where it is added to your wallet.
             </p>
 
-            <div className="panel">
-              {step === 'identify' ? (
-                <form onSubmit={sendCode}>
-                  <label htmlFor="email">Email address</label>
-                  <input
-                    id="email"
-                    type="email"
-                    required
-                    value={email}
-                    onChange={(event) => setEmail(event.target.value)}
-                    placeholder="you@example.com"
-                  />
-                  {error && <p style={{ color: 'var(--err)' }}>{error}</p>}
-                  <button type="submit" className="btn btn-primary" disabled={busy || !email.trim()}>
-                    {busy ? 'Sending…' : 'Send me a code'}
-                  </button>
-                </form>
-              ) : (
-                <form onSubmit={signIn}>
-                  <label htmlFor="code">Your code</label>
-                  <input
-                    id="code"
-                    inputMode="numeric"
-                    autoComplete="one-time-code"
-                    required
-                    value={code}
-                    onChange={(event) => setCode(event.target.value)}
-                    placeholder="123456"
-                  />
-                  {devCode && (
-                    <p className="muted">
-                      Email delivery is off in the demo, so your code is {devCode}.
-                    </p>
-                  )}
-                  {error && <p style={{ color: 'var(--err)' }}>{error}</p>}
-                  <button type="submit" className="btn btn-primary" disabled={busy || !code.trim()}>
-                    {busy ? 'Signing you in…' : 'Show me my credentials'}
-                  </button>
-                </form>
-              )}
+            <div className="card">
+              <form onSubmit={publish}>
+                <label htmlFor="email">Email address</label>
+                <input
+                  id="email"
+                  type="email"
+                  required
+                  value={email}
+                  onChange={(event) => setEmail(event.target.value)}
+                  placeholder="you@example.com"
+                />
+                {error && <p style={{ color: 'var(--err)' }}>{error}</p>}
+                <button
+                  type="submit"
+                  className="btn btn-primary"
+                  style={{ marginTop: 16 }}
+                  disabled={busy || !email.trim()}
+                >
+                  {busy ? 'Preparing…' : 'Prepare my credentials'}
+                </button>
+              </form>
+              <p className="muted" style={{ marginTop: 16 }}>
+                Nothing is issued here. Your credentials are published to Quals, and you collect them
+                there.
+              </p>
             </div>
-
-            <p className="muted" style={{ marginTop: 18 }}>
-              <Link href="/">Back to Smart Academy</Link>
-            </p>
           </>
         )}
       </div>
