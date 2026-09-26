@@ -158,13 +158,16 @@ export default function RequestsPage() {
         setRefusal({ error: result.error, details: result.details });
         return;
       }
-      setNotice(
-        `Stored ${result.rowCount} credential${result.rowCount === 1 ? '' : 's'}: ${result.credentials
-          .map((credential) => credential.label)
-          .join(', ')}.`,
-      );
+      // Reload first, then say so: open() resets this panel as it re-reads the case, and a notice put
+      // up before it is a notice nobody sees. What the upload unlocked - the stored row, the preview
+      // and the issue step - is on the page by the time the operator reads the line.
       await open(selected.requestId);
       await load();
+      const what = result.credentials.map((credential) => credential.label).join(', ') || 'the record';
+      setNotice(
+        `Uploaded. ${result.rowCount} credential${result.rowCount === 1 ? '' : 's'} stored: ${what}.`
+          + ' Preview the documents below, then issue.',
+      );
     } catch (e) {
       setError((e as Error).message);
     } finally {
@@ -567,7 +570,6 @@ export default function RequestsPage() {
                             <li key={item}>{item}</li>
                           ))}
                         </ul>
-                        <span className="muted">Nothing was stored, so the request is where it was.</span>
                       </div>
                     )}
                   </>

@@ -134,15 +134,26 @@ export async function uploadRequestPayload(
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(body),
   });
-  const data = await res.json().catch(() => ({}));
+  const data = (await res.json().catch(() => ({}))) as {
+    error?: string;
+    details?: { errors?: string[]; rows?: Array<{ line: number; errors: string[] }> };
+    rowCount?: number;
+    credentials?: Array<{ kind: string; label: string; title: string }>;
+  };
   if (!res.ok) {
-    return {
-      ok: false,
-      error: (data as { error?: string }).error || `Request failed (${res.status})`,
-      details: (data as { details?: { errors?: string[] } }).details,
-    };
+    return { ok: false, error: data.error || `Request failed (${res.status})`, details: data.details };
   }
-  return data as { ok: true; rowCount: number; credentials: Array<{ kind: string; label: string; title: string }> };
+  // Built here rather than read back off the body.
+  //
+  // The issuer answers a stored file with `success` and what it stored, not with an `ok`, so looking
+  // for one meant every successful upload was reported as a refusal - while the file was stored all
+  // along. The one thing this function has to get right is which of the two happened, so it decides
+  // that from the status code and takes only the counts from the response.
+  return {
+    ok: true,
+    rowCount: Number(data.rowCount) || 0,
+    credentials: Array.isArray(data.credentials) ? data.credentials : [],
+  };
 }
 
 export async function previewRequestPayload(requestId: string): Promise<RequestPreview> {
