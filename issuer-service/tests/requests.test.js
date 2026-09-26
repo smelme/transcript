@@ -133,6 +133,38 @@ test('opening a case needs an address, a school, a number to match on, and a kin
   );
 });
 
+test("the applicant's own view gives them back what they gave us", () => {
+  const service = newService();
+  const { requestId, token } = openCase(service, {
+    applicantName: 'Ada Lovelace',
+    applicantPhone: '+642102323447',
+    applicantSsn: '123-45-6789',
+    applicantStudentId: '58/745665',
+  });
+
+  // The document check takes the browser away and brings it back, so everything the wizard has to
+  // show on the review is read from here. A view that forgets the applicant's own answers leaves
+  // them checking a page of dashes before paying for a search made with them.
+  const view = service.applicantView({ requestId, token });
+  assert.strictEqual(view.name, 'Ada Lovelace');
+  assert.strictEqual(view.phone, '+642102323447');
+  assert.strictEqual(view.ssn, '123-45-6789');
+  assert.strictEqual(view.studentId, '58/745665');
+  assert.deepStrictEqual(view.wanted, ['both']);
+  assert.deepStrictEqual(view.fee, { amount: 3000, currency: 'USD' });
+  assert.strictEqual(view.workingDays, 10);
+
+  // Still their own case: their handle is what stands between a request id and somebody else's
+  // identity evidence.
+  assert.throws(() => service.applicantView({ requestId, token: 'not-the-handle' }), /not found/);
+
+  // A student id and a phone number are optional, so a case without them says so rather than
+  // offering up somebody else's.
+  const other = openCase(service, { applicantEmail: 'nobody@example.com' });
+  assert.strictEqual(service.applicantView(other).studentId, null);
+  assert.strictEqual(service.applicantView(other).phone, null);
+});
+
 test('a case cannot be submitted before the identity check and the fee', () => {
   const service = newService();
   const { requestId, token } = openCase(service);

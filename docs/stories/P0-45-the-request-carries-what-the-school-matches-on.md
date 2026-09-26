@@ -46,3 +46,27 @@ Two pieces of copy that the screen did not need: the review step listed **"Answe
 days"** as a summary row when the line above it already says the same thing, and the button said
 "Pay 30.00 USD and send my request" where the amount is in the summary directly above it. The row is
 gone and the button says **Pay**.
+
+## Fixed after the first run through the flow, 27 September 2026
+
+The review screen asked the applicant to check their answers and then showed those answers as dashes:
+the name and the number, and no row at all for a phone number or a student id that had been given.
+
+The cause was not the summary. The document check sends the browser out to the provider and back, and
+the page that returns is a fresh one with no memory of the form: only the address (kept in local
+storage) and the date of birth (read from the case) survived it. Everything else lived in component
+state and left with the page.
+
+So the answers are read from the case, which is where they actually are. The applicant's own view now
+hands back the name, the phone number, the number the record is matched by, the student id, what they
+asked for, the fee and the promised period. It is their own submission behind their own handle, so
+giving it back costs nothing, and the review fills itself in however the applicant arrives at it: back
+from the document check, back from the payment page, or from a saved link on another device.
+
+The phone number is now its own row when there is one, and the **Fee** row is gone: the amount was not
+known at that point in the flow, so the row could only ever read as a dash, and the payment page
+states it where it is being paid.
+
+Covered by *"the applicant's own view gives them back what they gave us"* — the coverage this view
+should have had from the start, since the review screen is only ever as good as what the view hands
+it.

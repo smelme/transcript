@@ -343,6 +343,19 @@ export class RequestService {
       reason: row.decision_reason,
       issuedAt: row.issued_at,
       expiresAt: row.expires_at,
+      // What they gave us, handed back.
+      //
+      // The document check leaves the page and comes back to it, so the page that returns is a new
+      // one with no memory of the form: whatever the applicant typed lives here or it is gone, and a
+      // review screen of dashes is how somebody ends up paying for a search against nothing. It is
+      // their own submission, behind their own handle, so giving it back costs nothing.
+      name: row.applicant_name,
+      phone: row.applicant_phone,
+      ssn: row.applicant_ssn,
+      studentId: row.applicant_student_id,
+      wanted: JSON.parse(row.wanted || '[]'),
+      fee: { amount: row.fee_amount, currency: row.fee_currency },
+      workingDays: this.workingDays,
       // The date of birth the document confirmed. It is the one extracted field the applicant is
       // shown, because they are about to pay for a search made with it and should be able to see
       // what is being sent. Everything else the check extracted stays inside.

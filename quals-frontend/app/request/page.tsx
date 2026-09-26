@@ -188,6 +188,44 @@ export default function RequestPage() {
     return result.identityStatus;
   }, []);
 
+  /**
+   * Put the applicant's own answers back.
+   *
+   * The document check takes the browser away and brings it back, so the page that comes back is a
+   * fresh one: anything kept only in this component is gone by the time they are asked to check it
+   * over. Their own case holds what they gave us, behind their own handle, so the review is filled
+   * from there rather than from luck.
+   */
+  const hydrate = useCallback(async (current: Held) => {
+    try {
+      const view = await api<{
+        name?: string | null;
+        phone?: string | null;
+        ssn?: string | null;
+        studentId?: string | null;
+        email?: string | null;
+        school?: string | null;
+        wanted?: string[] | null;
+        fee?: Fee | null;
+        workingDays?: number;
+      }>(`/requests/${current.requestId}?token=${encodeURIComponent(current.token)}`);
+
+      if (view.name) setName(view.name);
+      if (view.phone) setPhone(view.phone);
+      if (view.ssn) setSsn(view.ssn);
+      if (view.studentId) setStudentId(view.studentId);
+      if (view.email) setEmail(view.email);
+      if (view.school) setSchool(view.school);
+      if (view.fee) setFee(view.fee);
+      if (view.workingDays) setWorkingDays(view.workingDays);
+      const one = Array.isArray(view.wanted) ? view.wanted[0] : null;
+      if (one && one in WANTED_LABELS) setWanted(one as Wanted);
+    } catch {
+      // A case we cannot read back is not a reason to stop: it still resolves, and the applicant
+      // can fill anything missing in themselves.
+    }
+  }, []);
+
   // What the applicant arrives with decides where they start: a return from the document check, a
   // return from the payment provider, a link back to their own case, or nothing at all.
   useEffect(() => {
@@ -209,6 +247,8 @@ export default function RequestPage() {
     if (!current) return;
 
     store(current);
+    // Before anything else: whoever comes back, comes back to their own answers.
+    void hydrate(current);
     if (cancelled) setNotice('You did not finish paying, so nothing has been sent to the school yet.');
     if (params.get('paid')) {
       confirmPayment(current, params.get('session_id'));
@@ -221,7 +261,7 @@ export default function RequestPage() {
       return;
     }
     loadStatus(current);
-  }, [confirmPayment, loadStatus, settleIdentity, store]);
+  }, [confirmPayment, hydrate, loadStatus, settleIdentity, store]);
 
   // Waiting on the document check. Polled rather than trusted to a redirect, because the provider
   // may send the browser anywhere once it is finished - including nowhere at all.
@@ -592,6 +632,12 @@ export default function RequestPage() {
               <dt>Email</dt>
               <dd>{email || '—'}</dd>
             </div>
+            {phone && (
+              <div>
+                <dt>Phone</dt>
+                <dd>{phone}</dd>
+              </div>
+            )}
             <div>
               <dt>School</dt>
               <dd>{school}</dd>
@@ -599,10 +645,6 @@ export default function RequestPage() {
             <div>
               <dt>Asked for</dt>
               <dd>{WANTED_LABELS[wanted]}</dd>
-            </div>
-            <div>
-              <dt>Fee</dt>
-              <dd>{money(fee)}</dd>
             </div>
           </dl>
 
