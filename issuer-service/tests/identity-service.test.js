@@ -108,6 +108,32 @@ test('starting a check sends the request id as the reference, and the callback a
   assert.strictEqual(body.callback, 'https://issuer.example/requests/identity/callback');
 });
 
+test('the return address carries the applicant back to their own request', async () => {
+  // The provider sends the applicant's *browser* here, so this address has to survive the round trip
+  // and has to bring them home: after the check they land on a page with no memory of the request
+  // they were making, and the handle in the path is the only thing that can get them back to it.
+  const provider = stubProvider(() => ({
+    status: 200,
+    body: { session_id: 'session-2', status: 'Not Started', url: 'https://verify.example/def' },
+  }));
+  const service = new IdentityService({
+    apiKey: 'key-1',
+    workflowId: 'workflow-1',
+    callbackBaseUrl: 'https://issuer.example/',
+    fetchImpl: provider.fetchImpl,
+  });
+
+  await service.createSession({ requestId: 'request-9', handle: 'handle/with?awkward' });
+  const body = JSON.parse(provider.calls[0].init.body);
+
+  assert.strictEqual(
+    body.callback,
+    'https://issuer.example/requests/identity/callback/handle%2Fwith%3Fawkward',
+    'the handle travels in the path, escaped, so the provider cannot break the address with its own query'
+  );
+  assert.strictEqual(body.vendor_data, 'request-9', 'the case is still found by our reference');
+});
+
 test('the outcome comes from the provider, not from whatever was posted to us', async () => {
   const provider = stubProvider(() => ({
     status: 200,
