@@ -93,7 +93,7 @@ of money and time.
 | `issuer-frontend/app/api/eligibility/route.ts` | **New.** The server-side question. A registry that does not answer becomes `unknown`, never `no` |
 | `issuer-frontend/app/get-credentials/page.tsx` | Rewritten as the **sign-in**: heading, address field, one button, and the way out underneath |
 | `issuer-frontend/app/page.tsx`, `app/credentials/page.tsx` | A single panel offering the sign-in, with the way out beneath it. The two-path cards and their cost tables are gone |
-| `issuer-frontend/app/lib/demo-registry.js` | **New, demonstration only.** The addresses this deployment will recognise and the record it pretends to hold for each, with the five-year rule applied to them. Off unless `NEXT_PUBLIC_DEMO_REGISTRY` is set |
+| `issuer-frontend/app/lib/demo-registry.js` | **New, demonstration only.** The two addresses this deployment serves and the record it pretends to hold for each, with the five-year rule applied to them. Off unless `NEXT_PUBLIC_DEMO_REGISTRY` is set, and never printed on a page |
 | `issuer-frontend/app/lib/demo-publish.ts` | **New, demonstration only.** Publishes a demonstrated credential for a listed address through the issuer's fenced demonstration route |
 | `scripts/check-decision.mjs` | **New.** 18 checks over the three outcomes, the copy rules, and the demonstration registry |
 | `scripts/check-doors-live.mjs` | **New.** 13 checks against the deployment: both doors stated on all three pages, no self-forwarding, and an unanswerable question coming back as `unknown` with a reason |
@@ -119,26 +119,42 @@ The sign-in asks the institution's database one question, and on a demonstration
 no reachable database to ask — so every address answered *"we could not look that up just now"* and
 nobody could get past the first step. A demo that cannot demonstrate anything is not a demo.
 
-`demo-registry.js` is therefore a small, deliberately fake registry: a list of addresses and the
-record the institution would hold for each, obeying **the same window rule, using the same constant**.
-A listed address whose graduation is inside the window is served; one outside it is sent down the
-checked path; an address that is not listed is `unknown`, never `no`.
+`demo-registry.js` is therefore a small, deliberately fake registry: **the addresses this deployment
+was asked to serve**, and the record the institution would hold for each, obeying **the same window
+rule, using the same constant**. The two of them graduated inside the window, so both can serve
+themselves; every other address — including one that looks exactly like another former student's —
+is `unknown`, never `no`, and takes the checked path.
 
-Four things keep it honest, and they are the reason it is safe to ship:
+For whoever is running the demonstration, the two addresses are `s.melese+63@gmail.com` and
+`s.melese+66@gmail.com`. They are recorded here, and nowhere a visitor can read them: a page that
+printed the addresses it would issue to would tell every visitor who else is on the roll, which is
+the first version of this and the reason it was taken off the page.
+
+Five things keep it honest, and they are the reason it is safe to ship:
 
 1. **The real registry answers first.** The list is consulted only when the real one did not answer,
    so it can never turn a real `no` into a `yes`.
 2. **It is off unless a deployment asks for it** (`NEXT_PUBLIC_DEMO_REGISTRY`). A list that quietly
    decided who could collect a real credential would be the worst kind of bug, because nobody would
    think to look for it.
-3. **Publishing is gated by the same list.** An address on it gets a demonstrated credential through
+3. **The list is exactly the addresses it was asked to serve, and both sides hold the same ones.**
+   The academy's list decides who is offered the self-service door; the issuer's
+   `DEMO_RECORDS_ALLOWLIST` decides who a record may be invented for. The fence is therefore not only
+   on the side an applicant can see, and `scripts/check-decision.mjs` fails if either list grows.
+4. **Publishing is gated by the same list.** An address on it gets a demonstrated credential through
    the issuer's fenced demonstration route; an address that is not on it gets the registry's own
    refusal. The demo cannot quietly issue to somebody it was not asked about.
-4. **The page states no graduation year from the list.** The demonstrated credential is *generated*,
+5. **The page states no graduation year from the list.** The demonstrated credential is *generated*,
    so a page repeating a year from the list would disagree with the document it just produced — and a
    page that contradicts its own credential is worse than one that says nothing about the year.
 
-Turning it on is two variables: `NEXT_PUBLIC_DEMO_REGISTRY=true` on the academy site, and
-`ISSUER_API_URL` pointing at the issuer. The issuer must also have `ALLOW_DEMO_RECORDS=true`, which
-is the fence P0-41 put around generated records — **setting it reopens that route for any address,
-not only the listed ones**, so it belongs on a demonstration deployment and nowhere else.
+Turning it on is three variables: `NEXT_PUBLIC_DEMO_REGISTRY=true` and `ISSUER_API_URL` on the
+academy site, and on the issuer `ALLOW_DEMO_RECORDS=true` with
+`DEMO_RECORDS_ALLOWLIST=s.melese+63@gmail.com,s.melese+66@gmail.com`.
+
+**`ALLOW_DEMO_RECORDS=true` on its own reopens that route for any address** — it is the fence P0-41
+put around generated records, and it does not know who the demonstration is for. The allow-list is
+what holds it to the addresses this deployment serves, and the route refuses everything else with
+`403 DEMO_RECORDS_NOT_ALLOWED` *before* it generates anything, so a refused request leaves no
+student id, no account link, no prepared credential and no email behind. Both variables belong on a
+demonstration deployment and nowhere else.

@@ -1929,6 +1929,27 @@ const ACADEMY_SITE_URL =
 
 const isEmail = (value) => /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(String(value || '').trim());
 
+/**
+ * The addresses a demonstration deployment will invent a record for (P0-41, demo only).
+ *
+ * `DEMO_RECORDS_ALLOWLIST` is a comma-separated list. Unset means `ALLOW_DEMO_RECORDS` alone
+ * decides, which is what a developer's own machine wants. Set means only those addresses are
+ * invented for, so one flag cannot open the generator to everybody who learns the address — the
+ * academy's sign-in offers the self-service door to the same list, and this is the fence behind it.
+ */
+export function demoRecordAllowlist(value = process.env.DEMO_RECORDS_ALLOWLIST) {
+  return String(value || '')
+    .split(',')
+    .map((entry) => entry.trim().toLowerCase())
+    .filter(Boolean);
+}
+
+/** Whether an address may be invented for, given the list the deployment was handed (if any). */
+export function demoRecordAllowed(email, allowlist = demoRecordAllowlist()) {
+  if (allowlist.length === 0) {return true;}
+  return allowlist.includes(String(email || '').trim().toLowerCase());
+}
+
 /** A number that is present, or null so the calling table omits the element. */
 const numberOrNull = (value) => (typeof value === 'number' && Number.isFinite(value) ? value : null);
 
@@ -2924,6 +2945,19 @@ app.post('/academy/requests', async (req, res) => {
     const email = String(req.body?.email || '').trim().toLowerCase();
     if (!isEmail(email)) {
       return res.status(400).json({ success: false, error: 'Please provide a valid email address' });
+    }
+
+    // The flag opens the generator; the list closes it again to the addresses this deployment was
+    // told to serve. Checked before anything is generated, so an address off the list leaves no
+    // trace: no student id, no account link, no prepared credential, no email.
+    if (!demoRecordAllowed(email)) {
+      return res.status(403).json({
+        success: false,
+        error:
+          'This demonstration deployment invents a record for a short list of addresses only. '
+          + 'Set DEMO_RECORDS_ALLOWLIST to change which addresses those are.',
+        code: 'DEMO_RECORDS_NOT_ALLOWED',
+      });
     }
 
     // Deterministic student id so repeat requests always map to one person.

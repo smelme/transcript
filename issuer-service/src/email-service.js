@@ -43,6 +43,10 @@ export async function sendEmail({ to, subject, html }) {
       // it is only unsent.
       const link = String(html || '').match(/https?:\/\/[^\s"'<>]+/)?.[0];
       console.log(`[email] not sent, no provider configured${link ? `: ${link}` : ''}`);
+      // Return here rather than carrying on. The line above says the message was not sent, and
+      // without a key the call below can only come back unauthorised - so an unconfigured machine
+      // logged "not sent", then logged a 401, and paid for a round trip to do it.
+      return { success: false, reason: 'no_provider_configured', error: 'no provider configured' };
   }
 
   try {

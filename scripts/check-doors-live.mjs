@@ -17,6 +17,10 @@ const ACADEMY_URL = (process.argv[2] || process.env.ACADEMY_URL || 'https://acad
 const REQUEST_SITE_URL = (process.argv[3] || process.env.REQUEST_SITE_URL || 'https://quals-production.up.railway.app')
   .replace(/\/+$/, '');
 
+// The addresses a demonstration deployment serves. They are never printed on a page, so they live
+// here rather than in the markup.
+const SERVED = ['s.melese+63@gmail.com', 's.melese+66@gmail.com'];
+
 let passed = 0;
 const failures = [];
 
@@ -111,6 +115,12 @@ check(
     !/window\.location\s*=/.test(signIn.text),
   'the page must wait for the applicant to act'
 );
+check(
+  'and prints none of the addresses this deployment serves',
+  !SERVED.some((email) => signIn.text.includes(email)) &&
+    !/demonstration address/i.test(signInText),
+  'a page that listed them would tell every visitor who else is on the roll'
+);
 
 const credentialsPage = await get('/credentials');
 const credentialsText = visibleText(credentialsPage.text);
@@ -146,34 +156,41 @@ check(
 
 // The demonstration registry, where a deployment has turned it on. These run only then, so a real
 // deployment is not failed for correctly refusing to keep a list of people who may apply.
-if (/Demonstration addresses/i.test(signInText)) {
-  const listed = await post('/api/eligibility', { email: 's.melese+63@gmail.com' });
-  check(
-    'a listed demo address is inside the window',
-    listed.json?.verdict === 'yes',
-    `verdict ${JSON.stringify(listed.json?.verdict)}`
-  );
+//
+// Gated on the answer rather than on anything printed, because the addresses are deliberately not
+// on the page: asking for one of them is the only way to tell a demonstration deployment from a
+// real one.
+const firstServed = await post('/api/eligibility', { email: SERVED[0] });
+if (firstServed.json?.reason === 'demo_inside_window') {
+  for (const email of SERVED) {
+    const answer = await post('/api/eligibility', { email });
+    check(
+      `the address this deployment serves (${email}) is inside the window`,
+      answer.json?.verdict === 'yes',
+      `verdict ${JSON.stringify(answer.json?.verdict)}`
+    );
+  }
   check(
     'and its answer states no year, so the page cannot disagree with the credential',
-    listed.json?.completedYear === null,
-    `completedYear ${JSON.stringify(listed.json?.completedYear)}`
+    firstServed.json?.completedYear === null,
+    `completedYear ${JSON.stringify(firstServed.json?.completedYear)}`
   );
 
-  const outside = await post('/api/eligibility', { email: 'alice@demo.smartcollege.test' });
-  check(
-    'a listed address outside the window is offered the checked path',
-    outside.json?.verdict === 'no',
-    `verdict ${JSON.stringify(outside.json?.verdict)}`
-  );
-
-  const unlisted = await post('/api/eligibility', { email: 'not-on-the-list@nowhere.test' });
-  check(
-    'an address that is not on the demo list is unknown, never no',
-    unlisted.json?.verdict === 'unknown',
-    `verdict ${JSON.stringify(unlisted.json?.verdict)}`
-  );
+  // Addresses that were on the list before it was narrowed. They must now take the checked path,
+  // and `unknown` is how they get there: a `no` would be a statement about a person.
+  for (const email of ['david@demo.smartcollege.test', 'alice@demo.smartcollege.test']) {
+    const offList = await post('/api/eligibility', { email });
+    check(
+      `an address off the list (${email}) is unknown, never no`,
+      offList.json?.verdict === 'unknown',
+      `verdict ${JSON.stringify(offList.json?.verdict)}`
+    );
+  }
 } else {
-  console.log('  ..    demonstration registry is off, so its list is not asserted');
+  console.log(
+    `  ..    no demonstration registry answered (${JSON.stringify(firstServed.json?.reason)}),`
+      + ' so its list is not asserted'
+  );
 }
 
 // ── the publish ────────────────────────────────────────────────────────────────────────────

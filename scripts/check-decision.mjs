@@ -7,10 +7,13 @@
 //   2. `unknown` never renders an accusation — no "failed", no "invalid", no "not found".
 //   3. The window figure appears once, and the copy states the same number the registry measures.
 //   4. Both doors are always described, with what each costs and how long each takes.
+//   5. The demonstration list is exactly the addresses this deployment was asked to serve, and it
+//      is never printed on a page.
 //
 // Run with: node scripts/check-decision.mjs
 
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 import {
   allCopy,
   CHECKED_PATH,
@@ -20,10 +23,14 @@ import {
 } from '../issuer-frontend/app/lib/doors.js';
 import {
   DEMO_REGISTRY_ENABLED,
+  DEMO_STUDENTS,
   demoEligibilityFor,
   demoStudentFor,
   withinWindow,
 } from '../issuer-frontend/app/lib/demo-registry.js';
+
+/** The addresses this deployment was asked to serve, and the whole of the demonstration list. */
+const SERVED = ['s.melese+63@gmail.com', 's.melese+66@gmail.com'];
 
 let passed = 0;
 const failures = [];
@@ -218,39 +225,73 @@ check('the demonstration registry measures the same window the real one does', (
   assert.equal(withinWindow('2021-09-25', now), false, 'the day past the boundary is outside');
 });
 
-check('a listed address is answered by its date, and an unlisted one is never a no', () => {
+check('only a listed address is answered, and an address we do not hold is never a no', () => {
   const now = new Date('2026-09-26T00:00:00Z');
 
-  assert.equal(demoEligibilityFor('s.melese+63@gmail.com', now).verdict, 'yes');
+  for (const email of SERVED) {
+    assert.equal(demoEligibilityFor(email, now).verdict, 'yes', `${email} is inside the window`);
+  }
   assert.equal(
     demoEligibilityFor('S.Melese+63@Gmail.com', now).verdict,
     'yes',
     'the address must match whatever its case is'
   );
-  assert.equal(demoEligibilityFor('alice@demo.smartcollege.test', now).verdict, 'no');
-  assert.equal(demoEligibilityFor('carol@demo.smartcollege.test', now).verdict, 'no');
 
-  const unknown = demoEligibilityFor('somebody@nowhere.test', now);
-  assert.equal(unknown.verdict, 'unknown', 'an address we do not hold is unknown, never no');
-  assert.equal(unknown.name, null);
-});
-
-check('the addresses this deployment was asked to serve are on the list', () => {
-  for (const email of ['s.melese+63@gmail.com', 's.melese+66@gmail.com']) {
-    const student = demoStudentFor(email);
-    assert.ok(student, `${email} must be listed`);
-    assert.match(student.graduationDate, /^\d{4}-\d{2}-\d{2}$/, 'with a date to measure from');
+  // Everything else is unknown, including an address that looks exactly like another former
+  // student's: the list decides who can serve themselves, and not being on it is not a no.
+  for (const email of [
+    's.melese+99@gmail.com',
+    'david@demo.smartcollege.test',
+    'alice@demo.smartcollege.test',
+    'somebody@nowhere.test',
+  ]) {
+    const answer = demoEligibilityFor(email, now);
+    assert.equal(answer.verdict, 'unknown', `${email} must be unknown, never no`);
+    assert.equal(answer.name, null, 'and we must not name anybody we do not hold');
   }
 });
 
-check('the list holds both sides of the window, so either path can be tried', () => {
-  const now = new Date('2026-09-26T00:00:00Z');
-  const verdicts = new Set(
-    ['s.melese+63@gmail.com', 'alice@demo.smartcollege.test'].map(
-      (email) => demoEligibilityFor(email, now).verdict
-    )
+check('the list holds exactly the addresses this deployment was asked to serve', () => {
+  assert.deepEqual(
+    DEMO_STUDENTS.map((student) => student.email),
+    SERVED,
+    'the list must be those addresses and no others'
   );
-  assert.deepEqual([...verdicts].sort(), ['no', 'yes'], 'the list must demonstrate both answers');
+  assert.equal(DEMO_STUDENTS.length, SERVED.length, 'and nothing may be added to it quietly');
+});
+
+check('and every one of them is inside the window, so nobody else can serve themselves', () => {
+  const now = new Date('2026-09-26T00:00:00Z');
+
+  for (const student of DEMO_STUDENTS) {
+    assert.match(student.graduationDate, /^\d{4}-\d{2}-\d{2}$/, 'with a date to measure from');
+    assert.equal(
+      withinWindow(student.graduationDate, now),
+      true,
+      `${student.email} must be inside the window, or the list would serve somebody else's path`
+    );
+  }
+});
+
+check('the addresses this deployment was asked to serve are on the list', () => {
+  for (const email of SERVED) {
+    assert.ok(demoStudentFor(email), `${email} must be listed`);
+  }
+});
+
+check('and the sign-in page does not print the addresses it holds', () => {
+  const page = readFileSync(
+    new URL('../issuer-frontend/app/get-credentials/page.tsx', import.meta.url),
+    'utf8'
+  );
+
+  for (const email of SERVED) {
+    assert.ok(!page.includes(email), `${email} must not be printed on the page`);
+  }
+  assert.ok(
+    !/demonstration address/i.test(page),
+    'and the panel that listed them must not come back'
+  );
 });
 
 // ── report ────────────────────────────────────────────────────────────────────────────────

@@ -6,9 +6,10 @@
  * to ask, so every address answers *"we could not look that up just now"* and nobody can get past
  * the first step. A demo that cannot demonstrate anything is not a demo.
  *
- * So this is a small, deliberately fake registry: a list of addresses and what the institution
- * would hold for each. It exists to make the five-year rule visible and testable, and it obeys the
- * same rule the real one does, using the same window constant:
+ * So this is a small, deliberately fake registry: a short list of addresses and what the
+ * institution would hold for each. It exists so the addresses this deployment was asked to serve
+ * can reach the self-service door, and it obeys the same rule the real one does, using the same
+ * window constant:
  *
  *   - a graduation inside the window  -> `yes`  -> collect them yourself
  *   - a graduation before the window   -> `no`   -> the checked path
@@ -25,6 +26,9 @@
  *   3. **Not a claim about anybody.** The records here are invented. They are named as demo data
  *      wherever they surface, and the copy that follows a `yes` does not assert a graduation year
  *      from them, because the demo's credential is generated and the two would disagree.
+ *   4. **Not a list anybody can read.** It holds only the addresses this deployment was asked to
+ *      serve, and the sign-in page does not print it. A page that published the addresses it will
+ *      issue to would be a page that tells every visitor who else is on the roll.
  */
 
 import { ELIGIBILITY_WINDOW_YEARS } from './doors.js';
@@ -35,8 +39,13 @@ export const DEMO_REGISTRY_ENABLED = process.env.NEXT_PUBLIC_DEMO_REGISTRY === '
 /**
  * The addresses this demo will recognise, and the record it pretends to hold for each.
  *
- * `graduationDate` is the whole point: it is what the five-year rule is measured from. Two entries
- * sit outside the window on purpose, so the checked path can be tried without editing anything.
+ * `graduationDate` is the whole point: it is what the five-year rule is measured from. Both dates
+ * below sit inside the window, so both of these addresses can serve themselves. Everything else —
+ * including an address a visitor would expect us to hold — takes the checked path, because an
+ * address we are not holding is `unknown` and never a `no`.
+ *
+ * The issuer holds the same two addresses on its own `DEMO_RECORDS_ALLOWLIST`, so the fence is the
+ * same on both sides of the flow rather than only the side an applicant can see.
  */
 export const DEMO_STUDENTS = [
   {
@@ -56,44 +65,6 @@ export const DEMO_STUDENTS = [
     degreeLevel: 'degree',
     fieldOfStudy: 'Computing',
     graduationDate: '2024-07-01',
-  },
-  {
-    email: 'david@demo.smartcollege.test',
-    name: 'David Kim',
-    studentId: 'DEMO-DAVID',
-    programmeTitle: 'BSc Computer Science',
-    degreeLevel: 'degree',
-    fieldOfStudy: 'Computing',
-    graduationDate: '2024-07-01',
-  },
-  {
-    email: 'bob@demo.smartcollege.test',
-    name: 'Bob Smith',
-    studentId: 'DEMO-BOB',
-    programmeTitle: 'BA Business',
-    degreeLevel: 'degree',
-    fieldOfStudy: 'Business',
-    graduationDate: '2023-09-01',
-  },
-  {
-    // Outside the window, so the checked path can be demonstrated with a real address.
-    email: 'alice@demo.smartcollege.test',
-    name: 'Alice Johnson',
-    studentId: 'DEMO-ALICE',
-    programmeTitle: 'BSc Computer Science',
-    degreeLevel: 'degree',
-    fieldOfStudy: 'Computing',
-    graduationDate: '2015-07-01',
-  },
-  {
-    // Outside the window too, and older still.
-    email: 'carol@demo.smartcollege.test',
-    name: 'Carol Lee',
-    studentId: 'DEMO-CAROL',
-    programmeTitle: 'BEng Engineering',
-    degreeLevel: 'degree',
-    fieldOfStudy: 'Engineering',
-    graduationDate: '2012-07-01',
   },
 ];
 
@@ -137,14 +108,4 @@ export function demoEligibilityFor(email, now = new Date()) {
     completedYear: Number(String(student.graduationDate).slice(0, 4)),
     demo: true,
   };
-}
-
-/** What each listed address will do, for the panel the demo page shows. */
-export function demoOutcomes(now = new Date()) {
-  return DEMO_STUDENTS.map((student) => ({
-    email: student.email,
-    name: student.name,
-    graduationDate: student.graduationDate,
-    verdict: withinWindow(student.graduationDate, now) ? 'yes' : 'no',
-  }));
 }
