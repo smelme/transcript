@@ -33,6 +33,7 @@ import {
   kindOfCredentialData,
   labelOfCredentialData,
   academicNamespacesOf,
+  validateAcademicClaims,
   todayIso,
 } from './credential-generator.js';
 import * as emailService from './email-service.js';
@@ -2009,6 +2010,25 @@ function bearerToken(req) {
 app.post('/issuance/invitations', async (req, res) => {
   try {
     if (!(await requireApiKey(req, res))) {return;}
+
+    // The claims are checked before they are stored. A credential is signed with whatever
+    // arrives here, so a namespace of the caller's own invention, or an award with no date,
+    // would otherwise be discovered by whoever opens the wallet rather than at the boundary.
+    // This does not make a thin record publishable; it makes a malformed one refusable.
+    const published = Array.isArray(req.body?.credentials) ? req.body.credentials : [];
+    if (published.length === 0) {
+      return res.status(400).json({ success: false, error: 'Publish at least one credential' });
+    }
+    for (const [index, item] of published.entries()) {
+      const checked = validateAcademicClaims(item?.claims);
+      if (!checked.ok) {
+        return res.status(400).json({
+          success: false,
+          error: `credential ${index + 1}: ${checked.errors.join('; ')}`,
+        });
+      }
+    }
+
     const result = await invitationService.create({
       institution: req.clientOrg.institution,
       apiKeyId: req.clientOrg.keyId || null,
@@ -2411,7 +2431,7 @@ app.post('/requests/:id/identity', async (req, res) => {
     }
     if (!identityService.configured) {throw new Error('Identity checks are not configured');}
 
-    const session = await identityService.createSession({ requestId: row.request_id });
+    const session = await identityService.createSession({ requestId: row.request_id, handle: req.body?.token });
     requestService.startIdentity({
       requestId: row.request_id,
       token: req.body?.token,
@@ -2466,6 +2486,151 @@ app.get('/requests/:id/identity', async (req, res) => {
 });
 
 /**
+ * The provider's session id, wherever it arrives.
+ *
+ * Its server notification puts it in the body as `session_id`; its redirect puts it in the query as
+ * `verificationSessionId`. One function reads both, because two entry points reading two different
+ * names is exactly how the redirect came to answer "Cannot GET".
+ */
+function providerSessionIdFrom(req) {
+  const candidates = [
+    req.body?.session_id,
+    req.body?.sessionId,
+    req.query?.verificationSessionId,
+    req.query?.session_id,
+    req.query?.sessionId,
+  ];
+  for (const candidate of candidates) {
+    const value = String(candidate ?? '').trim();
+    if (value) {return value;}
+  }
+  return null;
+}
+
+/** The page interpolates a reason and a handle that both arrive from outside this process. */
+function escapeHtmlText(value) {
+  return String(value ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
+/**
+ * The page a person lands on when the provider sends their browser back after the check.
+ *
+ * A page rather than JSON, because the visitor is a graduate holding a phone rather than a client,
+ * and it has to do one thing above all: put them back in front of their own request. The styling is
+ * inline and dependency-free on purpose - this is the one screen in the flow that must render even
+ * when everything else is having a bad day.
+ */
+function identityReturnPage({ outcome, reference, handle, reason }) {
+  const back = reference && handle
+    ? `${ISSUE_SITE_URL}/request?reference=${encodeURIComponent(reference)}&token=${encodeURIComponent(handle)}`
+    : `${ISSUE_SITE_URL}/request`;
+
+  let heading = 'Your check is on its way';
+  let body = 'This can take a moment. Go back to your request - it keeps checking for you, and there is nothing else you need to do.';
+
+  if (outcome === 'verified') {
+    heading = 'That is you confirmed';
+    body = 'Your identity check is done. Go back to your request to carry on.';
+  } else if (outcome === 'failed') {
+    heading = 'We could not complete that check';
+    body = reason || identityReason(null);
+  }
+
+  return `<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>${escapeHtmlText(heading)} - Quals</title>
+<style>
+  :root { color-scheme: light dark; }
+  body { margin: 0; background: #f7f7f8; color: #16181d;
+         font: 16px/1.6 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+  main { max-width: 34rem; margin: 0 auto; padding: 3rem 1.25rem; }
+  h1 { font-size: 1.5rem; line-height: 1.3; margin: 0 0 .75rem; letter-spacing: -.01em; }
+  p { margin: 0 0 1.25rem; color: #4a4f5a; }
+  a.button { display: inline-flex; align-items: center; min-height: 44px; padding: 0 1.25rem;
+             border-radius: 999px; background: #16181d; color: #fff; text-decoration: none;
+             font-weight: 600; }
+  @media (prefers-color-scheme: dark) {
+    body { background: #101216; color: #f2f3f5; }
+    p { color: #b9bdc7; }
+    a.button { background: #f2f3f5; color: #101216; }
+  }
+</style>
+</head>
+<body>
+  <main>
+    <h1>${escapeHtmlText(heading)}</h1>
+    <p>${escapeHtmlText(body)}</p>
+    <p><a class="button" href="${escapeHtmlText(back)}">Back to my request</a></p>
+  </main>
+</body>
+</html>`;
+}
+
+/**
+ * Where the applicant's browser comes back to after the identity provider has finished with them.
+ *
+ * Nothing in the address decides anything. `status=Approved` is a claim by whoever holds the URL, so
+ * it is ignored outright; the only thing taken from it is which session to ask about, and the answer
+ * comes from the provider's API, exactly as it does for the webhook. A session that maps to no case
+ * renders the same page and changes nothing.
+ *
+ * No rate limit, deliberately, and not out of optimism: the provider call only happens once a
+ * session id has been matched to a case we already hold, and that id is a value the caller cannot
+ * guess. A limiter here would be a new dependency guarding the one route that has to keep working.
+ */
+async function identityReturn(req, res) {
+  const sessionId = providerSessionIdFrom(req);
+  const handle = req.params?.handle || null;
+
+  let outcome = null;
+  let reason = null;
+  let reference = null;
+
+  const row = sessionId ? requestService.findByIdentityRef(sessionId) : null;
+
+  if (row) {
+    reference = row.request_id;
+
+    if (row.identity_status === 'verified' || row.identity_status === 'failed') {
+      // Already decided. Somebody may be reloading the page, and reloading must not change the
+      // answer they have already been given.
+      outcome = row.identity_status;
+      reason = outcome === 'failed' ? identityReason(null) : null;
+    } else {
+      try {
+        const decision = await identityService.getDecision(sessionId);
+        if (decision.outcome === 'pending') {
+          reason = identityReason(decision.status);
+        } else {
+          const updated = applyIdentityOutcome(row, decision, 'identity-provider');
+          outcome = updated.identity_status;
+          reason = outcome === 'failed' ? identityReason(decision.status) : null;
+        }
+      } catch (e) {
+        // Somebody is standing in front of this page. A provider we cannot reach is something to
+        // tell them about plainly, and the request page keeps checking regardless.
+        console.error('The identity decision could not be collected on the return:', e.message);
+      }
+    }
+  }
+
+  res.type('html').status(200).send(identityReturnPage({ outcome, reference, handle, reason }));
+}
+
+// The provider redirects the applicant's browser here. Two spellings of the path because the handle
+// is optional: a session started without one still has somewhere to come back to.
+app.get('/requests/identity/callback', identityReturn);
+app.get('/requests/identity/callback/:handle', identityReturn);
+
+/**
  * The provider's notification that there is a decision to collect.
  *
  * Its body decides nothing: the session is looked up against a request we already hold, and the
@@ -2476,7 +2641,7 @@ app.post(
   '/requests/identity/callback',
   express.json({ limit: '256kb', verify: (req, _res, buffer) => {req.rawBody = buffer.toString('utf8');} }),
   async (req, res) => {
-    const sessionId = String(req.body?.session_id || req.body?.sessionId || '').trim();
+    const sessionId = providerSessionIdFrom(req);
     if (!sessionId) {return res.status(400).json({ success: false, error: 'A session is required' });}
     if (!identitySignatureValid(req)) {
       return res.status(401).json({ success: false, error: 'Signature check failed' });
@@ -2734,6 +2899,28 @@ async function tellApplicant(request) {
 
 app.post('/academy/requests', async (req, res) => {
   try {
+    // The generator is fenced, not deleted (P0-41).
+    //
+    // This route does not publish a record, it *invents* one: the graduation year is picked from
+    // a range, the modules come from a demo fixture, and the credits are computed. It is what the
+    // self-service path used to run on, and every credential it produced was synthetic. A silent
+    // fallback to generated claims is the most dangerous thing this codebase could do, because
+    // the result looks exactly like a real credential and is not.
+    //
+    // The demo sites still need a recognisable record to show, so the route stays behind a flag
+    // that has to be set deliberately. It is off unless somebody says otherwise, which means the
+    // live deployments must publish through /issuance/invitations instead.
+    if (process.env.ALLOW_DEMO_RECORDS !== 'true') {
+      return res.status(409).json({
+        success: false,
+        error:
+          'This route invents a record and is disabled. Publish the institution\u2019s real claims '
+          + 'through POST /issuance/invitations with an API key. Set ALLOW_DEMO_RECORDS=true only on '
+          + 'a demonstration deployment.',
+        code: 'DEMO_RECORDS_DISABLED',
+      });
+    }
+
     const email = String(req.body?.email || '').trim().toLowerCase();
     if (!isEmail(email)) {
       return res.status(400).json({ success: false, error: 'Please provide a valid email address' });

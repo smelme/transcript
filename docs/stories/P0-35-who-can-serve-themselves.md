@@ -1,6 +1,6 @@
 # P0-35: Who can serve themselves
 
-**Status:** Not started
+**Status:** ✅ Done — 2026-09-26 (`node scripts/check-decision.mjs`, 12 checks)
 **Components:** `issuer-frontend` (`/`, `/get-credentials`, `/credentials`), `issuer-service`
 (eligibility answer), Smart College registry (the data — separate repository)
 **Blocks:** P0-36 (nothing else can be sized until we know how many people the second door is for)
@@ -29,9 +29,25 @@ This story adds the question, the alternative, and the honest third answer.
 changed, an address that is old, or a record that is thin. *Unknown* is the honest answer and it
 routes to the ordered path, where a person looks. See ADR-5.
 
-**The window is measured on the institution's data, never on the applicant's word.** The chooser
-asks nothing; it only tells the applicant which door applies. Anyone who disagrees with the answer
-can still take the second door.
+**One way in, and a quiet way out.** The page is a sign-in: one field, one button, and underneath it
+the second road, shaped the way every sign-in screen offers *forgot your password?* — a question
+about circumstances rather than a verdict about the person. Somebody who finished longer ago, or whom
+we cannot match, takes that line; somebody who does not recognise themselves in it signs in and never
+thinks about it again.
+
+**The applicant is not asked to classify themselves, and is not quoted two prices up front.** Two
+labelled paths with their costs and waits, shown before anything had been asked for, made the simplest
+way in look like a decision about the applicant rather than an action they take. The second road's
+cost, wait and requirements are stated where they are needed: in the refusal, when the sign-in cannot
+serve somebody and they are about to take it.
+
+**The record decides whether the sign-in can serve somebody**, never their word about themselves.
+Somebody it cannot serve is corrected by the record, not blamed for it.
+
+*(This story has been through three shapes: a single page that asked for an address and then told the
+applicant which door applied; then two labelled paths offered side by side; then this. Each change came
+from the same finding — the page was asking the applicant to do the institution's job, or to read the
+institution's paperwork before they had asked for anything.)*
 
 **Nothing redirects on its own.** The applicant chooses. This is the rule we already settled on the
 hand-over screen, and it applies with more force here because the two doors cost different amounts
@@ -66,3 +82,31 @@ of money and time.
 - The responsive check extended to the new sections at the three widths.
 - A copy review against the rules above, since the wording is the acceptance criterion.
 - One manual walk: a real address inside the window, and one deliberately outside it.
+
+---
+
+## What was built
+
+| Where | What |
+| --- | --- |
+| `issuer-frontend/app/lib/doors.js` | **New.** The one way in, the quiet way out, and the words for every answer, as a plain module so the wording can be checked without a browser. The way-out prompt is built from the window constant, so it cannot drift from the rule the institution measures by |
+| `issuer-frontend/app/api/eligibility/route.ts` | **New.** The server-side question. A registry that does not answer becomes `unknown`, never `no` |
+| `issuer-frontend/app/get-credentials/page.tsx` | Rewritten as the **sign-in**: heading, address field, one button, and the way out underneath |
+| `issuer-frontend/app/page.tsx`, `app/credentials/page.tsx` | A single panel offering the sign-in, with the way out beneath it. The two-path cards and their cost tables are gone |
+| `scripts/check-decision.mjs` | **New.** 13 checks over the three outcomes and the copy rules |
+| `scripts/check-doors-live.mjs` | **New.** 13 checks against the deployment: both doors stated on all three pages, no self-forwarding, and an unanswerable question coming back as `unknown` with a reason |
+
+The copy rules the check enforces, because they are the acceptance criterion: only a `yes` reaches
+the self-service path; no sentence contains "failed", "invalid", "denied", "rejected", "not
+found", "no record" or "verification failed"; **every** year figure in the copy is the configured
+window, so the page cannot state a different number from the one the registry measures by; the way
+out is a question, states the window, and does not characterise the applicant; and every outcome that
+is not self-service offers the checked path by name.
+
+**One deliberate departure.** The story's step 5 has the chooser present both doors on "the page
+people read first". Both paths are now offered on the home page, on `/get-credentials` *and* on
+`/credentials`, each with its own way in, because the page somebody actually lands on from an email
+link is `/get-credentials`, and it should not be the one page that withholds the alternative.
+
+**What the responsive check still needs.** `scripts/check-responsive.mjs` reads the live sites, so
+the new sections are checked at 360/390/768 after deployment rather than before it.

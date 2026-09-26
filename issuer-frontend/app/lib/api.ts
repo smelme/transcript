@@ -197,15 +197,13 @@ export interface AcademyOfferResult {
 }
 
 /** Ask the academy to prepare credentials and email a secure link. */
-export function requestCredentials(payload: {
-  email: string;
-  fullName?: string;
-  include?: CredentialChoice;
-  /** Whether to include the recognition details (identifiers, workload, cohort context). */
-  recognition?: boolean;
-}): Promise<AcademyRequestResult> {
-  return request('/academy/requests', { method: 'POST', body: JSON.stringify(payload) });
-}
+// requestCredentials() used to live here. It called POST /academy/requests, which *generated* a
+// record — the graduation year from a range, the modules from a demo fixture, the credits
+// computed — and that route is now disabled unless a deployment sets ALLOW_DEMO_RECORDS (P0-41).
+//
+// The academy publishes the record it actually holds instead: the page calls this site's own
+// /api/publish, which asks the institution's registry, which builds the claims from what it keeps
+// and publishes them to the issuer with its own key.
 
 export function requestSignInOtp(email: string): Promise<{ success: boolean; otp?: string; otpSent?: boolean; error?: string }> {
   // Saying which site is asking, so the message is worded for this site rather than for the

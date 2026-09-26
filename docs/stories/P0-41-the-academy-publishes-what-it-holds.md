@@ -1,6 +1,6 @@
 # P0-41: The academy publishes the record it holds
 
-**Status:** Not started
+**Status:** ✅ Done — 2026-09-26 (academy side: `npm run test:s048`, 9 tests; issuer side: 138 tests)
 **Components:** `issuer-frontend` (server-side publish), `issuer-service` (generator fence),
 `issuer-service` (claims validation)
 **Depends on:** the registry supplying the record (academy-side story S-047)
@@ -47,6 +47,46 @@ today. Rather than deleting it and breaking the demos, it keeps working under th
 the live path moves to the publish API.
 
 **A repeat request reuses the invitation rather than creating a second one.** The publish API
+
+---
+
+## What was built, and the one place it departs from the plan
+
+| Where | What |
+| --- | --- |
+| `college/credentials-service.js` | **New** (academy platform). Builds the claims from the record the institution actually holds, and publishes them |
+| `college/database.js` | `getAcademicRecordFor()` — programme, level, field, dates and modules in one query |
+| `college/server.js` | `POST /v1/registry/publish`, behind the same keyed authentication as the eligibility answer |
+| `issuer-service/src/index.js` | `/academy/requests` fenced behind `ALLOW_DEMO_RECORDS`; claims validated on publish |
+| `issuer-service/src/credential-generator.js` | `validateAcademicClaims()` — the boundary that turns a quiet mistake into a refusal |
+| `issuer-frontend/app/api/publish/route.ts` | **New.** The academy site's server route, so no key is ever in a browser |
+| `issuer-frontend/app/get-credentials/page.tsx` | Publishes through the registry instead of asking anybody to generate a record |
+
+**The departure.** Step 3 has *Smart Academy* build the claims and call `/issuance/invitations`.
+The claims are in fact built by the institution's own registry — the academy platform — rather than
+by the website, and the website's server route asks the registry to publish. Three reasons, and they
+are the reason this is a departure rather than an oversight:
+
+1. **The claim fields are facts about a record**, and the record lives in the registry. Building them
+   in a website would put a copy of the mapping in a place that cannot see the data it describes.
+2. **A transcript needs what each module was worth**, and only the registry knows what it holds. When
+   a field is absent, the module that omits it has to be the one that knows it is absent.
+3. **The key that names the institution belongs with the institution's own system**, not in a public
+   website's bundle.
+
+The website still owns what the story asked of it: it no longer publishes from the browser, and the
+holder is handed over by button with the expiry stated.
+
+**What the live path now does differently.** `/academy/requests` invented a record — a graduation
+year from a range, modules from a fixture, credits computed. It is now off unless
+`ALLOW_DEMO_RECORDS=true`, and it refuses with an explanation naming the publish API instead. The
+demo sites keep their generated records by setting that flag deliberately; the live deployments do
+not set it, so no generated claim can reach a real institution.
+
+**What is not yet published.** Credits, and therefore the transcript. `course_catalog` holds a fee
+per course and nothing in the platform counts credits, so an unheld field is left out rather than
+estimated. A graduate currently receives an award credential with no module list; closing that is
+the college repository's next story, not something to guess at here.
 already reuses prepared sessions by comparing claim sets; this story keeps that behaviour so a
 holder who asks twice does not accumulate duplicates.
 
