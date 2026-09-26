@@ -2629,7 +2629,16 @@ app.post('/requests/:id/advance', async (req, res) => {
       currency: row.fee_currency,
     });
     const submitted = requestService.submit({ requestId: row.request_id, termsVersion: 'dev' });
-    res.json({ success: true, status: submitted.status, dueAt: submitted.due_at });
+    // The same notification the real confirmation sends, so this scaffold exercises the path the
+    // applicant will take rather than a quieter one that only looks like it.
+    const told = await confirmToApplicant(submitted);
+    res.json({
+      success: true,
+      status: submitted.status,
+      dueAt: submitted.due_at,
+      emailSent: told.success,
+      queueNotified: told.queue.success === true,
+    });
   } catch (e) {
     res.status(400).json({ success: false, error: e.message });
   }
