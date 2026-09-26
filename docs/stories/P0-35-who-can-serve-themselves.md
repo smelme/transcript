@@ -95,8 +95,8 @@ of money and time.
 | `issuer-frontend/app/page.tsx`, `app/credentials/page.tsx` | A single panel offering the sign-in, with the way out beneath it. The two-path cards and their cost tables are gone |
 | `issuer-frontend/app/lib/demo-registry.js` | **New, demonstration only.** The two addresses this deployment serves and the record it pretends to hold for each, with the five-year rule applied to them. Off unless `NEXT_PUBLIC_DEMO_REGISTRY` is set, and never printed on a page |
 | `issuer-frontend/app/lib/demo-publish.ts` | **New, demonstration only.** Publishes a demonstrated credential for a listed address through the issuer's fenced demonstration route |
-| `scripts/check-decision.mjs` | **New.** 18 checks over the three outcomes, the copy rules, and the demonstration registry |
-| `scripts/check-doors-live.mjs` | **New.** 13 checks against the deployment: both doors stated on all three pages, no self-forwarding, and an unanswerable question coming back as `unknown` with a reason |
+| `scripts/check-decision.mjs` | **New.** 20 checks over the three outcomes, the copy rules, and the demonstration list — including that the list is exactly the addresses this deployment serves, and that no page prints one |
+| `scripts/check-doors-live.mjs` | **New.** 25 checks against the deployment: both doors stated on all three pages, no self-forwarding, an unanswerable question coming back as `unknown` with a reason, and — on a demonstration deployment — the addresses it serves answered `yes`, the two that were dropped from the list answered `unknown`, and none of them printed on a page |
 
 The copy rules the check enforces, because they are the acceptance criterion: only a `yes` reaches
 the self-service path; no sentence contains "failed", "invalid", "denied", "rejected", "not
