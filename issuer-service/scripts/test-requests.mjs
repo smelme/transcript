@@ -140,7 +140,11 @@ check('an applicant can open a request', opened.status === 201, JSON.stringify(o
 const requestId = opened.data.requestId;
 const applicantToken = opened.data.token;
 check('the applicant gets a handle of their own', Boolean(requestId && applicantToken));
-check('the fee is the configured one', opened.data.fee?.amount === 3000 && opened.data.fee?.currency === 'USD', JSON.stringify(opened.data.fee));
+check(
+  'the fee is the configured one',
+  opened.data.fee?.amount === 3000 && String(opened.data.fee?.currency).toLowerCase() === 'usd',
+  JSON.stringify(opened.data.fee),
+);
 check('the promised period is 10 working days', opened.data.dueWorkingDays === 10, String(opened.data.dueWorkingDays));
 
 const statusBefore = await call(`/requests/${requestId}?token=${encodeURIComponent(applicantToken)}`);
@@ -161,7 +165,48 @@ check('the institution sees the request in its queue', (queueBefore.data.request
 check('the institution is the one that will be asked', (queueBefore.data.requests || []).every((row) => row.institution === ACADEMY), JSON.stringify(queueBefore.data.requests?.[0]?.institution));
 check('another institution sees nothing of it', (await call('/admin/requests', { token: otherToken })).data.requests?.every((row) => row.requestId !== requestId) !== false);
 
-// 4. The identity check and the fee, stood in for on this build.
+// 4. The identity check. The provider is stood in for on this build, but the route, the reference
+// and the way the outcome is collected are the real ones: the outcome is fetched from the provider,
+// never taken from a request body.
+const identityStart = await call(`/requests/${requestId}/identity`, {
+  method: 'POST',
+  body: { token: applicantToken },
+});
+check('an identity check can be started', identityStart.status === 200 && Boolean(identityStart.data.sessionId), JSON.stringify(identityStart.data).slice(0, 160));
+
+const identityPoll = await call(`/requests/${requestId}/identity?token=${encodeURIComponent(applicantToken)}`);
+check('the outcome is collected from the provider', identityPoll.data.identityStatus === 'verified', JSON.stringify(identityPoll.data).slice(0, 160));
+
+// 4b. The fee. The session is created with the real key, and an unpaid one must settle nothing:
+// a request that could be marked paid by asking nicely would be a hole rather than a shortcut.
+const checkout = await call(`/requests/${requestId}/checkout`, {
+  method: 'POST',
+  body: { token: applicantToken },
+});
+if (process.env.STRIPE_SECRET_KEY) {
+  check('a checkout is created for the fee', checkout.status === 200, JSON.stringify(checkout.data).slice(0, 200));
+  check('and it is the provider\'s own page', String(checkout.data.checkoutUrl || '').startsWith('https://checkout.stripe.com'), String(checkout.data.checkoutUrl).slice(0, 80));
+  check('for the fee on this request', checkout.data.fee?.amount === 3000, JSON.stringify(checkout.data.fee));
+
+  const unpaid = await call(`/requests/${requestId}/payment/confirm`, {
+    method: 'POST',
+    body: { token: applicantToken, session_id: checkout.data.sessionId },
+  });
+  check('an unpaid session does not settle the fee', unpaid.status === 402, `status ${unpaid.status} ${JSON.stringify(unpaid.data).slice(0, 140)}`);
+
+  const afterUnpaid = await call(`/requests/${requestId}?token=${encodeURIComponent(applicantToken)}`);
+  check('and the request is still with the applicant', afterUnpaid.data.status === 'received', String(afterUnpaid.data.status));
+
+  const foreign = await call(`/requests/${requestId}/payment/confirm`, {
+    method: 'POST',
+    body: { token: applicantToken, session_id: 'cs_test_not_a_session' },
+  });
+  check('a session the provider does not know is refused', foreign.status === 402 || foreign.status === 400, `status ${foreign.status}`);
+} else {
+  console.log('  skip  the payment checks (no STRIPE_SECRET_KEY here)');
+}
+
+// The last step of the fee is the scaffold, because a card cannot be completed from a script.
 const advanced = await call(`/requests/${requestId}/advance`, { method: 'POST', body: { token: applicantToken } });
 check('the case reaches the school', advanced.status === 200 && advanced.data.status === 'submitted', JSON.stringify(advanced.data).slice(0, 140));
 check('and the promised date is set from submission', Boolean(advanced.data.dueAt), String(advanced.data.dueAt));

@@ -9,6 +9,8 @@ import addFormats from 'ajv-formats';
 import QRCode from 'qrcode';
 import { InvitationService } from './invitations.js';
 import { RequestService } from './requests.js';
+import { IdentityService, identityReason } from './identity-service.js';
+import { PaymentService } from './payment-service.js';
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath, pathToFileURL } from 'url';
@@ -1347,6 +1349,19 @@ const requestService = new RequestService({
   siteUrl: ISSUE_SITE_URL,
 });
 
+// Identity and payment for the ordered path. Both are fetched from their provider rather than
+// believed from a page: the applicant's browser never states that a check passed or that money
+// moved, and neither is configured by default.
+const identityService = new IdentityService({
+  apiKey: process.env.DIDIT_API_KEY || null,
+  workflowId: process.env.DIDIT_WORKFLOW_ID || null,
+  callbackBaseUrl: process.env.ISSUER_BASE_URL || `http://127.0.0.1:${process.env.PORT || 3000}`,
+});
+const paymentService = new PaymentService({
+  secretKey: process.env.STRIPE_SECRET_KEY || null,
+  publishableKey: process.env.STRIPE_PUBLISHABLE_KEY || null,
+});
+
 // Build an OpenID4VCI credential-offer URL that references an issuance session.
 //
 // A re-issue is marked inside the offer itself, because the offer is what travels to the wallet.
@@ -2370,6 +2385,221 @@ app.get('/requests/:id', (req, res) => {
 });
 
 /**
+ * Record an identity outcome against whichever case the session belongs to.
+ *
+ * Called from both the poll and the callback, so the two can never disagree about the same session:
+ * whoever asks second finds the case already decided and is told so.
+ */
+function applyIdentityOutcome(row, decision, actor) {
+  return requestService.attachIdentity({
+    requestId: row.request_id,
+    status: decision.outcome,
+    sessionRef: decision.sessionId,
+    summary: { provider: 'didit', reportedStatus: decision.status, checkedAt: new Date().toISOString() },
+    extract: decision.extract,
+    actor,
+  });
+}
+
+// Start a check. The applicant's own handle authorises it, and the session carries the request id,
+// so the provider's callback can find its case without being trusted about who it concerns.
+app.post('/requests/:id/identity', async (req, res) => {
+  try {
+    const row = requestService.resolve({ requestId: req.params.id, token: req.body?.token });
+    if (row.identity_status === 'verified') {
+      return res.json({ success: true, identityStatus: 'verified', alreadyVerified: true });
+    }
+    if (!identityService.configured) {throw new Error('Identity checks are not configured');}
+
+    const session = await identityService.createSession({ requestId: row.request_id });
+    requestService.startIdentity({
+      requestId: row.request_id,
+      token: req.body?.token,
+      sessionRef: session.sessionId,
+    });
+
+    res.json({
+      success: true,
+      identityStatus: 'pending',
+      sessionId: session.sessionId,
+      url: session.url,
+      // True when the provider is stood in for, so a caller can tell a real check from a rehearsal.
+      mock: session.mock === true,
+    });
+  } catch (e) {
+    sendRequestError(res, e);
+  }
+});
+
+// Ask the provider what happened. This is the applicant's own way of finding out, and it is what
+// makes the wizard work without a webhook reaching a development machine.
+app.get('/requests/:id/identity', async (req, res) => {
+  try {
+    const row = requestService.resolve({ requestId: req.params.id, token: req.query?.token });
+    if (row.identity_status === 'verified' || row.identity_status === 'failed') {
+      return res.json({
+        success: true,
+        identityStatus: row.identity_status,
+        reason: row.identity_status === 'failed' ? identityReason(null) : null,
+      });
+    }
+    if (!row.identity_ref) {return res.json({ success: true, identityStatus: 'pending', url: null });}
+
+    const decision = await identityService.getDecision(row.identity_ref);
+    if (decision.outcome === 'pending') {
+      return res.json({
+        success: true,
+        identityStatus: 'pending',
+        reason: identityReason(decision.status),
+      });
+    }
+
+    const updated = applyIdentityOutcome(row, decision, 'applicant');
+    res.json({
+      success: true,
+      identityStatus: updated.identity_status,
+      reason: updated.identity_status === 'failed' ? identityReason(decision.status) : null,
+    });
+  } catch (e) {
+    sendRequestError(res, e);
+  }
+});
+
+/**
+ * The provider's notification that there is a decision to collect.
+ *
+ * Its body decides nothing: the session is looked up against a request we already hold, and the
+ * outcome is fetched. A callback we cannot tie to a case is answered politely and changes nothing,
+ * because a wrong session id is either a mistake or an attempt and neither should leave a mark.
+ */
+app.post(
+  '/requests/identity/callback',
+  express.json({ limit: '256kb', verify: (req, _res, buffer) => {req.rawBody = buffer.toString('utf8');} }),
+  async (req, res) => {
+    const sessionId = String(req.body?.session_id || req.body?.sessionId || '').trim();
+    if (!sessionId) {return res.status(400).json({ success: false, error: 'A session is required' });}
+    if (!identitySignatureValid(req)) {
+      return res.status(401).json({ success: false, error: 'Signature check failed' });
+    }
+
+    const row = requestService.findByIdentityRef(sessionId);
+    if (!row) {return res.json({ success: true, ignored: true });}
+
+    try {
+      const decision = await identityService.getDecision(sessionId);
+      if (decision.outcome === 'pending') {return res.json({ success: true, pending: true });}
+      applyIdentityOutcome(row, decision, 'identity-provider');
+      res.json({ success: true, identityStatus: decision.outcome });
+    } catch (e) {
+      res.status(400).json({ success: false, error: e.message });
+    }
+  },
+);
+
+/**
+ * A signature is checked when a webhook secret is configured. Even then it decides only whether to
+ * look: the outcome still comes from the provider's API, so a valid signature on a lie is harmless.
+ */
+function identitySignatureValid(req) {
+  const secret = process.env.DIDIT_WEBHOOK_SECRET;
+  if (!secret) {return true;}
+  const provided = String(req.headers['x-signature-v2'] || req.headers['x-signature'] || '').replace(/^sha256=/, '');
+  if (!provided) {return false;}
+  const expected = crypto.createHmac('sha256', secret).update(req.rawBody || '').digest('hex');
+  if (expected.length !== provided.length) {return false;}
+  return crypto.timingSafeEqual(Buffer.from(expected), Buffer.from(provided));
+}
+
+// Take the fee. The applicant is sent to the provider's own page, so no card details come near us.
+app.post('/requests/:id/checkout', async (req, res) => {
+  try {
+    const cash = req.body?.token || '';
+    const row = requestService.resolve({ requestId: req.params.id, token: cash });
+    if (row.identity_status !== 'verified') {throw new Error('Confirm who you are before paying');}
+    if (row.payment_status === 'paid') {
+      return res.json({ success: true, alreadyPaid: true, status: row.status, dueAt: row.due_at });
+    }
+    if (!paymentService.configured) {throw new Error('Payment is not configured');}
+
+    // Where the applicant comes back to. The handle travels in it because the return is a fresh page
+    // load with no memory of the wizard, and the same handle is what lets them see their own case.
+    const back = `${ISSUE_SITE_URL}/request?reference=${encodeURIComponent(row.request_id)}&token=${encodeURIComponent(cash)}`;
+    const session = await paymentService.createCheckout({
+      requestId: row.request_id,
+      amount: row.fee_amount,
+      currency: row.fee_currency,
+      productName: `Credential request: ${row.school}`,
+      description: 'Checking your record and issuing your credential',
+      successUrl: `${back}&paid=1`,
+      cancelUrl: `${back}&cancelled=1`,
+    });
+
+    res.json({
+      success: true,
+      checkoutUrl: session.url,
+      sessionId: session.sessionId,
+      fee: { amount: row.fee_amount, currency: row.fee_currency },
+    });
+  } catch (e) {
+    sendRequestError(res, e);
+  }
+});
+
+/**
+ * Confirm the payment and hand the request to the school.
+ *
+ * The amount and the currency are checked against this request's own fee, so a session for
+ * something else cannot settle it. Once paid, the applicant's confirmation and the school's notice
+ * both go out, because the promised period starts here.
+ */
+app.post('/requests/:id/payment/confirm', async (req, res) => {
+  try {
+    const token = req.body?.token || null;
+    const row = requestService.resolve({ requestId: req.params.id, token });
+    if (row.payment_status === 'paid') {
+      return res.json({ success: true, paid: true, alreadyPaid: true, status: row.status, dueAt: row.due_at });
+    }
+
+    const sessionId = String(req.body?.session_id || '').trim();
+    if (!sessionId) {throw new Error('The payment session is required');}
+    if (!paymentService.configured) {throw new Error('Payment is not configured');}
+
+    const session = await paymentService.getSession(sessionId);
+    const check = paymentService.verify({
+      session,
+      requestId: row.request_id,
+      amount: row.fee_amount,
+      currency: row.fee_currency,
+    });
+    if (!check.paid) {return res.status(402).json({ success: false, error: check.reason });}
+
+    requestService.markPaid({
+      requestId: row.request_id,
+      paymentRef: session.sessionId,
+      amount: session.amount,
+      currency: row.fee_currency,
+    });
+    const submitted = requestService.submit({
+      requestId: row.request_id,
+      token,
+      termsVersion: req.body?.termsVersion || null,
+    });
+    const told = await confirmToApplicant(submitted);
+
+    res.json({
+      success: true,
+      paid: true,
+      status: submitted.status,
+      dueAt: submitted.due_at,
+      workingDays: requestService.workingDays,
+      emailSent: told.success,
+    });
+  } catch (e) {
+    sendRequestError(res, e);
+  }
+});
+
+/**
  * Development only: stand in for the identity check and the fee, so the ordered path can be walked
  * end to end before those integrations exist.
  *
@@ -2404,6 +2634,64 @@ app.post('/requests/:id/advance', async (req, res) => {
     res.status(400).json({ success: false, error: e.message });
   }
 });
+
+/**
+ * Tell the applicant their request has gone to the school, and tell the school there is one.
+ *
+ * This is the promise being made, so it is made once, in writing, with the period and the reference
+ * in it. If the school cannot be told, the applicant is still told: a request that exists with
+ * nobody looking at it is worse than one that failed loudly, and the history records that the
+ * notice did not go.
+ */
+async function confirmToApplicant(request) {
+  const due = request.due_at ? new Date(request.due_at).toDateString() : null;
+  const applicant = await emailService
+    .sendEmail({
+      to: request.applicant_email,
+      subject: 'Your credential request has been sent',
+      html: `
+    <p>Your request has been sent to ${request.school}.</p>
+    <p>What happens next:</p>
+    <ul>
+      <li>${request.school} checks your record.</li>
+      <li>When they have confirmed it, we issue your credentials and email you a link to collect them.</li>
+      <li>This takes up to ${requestService.workingDays} working days${due ? `, so by about ${due}` : ''}.</li>
+    </ul>
+    <p>Your reference is <strong>${request.request_id}</strong>. We will email ${request.applicant_email} either way.</p>
+    <p>If the request is declined, the fee is returned to the card you paid with.</p>`,
+    })
+    .catch((e) => {
+      console.error('[requests] could not confirm to the applicant:', e.message);
+      return { success: false, reason: e.message };
+    });
+
+  const queueEmail = process.env.REQUEST_QUEUE_EMAIL;
+  let queue = { success: false, skipped: 'no-queue-address' };
+  if (queueEmail) {
+    const portalUrl = (process.env.PORTAL_URL || '').replace(/\/$/, '');
+    queue = await emailService
+      .sendEmail({
+        to: queueEmail,
+        subject: 'A credential request needs a decision',
+        html: `
+    <p>There is a request waiting for a decision.</p>
+    <ul>
+      <li>Applicant: ${request.applicant_name || '—'} (${request.applicant_email})</li>
+      <li>School: ${request.school}</li>
+      <li>Reference: <strong>${request.request_id}</strong></li>
+      <li>Identity: ${request.identity_status}</li>
+      <li>Promised by: ${due || 'the period agreed'}</li>
+    </ul>
+    <p>${portalUrl ? `<a href="${portalUrl}/requests">Open the queue</a>` : 'Open the management portal and look under Manual requests.'}</p>`,
+      })
+      .catch((e) => {
+        console.error('[requests] could not notify the queue:', e.message);
+        return { success: false, reason: e.message };
+      });
+  }
+
+  return { success: applicant.success === true, applicant, queue };
+}
 
 /**
  * Tell the applicant what was decided. The reviewer's note is not sent: the reason is what the

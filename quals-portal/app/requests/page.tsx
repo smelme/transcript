@@ -48,7 +48,8 @@ function statusClass(status: string): string {
 
 function money(fee?: { amount: number; currency: string } | null): string {
   if (!fee) return '—';
-  return `${(fee.amount / 100).toFixed(2)} ${fee.currency}`;
+  // Stored in the provider's lower case, shown the way a person writes it.
+  return `${(fee.amount / 100).toFixed(2)} ${fee.currency.toUpperCase()}`;
 }
 
 function wantedLabel(wanted: string[]): string {

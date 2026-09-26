@@ -314,6 +314,45 @@ export class RequestService {
   }
 
   /**
+   * Start an identity check, or start another one after a refusal.
+   *
+   * The session id is kept on the request so that a callback can find its case by the reference we
+   * created, rather than by believing anything the callback says about which person it concerns.
+   */
+  startIdentity({ requestId, token, sessionRef }) {
+    const row = this.resolve({ requestId, token });
+    if (row.identity_status === 'verified') {return row;}
+
+    const patch = { identity_ref: sessionRef, identity_status: 'pending' };
+    if ([STATUS.DRAFT, STATUS.DETAILS_CAPTURED, STATUS.IDENTITY_FAILED].includes(row.status)) {
+      return this._transition(row, STATUS.IDENTITY_PENDING, {
+        actor: 'applicant',
+        event: 'identity.started',
+        detail: { sessionRef },
+        patch,
+      });
+    }
+
+    // Already waiting on a check: a second attempt replaces the session it points at, and the event
+    // history keeps the first, so a repeated start is visible rather than silent.
+    getDb()
+      .prepare('UPDATE credential_requests SET identity_ref = ?, identity_status = ?, updated_at = ? WHERE request_id = ?')
+      .run(sessionRef, 'pending', new Date().toISOString(), row.request_id);
+    this._event(requestId, 'identity.restarted', { actor: 'applicant', detail: { sessionRef } });
+    return this._row(requestId);
+  }
+
+  /** The request a session belongs to, or nothing. A callback is only ever a hint to look here. */
+  findByIdentityRef(sessionRef) {
+    if (!sessionRef) {return null;}
+    return (
+      getDb()
+        .prepare('SELECT * FROM credential_requests WHERE identity_ref = ? ORDER BY created_at DESC LIMIT 1')
+        .get(sessionRef) || null
+    );
+  }
+
+  /**
    * Record the identity outcome. Called by the verification callback, so it is not applicant
    * input: the applicant's browser never states that a check passed.
    */
