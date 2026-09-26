@@ -344,6 +344,29 @@ export default function RequestsPage() {
                     <th>Asked for</th>
                     <td>{wantedLabel(selected.wanted)}</td>
                   </tr>
+                  {/* What the school matches the record by hand with: the number, the student id when
+                      the applicant knew it, and the date of birth the document confirmed (P0-45). */}
+                  <tr>
+                    <th>Social security number</th>
+                    <td className="mono">{selected.applicantSsn || '—'}</td>
+                  </tr>
+                  <tr>
+                    <th>Student id</th>
+                    <td className="mono">{selected.applicantStudentId || '—'}</td>
+                  </tr>
+                  <tr>
+                    <th>Date of birth</th>
+                    <td>
+                      {selected.extract?.birthDate ? (
+                        <>
+                          {String(selected.extract.birthDate)}{' '}
+                          <span className="muted">from the document</span>
+                        </>
+                      ) : (
+                        <span className="muted">Not read from the document</span>
+                      )}
+                    </td>
+                  </tr>
                   <tr>
                     <th>Identity</th>
                     <td>

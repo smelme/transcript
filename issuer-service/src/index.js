@@ -8,7 +8,7 @@ import Ajv from 'ajv';
 import addFormats from 'ajv-formats';
 import QRCode from 'qrcode';
 import { InvitationService } from './invitations.js';
-import { RequestService } from './requests.js';
+import { RequestService, extractedBirthDate } from './requests.js';
 import { IdentityService, identityReason } from './identity-service.js';
 import { PaymentService } from './payment-service.js';
 import fs from 'fs';
@@ -2529,6 +2529,10 @@ app.post('/requests', async (req, res) => {
       applicantEmail: req.body?.email,
       applicantPhone: req.body?.phone ?? null,
       applicantName: req.body?.name ?? null,
+      // What the school matches the record by hand with (P0-45): the number is required, and a
+      // student id is taken when the applicant knows it.
+      applicantSsn: req.body?.ssn ?? null,
+      applicantStudentId: req.body?.studentId ?? null,
       wanted: req.body?.wanted,
     });
     res.status(201).json({
@@ -2615,6 +2619,8 @@ app.get('/requests/:id/identity', async (req, res) => {
         success: true,
         identityStatus: row.identity_status,
         reason: row.identity_status === 'failed' ? identityReason(null) : null,
+        // What the document said, so the applicant can see the date of birth the search will use.
+        birthDate: extractedBirthDate(row),
       });
     }
     if (!row.identity_ref) {return res.json({ success: true, identityStatus: 'pending', url: null });}
@@ -2633,6 +2639,7 @@ app.get('/requests/:id/identity', async (req, res) => {
       success: true,
       identityStatus: updated.identity_status,
       reason: updated.identity_status === 'failed' ? identityReason(decision.status) : null,
+      birthDate: extractedBirthDate(updated),
     });
   } catch (e) {
     sendRequestError(res, e);
@@ -2776,6 +2783,17 @@ async function identityReturn(req, res) {
     }
   }
 
+  // Put the applicant back in front of their own request rather than leaving them on a page of ours.
+  // The wizard reads the marker: it carries on if the check passed, and offers another try if it did
+  // not. The rendered page below is the fallback for a session with no handle to return with.
+  if (reference && handle) {
+    const back = new URL(`${ISSUE_SITE_URL}/request`);
+    back.searchParams.set('reference', reference);
+    back.searchParams.set('token', handle);
+    back.searchParams.set('identity', outcome || 'pending');
+    return res.redirect(302, back.toString());
+  }
+
   res.type('html').status(200).send(identityReturnPage({ outcome, reference, handle, reason }));
 }
 
@@ -2840,26 +2858,30 @@ app.post('/requests/:id/checkout', async (req, res) => {
     }
     if (!paymentService.configured) {throw new Error('Payment is not configured');}
 
-    // Where the applicant comes back to. The handle travels in it because the return is a fresh page
-    // load with no memory of the wizard, and the same handle is what lets them see their own case.
-    // The provider replaces the session placeholder, so the return carries which payment it was.
+    // Where the applicant comes back to if the provider insists on sending them somewhere. The handle
+    // travels in it because the return is a fresh page load with no memory of the wizard, and the same
+    // handle is what lets them see their own case. The provider replaces the session placeholder, so
+    // the return carries which payment it was.
     const back = `${ISSUE_SITE_URL}/request?reference=${encodeURIComponent(row.request_id)}&token=${encodeURIComponent(cash)}`;
-    const session = await paymentService.createCheckout({
+    const session = await paymentService.createEmbeddedCheckout({
       requestId: row.request_id,
       amount: row.fee_amount,
       currency: row.fee_currency,
       productName: `Credential request: ${row.school}`,
       description: 'Checking your record and issuing your credential',
-      successUrl: `${back}&paid=1&session_id={CHECKOUT_SESSION_ID}`,
-      cancelUrl: `${back}&cancelled=1`,
+      returnUrl: `${back}&paid=1&session_id={CHECKOUT_SESSION_ID}`,
     });
 
-    // Recorded as well as returned, so confirming does not depend on the return keeping its query.
+    // Recorded as well as returned, so confirming does not depend on the browser coming back with
+    // anything at all: the embedded form finishes where it is and asks us to confirm.
     requestService.recordCheckout({ requestId: row.request_id, sessionId: session.sessionId });
 
     res.json({
       success: true,
-      checkoutUrl: session.url,
+      // What the browser mounts, and the key it mounts it with. The amount is repeated so the page can
+      // say what it is about to take without trusting what it was told earlier.
+      clientSecret: session.clientSecret,
+      publishableKey: paymentService.publishableKey,
       sessionId: session.sessionId,
       fee: { amount: row.fee_amount, currency: row.fee_currency },
     });

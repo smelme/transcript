@@ -52,6 +52,9 @@ export interface CredentialRequest {
 
 /** One case, with what a decision needs. */
 export interface RequestDetail extends CredentialRequest {
+  /** What the applicant is matched to a record by hand with (P0-45). */
+  applicantSsn?: string | null;
+  applicantStudentId?: string | null;
   extract: Record<string, unknown> | null;
   identitySummary: Record<string, unknown> | null;
   canDecide: boolean;
