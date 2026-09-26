@@ -87,7 +87,8 @@ export default function RequestPage() {
   const [notice, setNotice] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
-  // What they entered, and what they are asking for.
+  // What they are asking for, and how to reach them. There is no name here on purpose: it comes from
+  // the document the check reads, and is filled in on the review step.
   const [school, setSchool] = useState(SCHOOLS[0]);
   const [wanted, setWanted] = useState<Wanted>('both');
   const [name, setName] = useState('');
@@ -173,10 +174,13 @@ export default function RequestPage() {
       identityStatus: 'pending' | 'verified' | 'failed';
       reason?: string | null;
       birthDate?: string | null;
+      name?: string | null;
     }>(`/requests/${current.requestId}/identity?token=${encodeURIComponent(current.token)}`);
 
     if (result.identityStatus === 'verified') {
       setVerifiedBirthDate(result.birthDate || null);
+      // The document's name, not one they typed: there is no name on the form to type one into.
+      if (result.name) setName(result.name);
       setIdentityProblem(null);
       setStage('review');
     } else if (result.identityStatus === 'failed') {
@@ -298,7 +302,7 @@ export default function RequestPage() {
     try {
       const created = await api<{ requestId: string; token: string; fee: Fee; dueWorkingDays: number }>('/requests', {
         method: 'POST',
-        body: JSON.stringify({ email, name, phone, ssn, studentId: studentId || null, school, wanted: [wanted] }),
+        body: JSON.stringify({ email, phone, ssn, studentId: studentId || null, school, wanted: [wanted] }),
       });
       store({ requestId: created.requestId, token: created.token, email });
       setFee(created.fee);
@@ -474,17 +478,6 @@ export default function RequestPage() {
             </fieldset>
 
             <label className="req-field">
-              <span>Your full name</span>
-              <input
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-                autoComplete="name"
-                required
-                placeholder="As it was when you studied"
-              />
-            </label>
-
-            <label className="req-field">
               <span>Email address</span>
               <input
                 type="email"
@@ -534,7 +527,7 @@ export default function RequestPage() {
             </label>
 
             <div className="req-actions">
-              <button type="submit" className="req-btn" disabled={busy || !name.trim() || !email.trim() || !ssn.trim()}>
+              <button type="submit" className="req-btn" disabled={busy || !email.trim() || !ssn.trim()}>
                 {busy ? 'Opening your request…' : 'Continue'}
               </button>
               <span className="req-note">Nothing is paid yet, and nothing is sent to the school yet.</span>
@@ -606,10 +599,16 @@ export default function RequestPage() {
           </p>
 
           <dl className="req-summary">
-            <div>
-              <dt>Name</dt>
-              <dd>{name || '—'}</dd>
-            </div>
+            {/* The name and the date of birth are both the document's rather than the applicant's:
+                the check read them, and they are what the school is asked to match against. */}
+            {name && (
+              <div>
+                <dt>Name</dt>
+                <dd>
+                  {name} <span className="req-note">from your document</span>
+                </dd>
+              </div>
+            )}
             {verifiedBirthDate && (
               <div>
                 <dt>Date of birth</dt>

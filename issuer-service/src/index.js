@@ -8,7 +8,7 @@ import Ajv from 'ajv';
 import addFormats from 'ajv-formats';
 import QRCode from 'qrcode';
 import { InvitationService } from './invitations.js';
-import { RequestService, extractedBirthDate } from './requests.js';
+import { RequestService, extractedBirthDate, extractedName } from './requests.js';
 import { IdentityService, identityReason } from './identity-service.js';
 import { PaymentService } from './payment-service.js';
 import fs from 'fs';
@@ -2358,7 +2358,9 @@ function requestSummary(request) {  return {
     school: request.school,
     applicantEmail: request.applicant_email,
     applicantPhone: request.applicant_phone,
-    applicantName: request.applicant_name,
+    // The document's name where the check has run, since that is the name the school is matching and
+    // the applicant is no longer asked to type one (P0-45 follow-up).
+    applicantName: extractedName(request) || request.applicant_name,
     wanted: typeof request.wanted === 'string' ? JSON.parse(request.wanted) : request.wanted,
     status: request.status,
     applicantStatus: request.applicantStatus,
@@ -2400,6 +2402,11 @@ app.get('/admin/requests/:id', async (req, res) => {
       success: true,
       request: {
         ...requestSummary(request),
+        // What the school matches the record by hand with, and the student id when the applicant
+        // knew it (P0-45). On the one case rather than on the queue: a reviewer reads these while
+        // looking somebody up, and a list of them is a list nobody needs to be holding.
+        applicantSsn: request.applicant_ssn ?? null,
+        applicantStudentId: request.applicant_student_id ?? null,
         extract: request.extract,
         identitySummary: request.identitySummary,
         canDecide: request.canDecide,
@@ -2528,7 +2535,8 @@ app.post('/requests', async (req, res) => {
       school: req.body?.school || ACADEMY_NAME,
       applicantEmail: req.body?.email,
       applicantPhone: req.body?.phone ?? null,
-      applicantName: req.body?.name ?? null,
+      // No name is taken from here: the applicant door does not ask for one, and the document check
+      // reads it instead. A name supplied by a browser is a name nobody verified.
       // What the school matches the record by hand with (P0-45): the number is required, and a
       // student id is taken when the applicant knows it.
       applicantSsn: req.body?.ssn ?? null,
@@ -2619,8 +2627,10 @@ app.get('/requests/:id/identity', async (req, res) => {
         success: true,
         identityStatus: row.identity_status,
         reason: row.identity_status === 'failed' ? identityReason(null) : null,
-        // What the document said, so the applicant can see the date of birth the search will use.
+        // What the document said, so the applicant can see the date of birth the search will use and
+        // the name it will be made in.
         birthDate: extractedBirthDate(row),
+        name: extractedName(row),
       });
     }
     if (!row.identity_ref) {return res.json({ success: true, identityStatus: 'pending', url: null });}
@@ -2640,6 +2650,7 @@ app.get('/requests/:id/identity', async (req, res) => {
       identityStatus: updated.identity_status,
       reason: updated.identity_status === 'failed' ? identityReason(decision.status) : null,
       birthDate: extractedBirthDate(updated),
+      name: extractedName(updated),
     });
   } catch (e) {
     sendRequestError(res, e);

@@ -163,6 +163,19 @@ test("the applicant's own view gives them back what they gave us", () => {
   const other = openCase(service, { applicantEmail: 'nobody@example.com' });
   assert.strictEqual(service.applicantView(other).studentId, null);
   assert.strictEqual(service.applicantView(other).phone, null);
+
+  // Once the document has been read, the name on the case is the document's rather than anything
+  // that arrived with the form: it is the name the school is asked to match, and the applicant is not
+  // asked for one (P0-45 follow-up).
+  service.attachIdentity({
+    requestId,
+    status: 'verified',
+    sessionRef: 'didit-name-1',
+    extract: { givenName: 'Ada', familyName: 'Lovelace', birthDate: '1815-12-10' },
+  });
+  const verified = service.applicantView({ requestId, token });
+  assert.strictEqual(verified.name, 'Ada Lovelace');
+  assert.strictEqual(verified.verifiedBirthDate, '1815-12-10');
 });
 
 test('a case cannot be submitted before the identity check and the fee', () => {

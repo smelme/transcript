@@ -70,3 +70,26 @@ states it where it is being paid.
 Covered by *"the applicant's own view gives them back what they gave us"* — the coverage this view
 should have had from the start, since the review screen is only ever as good as what the view hands
 it.
+
+## The name is not asked for either, from the same run
+
+Step one asked for a full name. It should not: the applicant is about to hold a document up to the
+camera, and the name the school is asked to match a record against should be the name the document
+carries rather than one typed into a form. A typed name is a name nobody verified, and in this flow
+the applicant is exactly the person the institution could not identify on its own.
+
+So the form asks for the address, the number the record is filed under, a student id when they know
+it and a phone number when they want to give one. The check reads the name and the date of birth off
+the document, and **both are shown back on the review step marked "from your document"**, which is
+also the last moment either can be seen before somebody pays for a search made with them.
+
+The name the document gave is written onto the case, so the reviewer's queue, the credential preview
+and the credential itself all spell it the way the document does, and a name sent in the request body
+is ignored. The number and the student id reached the case but were **not** in the response the
+reviewer's screen reads, which is why that screen showed a dash where the number should be: the field
+was missing from the API rather than from the form. Both are now on the case detail, and the queue
+carries neither, because a list of numbers is a list nobody needs to be holding.
+
+Guarded by *"the case carries the number, and the document carries the name, to whoever looks the
+record up"*, which signs in as a registrar of the institution, opens a case through the applicant's
+own door, reads it back, and confirms another institution can read none of it.
