@@ -1,6 +1,6 @@
 # P0-38: Quals reviews a request
 
-**Status:** Not started
+**Status:** Not started - the queue and the decision are built in the service; the portal section is not
 **Components:** `quals-portal` (new Manual requests section), `issuer-service` (queue, detail,
 decision, evidence access, notifications)
 **Depends on:** P0-36, P0-37

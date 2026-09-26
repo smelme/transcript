@@ -1,6 +1,6 @@
 # P0-37: The fee, before the review
 
-**Status:** Not started
+**Status:** Not started - decided: $30.00 USD, refunds deferred, the period runs from submission
 **Components:** `issuer-service` (checkout, webhook, reconciliation), `quals-frontend` (payment
 step and confirmation)
 **Depends on:** P0-36

@@ -167,6 +167,25 @@ Three answers are possible, and the page must handle all three:
 | Does the applicant need a Quals account before paying? | Decides whether we verify an address before taking money | Recommend: yes, verified by the existing email code step, so the collection link later lands somewhere trustworthy |
 | One request, several credentials? | The payload decides, so it should be possible | Default to allowing it; the CSV carries it |
 
+## Decisions taken after review
+
+| Question | Answer |
+| --- | --- |
+| Who may assert an academic fact | The institution's own administrator, in the Quals portal, with their logged-in token. The issuer reads the institution from that administrator and signs with Smart College's certificate |
+| The anchor for the five years | Since they studied - the last date of study, not the award |
+| The fee | $30.00 USD, through the payment credentials already configured in production |
+| Refunds on a declined request | Deferred. Handled by hand for now, so the page must not promise an automatic return yet |
+| The promised period | 10 working days, from submission - that is, once the completed request has been passed to the school |
+| Order of the applicant's steps | Review their details, pay, submit |
+| One request, several credentials | Allowed. A request may ask for the qualification, the transcript, or both |
+| Who owns the queue | A Smart Academy administrator, scoped to their institution, so they see only their own requests |
+
+Two consequences worth stating plainly. The decision point on Smart Academy still needs a
+completion date the registry does not have, so P0-35 cannot be finished before the academy-side
+story lands. And because the institution acts with an administrator's token rather than an API key,
+the payload upload and the issue both inherit the portal's existing organisation scoping, which is
+the same boundary that protects credentials and keys today.
+
 ## Risks
 
 | Risk | Severity | Likelihood | Note |

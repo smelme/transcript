@@ -59,6 +59,11 @@ the request must live where issuing happens, so there is one place that can refu
 payment configuration as the model. C is rejected because the promise must start from a state we can
 observe.
 
+**Decided:** A. The fee is **$30.00 USD**, taken through the payment credentials already configured
+in production, with the same provider the academy uses. **Refunds are deferred**, so the page may
+state the fee and the period but must not promise an automatic return on a declined request until
+that path exists - declining returns the fee by hand in the meantime, and the copy says so.
+
 ### How claims reach the issuer
 
 | Option | Pros | Cons |
@@ -120,6 +125,17 @@ collection and its expiry.
 
 SQLite in `db.js`, following the existing conventions (snake_case, opaque TEXT ids, ISO timestamps,
 `CREATE TABLE IF NOT EXISTS` plus `PRAGMA table_info` before `ALTER TABLE`).
+
+**As built on this branch**: `credential_requests`, `request_events` and `request_payloads` exist in
+`db.js`, with the service in `issuer-service/src/requests.js` and the file contract in
+`issuer-service/src/request-payload.js`. The listing below is the shape they implement; the one
+thing not yet stored is `request_evidence`, which arrives with the identity story. Two differences
+from the sketch are deliberate: the delivery address is the applicant's own verified address rather
+than a separate field, so a case cannot be redirected later; and `paid` is a state of its own rather
+than a flag, so the promised period starts when the applicant submits and not when the money lands.
+
+The routes below are the contract the wizard and the portal will call. None are wired yet; the queue
+and the payload are the next step.
 
 ```sql
 requests
@@ -259,7 +275,8 @@ stateDiagram-v2
   identity_pending --> identity_failed: refused
   identity_failed --> identity_pending: retry
   identity_verified --> awaiting_payment
-  awaiting_payment --> submitted: paid and frozen
+  awaiting_payment --> paid: fee paid
+  paid --> submitted: applicant confirms and freezes
   submitted --> in_review: operator opens the case
   in_review --> accepted: decision
   in_review --> declined: decision
@@ -395,7 +412,8 @@ self-reported claims, and the demo generator.
 
 **ADR-4: Payment before the review, with the refund rule stated before payment.** Rejected: payment
 after acceptance, because it lengthens the promise and adds a second abandonment point; and payment
-by transfer, because the promise could not start from an observable state.
+by transfer, because the promise could not start from an observable state. Settled: $30.00 USD
+before the review, refunds deferred and handled by hand for now.
 
 **ADR-5: The decision point answers yes / no / unknown, and unknown goes to the queue.** Rejected: a
 hard yes/no, because a wrong *no* turns away a legitimate graduate and a wrong *yes* issues a
@@ -404,3 +422,13 @@ credential on no evidence.
 **ADR-6: Identity evidence carries its own retention clock.** Rejected: keeping evidence with the
 case indefinitely, because there is no reason to hold a copy of somebody's passport after the
 decision that needed it.
+
+**ADR-7: The promised period runs from submission.** Ten working days, counted from the moment the
+completed request is handed to the school, because that is the first moment somebody at the
+institution could act on it. Payment starts the applicant's clock, not the school's.
+
+**ADR-8: The institution acts with its own administrator's token.** The upload and the issue are both
+made by an administrator scoped to the institution, and the issuer reads the institution from that
+administrator rather than from the request body. The API-key path stays for a registry publishing
+without a human, but the ordered path has a human in it, and the audit trail should name them.
+Declining is the institution's decision too, so the same token carries it.

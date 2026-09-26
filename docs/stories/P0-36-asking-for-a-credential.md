@@ -1,7 +1,7 @@
 # P0-36: Asking for a credential
 
-**Status:** Not started
-**Components:** `issuer-service` (new request domain, `db.js`), `quals-frontend` (`/request`
+**Status:** In progress - the case, its states and its audit trail are built; the wizard is not
+**Components:** `issuer-service` (request domain: `db.js`, `src/requests.js`), `quals-frontend` (`/request`
 wizard), Didit integration
 **Depends on:** P0-35 (the door that leads here)
 **Blocks:** P0-37, P0-38, P0-39, P0-40
