@@ -29,20 +29,25 @@ This story adds the question, the alternative, and the honest third answer.
 changed, an address that is old, or a record that is thin. *Unknown* is the honest answer and it
 routes to the ordered path, where a person looks. See ADR-5.
 
-**The applicant picks their path; the record decides whether it can serve them.** The two ways in
-are named by when somebody studied — *in the last five years* and *more than five years ago* — and
-both are offered side by side with their costs and waits. That is the one thing the applicant knows
-without being asked and the only thing either path turns on, so nothing is put in front of the
-choice. The institution's records still have the last word: somebody who takes the first path whose
-record is older than the window, or cannot be matched, is sent down the second one rather than turned
-away. Offering the paths is not the same as promising the answer.
+**One way in, and a quiet way out.** The page is a sign-in: one field, one button, and underneath it
+the second road, shaped the way every sign-in screen offers *forgot your password?* — a question
+about circumstances rather than a verdict about the person. Somebody who finished longer ago, or whom
+we cannot match, takes that line; somebody who does not recognise themselves in it signs in and never
+thinks about it again.
 
-*(This story first specified a single page that asked for an address and then told the applicant
-which door applied. That put a question in front of a decision they could already make, and it read
-as a verdict on them. The two paths are now chosen, not assigned.)*
+**The applicant is not asked to classify themselves, and is not quoted two prices up front.** Two
+labelled paths with their costs and waits, shown before anything had been asked for, made the simplest
+way in look like a decision about the applicant rather than an action they take. The second road's
+cost, wait and requirements are stated where they are needed: in the refusal, when the sign-in cannot
+serve somebody and they are about to take it.
 
-The window is measured on the institution's data, never on the applicant's word — including when
-they choose the wrong path, which corrects them rather than blaming them.
+**The record decides whether the sign-in can serve somebody**, never their word about themselves.
+Somebody it cannot serve is corrected by the record, not blamed for it.
+
+*(This story has been through three shapes: a single page that asked for an address and then told the
+applicant which door applied; then two labelled paths offered side by side; then this. Each change came
+from the same finding — the page was asking the applicant to do the institution's job, or to read the
+institution's paperwork before they had asked for anything.)*
 
 **Nothing redirects on its own.** The applicant chooses. This is the rule we already settled on the
 hand-over screen, and it applies with more force here because the two doors cost different amounts
@@ -84,19 +89,19 @@ of money and time.
 
 | Where | What |
 | --- | --- |
-| `issuer-frontend/app/lib/doors.js` | **New.** The two paths and the words for every answer, as a plain module so the wording can be checked without a browser. The path labels are built from the window constant, so they cannot drift apart |
+| `issuer-frontend/app/lib/doors.js` | **New.** The one way in, the quiet way out, and the words for every answer, as a plain module so the wording can be checked without a browser. The way-out prompt is built from the window constant, so it cannot drift from the rule the institution measures by |
 | `issuer-frontend/app/api/eligibility/route.ts` | **New.** The server-side question. A registry that does not answer becomes `unknown`, never `no` |
-| `issuer-frontend/app/get-credentials/page.tsx` | Rewritten as the **first path**: its heading names it, it is where the address is entered, and the second path is linked from it throughout |
-| `issuer-frontend/app/page.tsx`, `app/credentials/page.tsx` | Both paths, each a card with its own link |
+| `issuer-frontend/app/get-credentials/page.tsx` | Rewritten as the **sign-in**: heading, address field, one button, and the way out underneath |
+| `issuer-frontend/app/page.tsx`, `app/credentials/page.tsx` | A single panel offering the sign-in, with the way out beneath it. The two-path cards and their cost tables are gone |
 | `scripts/check-decision.mjs` | **New.** 13 checks over the three outcomes and the copy rules |
 | `scripts/check-doors-live.mjs` | **New.** 13 checks against the deployment: both doors stated on all three pages, no self-forwarding, and an unanswerable question coming back as `unknown` with a reason |
 
 The copy rules the check enforces, because they are the acceptance criterion: only a `yes` reaches
 the self-service path; no sentence contains "failed", "invalid", "denied", "rejected", "not
 found", "no record" or "verification failed"; **every** year figure in the copy is the configured
-window, so the page cannot state a different number from the one the registry measures by; both
-paths are recognisable by timeframe and state their cost, wait and what is needed; and every outcome
-that is not self-service offers the checked path by name.
+window, so the page cannot state a different number from the one the registry measures by; the way
+out is a question, states the window, and does not characterise the applicant; and every outcome that
+is not self-service offers the checked path by name.
 
 **One deliberate departure.** The story's step 5 has the chooser present both doors on "the page
 people read first". Both paths are now offered on the home page, on `/get-credentials` *and* on
