@@ -93,7 +93,9 @@ of money and time.
 | `issuer-frontend/app/api/eligibility/route.ts` | **New.** The server-side question. A registry that does not answer becomes `unknown`, never `no` |
 | `issuer-frontend/app/get-credentials/page.tsx` | Rewritten as the **sign-in**: heading, address field, one button, and the way out underneath |
 | `issuer-frontend/app/page.tsx`, `app/credentials/page.tsx` | A single panel offering the sign-in, with the way out beneath it. The two-path cards and their cost tables are gone |
-| `scripts/check-decision.mjs` | **New.** 13 checks over the three outcomes and the copy rules |
+| `issuer-frontend/app/lib/demo-registry.js` | **New, demonstration only.** The addresses this deployment will recognise and the record it pretends to hold for each, with the five-year rule applied to them. Off unless `NEXT_PUBLIC_DEMO_REGISTRY` is set |
+| `issuer-frontend/app/lib/demo-publish.ts` | **New, demonstration only.** Publishes a demonstrated credential for a listed address through the issuer's fenced demonstration route |
+| `scripts/check-decision.mjs` | **New.** 18 checks over the three outcomes, the copy rules, and the demonstration registry |
 | `scripts/check-doors-live.mjs` | **New.** 13 checks against the deployment: both doors stated on all three pages, no self-forwarding, and an unanswerable question coming back as `unknown` with a reason |
 
 The copy rules the check enforces, because they are the acceptance criterion: only a `yes` reaches
@@ -110,3 +112,33 @@ link is `/get-credentials`, and it should not be the one page that withholds the
 
 **What the responsive check still needs.** `scripts/check-responsive.mjs` reads the live sites, so
 the new sections are checked at 360/390/768 after deployment rather than before it.
+
+## The demonstration registry
+
+The sign-in asks the institution's database one question, and on a demonstration deployment there is
+no reachable database to ask — so every address answered *"we could not look that up just now"* and
+nobody could get past the first step. A demo that cannot demonstrate anything is not a demo.
+
+`demo-registry.js` is therefore a small, deliberately fake registry: a list of addresses and the
+record the institution would hold for each, obeying **the same window rule, using the same constant**.
+A listed address whose graduation is inside the window is served; one outside it is sent down the
+checked path; an address that is not listed is `unknown`, never `no`.
+
+Four things keep it honest, and they are the reason it is safe to ship:
+
+1. **The real registry answers first.** The list is consulted only when the real one did not answer,
+   so it can never turn a real `no` into a `yes`.
+2. **It is off unless a deployment asks for it** (`NEXT_PUBLIC_DEMO_REGISTRY`). A list that quietly
+   decided who could collect a real credential would be the worst kind of bug, because nobody would
+   think to look for it.
+3. **Publishing is gated by the same list.** An address on it gets a demonstrated credential through
+   the issuer's fenced demonstration route; an address that is not on it gets the registry's own
+   refusal. The demo cannot quietly issue to somebody it was not asked about.
+4. **The page states no graduation year from the list.** The demonstrated credential is *generated*,
+   so a page repeating a year from the list would disagree with the document it just produced — and a
+   page that contradicts its own credential is worse than one that says nothing about the year.
+
+Turning it on is two variables: `NEXT_PUBLIC_DEMO_REGISTRY=true` on the academy site, and
+`ISSUER_API_URL` pointing at the issuer. The issuer must also have `ALLOW_DEMO_RECORDS=true`, which
+is the fence P0-41 put around generated records — **setting it reopens that route for any address,
+not only the listed ones**, so it belongs on a demonstration deployment and nowhere else.

@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import Link from 'next/link';
 import { CHECKED_PATH, COPY, REQUEST_PAGE_URL, outcomeFor } from '../lib/doors';
+import { DEMO_REGISTRY_ENABLED, demoOutcomes } from '../lib/demo-registry';
 
 /**
  * Sign in with your email - the one way in.
@@ -234,6 +235,34 @@ export default function GetCredentialsPage() {
               </p>
             </div>
           </>
+        )}
+
+        {/*
+          On a demonstration deployment this list *is* the registry: there is no database behind the
+          sign-in, so these invented records stand in, and the panel says so rather than pretending.
+          Shown nowhere else — a real deployment must not appear to keep a list of people who may
+          apply, because that is not what it is.
+        */}
+        {DEMO_REGISTRY_ENABLED && (
+          <div className="card" style={{ marginTop: 20 }}>
+            <p style={{ marginTop: 0 }}>
+              <strong>Demonstration addresses</strong>
+            </p>
+            <p className="muted" style={{ marginTop: 6 }}>
+              No registry is connected on this deployment, so these invented records stand in for
+              one. Any other address is offered the checked path.
+            </p>
+            <ul style={{ margin: '12px 0 0', paddingLeft: 18 }}>
+              {demoOutcomes().map((entry) => (
+                <li key={entry.email} style={{ marginBottom: 4, fontSize: 14 }}>
+                  <code>{entry.email}</code> —{' '}
+                  {entry.verdict === 'yes'
+                    ? 'inside the window, so collect them yourself'
+                    : 'outside the window, so the checked path'}
+                </li>
+              ))}
+            </ul>
+          </div>
         )}
       </div>
     </section>

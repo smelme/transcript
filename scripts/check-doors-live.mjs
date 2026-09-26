@@ -144,6 +144,38 @@ check(
   `status ${noAddress.status}, verdict ${JSON.stringify(noAddress.json?.verdict)}`
 );
 
+// The demonstration registry, where a deployment has turned it on. These run only then, so a real
+// deployment is not failed for correctly refusing to keep a list of people who may apply.
+if (/Demonstration addresses/i.test(signInText)) {
+  const listed = await post('/api/eligibility', { email: 's.melese+63@gmail.com' });
+  check(
+    'a listed demo address is inside the window',
+    listed.json?.verdict === 'yes',
+    `verdict ${JSON.stringify(listed.json?.verdict)}`
+  );
+  check(
+    'and its answer states no year, so the page cannot disagree with the credential',
+    listed.json?.completedYear === null,
+    `completedYear ${JSON.stringify(listed.json?.completedYear)}`
+  );
+
+  const outside = await post('/api/eligibility', { email: 'alice@demo.smartcollege.test' });
+  check(
+    'a listed address outside the window is offered the checked path',
+    outside.json?.verdict === 'no',
+    `verdict ${JSON.stringify(outside.json?.verdict)}`
+  );
+
+  const unlisted = await post('/api/eligibility', { email: 'not-on-the-list@nowhere.test' });
+  check(
+    'an address that is not on the demo list is unknown, never no',
+    unlisted.json?.verdict === 'unknown',
+    `verdict ${JSON.stringify(unlisted.json?.verdict)}`
+  );
+} else {
+  console.log('  ..    demonstration registry is off, so its list is not asserted');
+}
+
 // ── the publish ────────────────────────────────────────────────────────────────────────────
 const published = await post('/api/publish', { email: 'nobody@example.com' });
 check(

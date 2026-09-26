@@ -18,6 +18,12 @@ import {
   outcomeFor,
   REQUEST_PAGE_URL,
 } from '../issuer-frontend/app/lib/doors.js';
+import {
+  DEMO_REGISTRY_ENABLED,
+  demoEligibilityFor,
+  demoStudentFor,
+  withinWindow,
+} from '../issuer-frontend/app/lib/demo-registry.js';
 
 let passed = 0;
 const failures = [];
@@ -187,6 +193,64 @@ check('every outcome that is not self-service points the applicant somewhere', (
       `the copy for ${JSON.stringify(answer)} must offer the checked path`
     );
   }
+});
+
+// ── 5. The demonstration registry, and the fence around it ────────────────────────────────
+
+check('the demonstration registry is off unless a deployment asks for it', () => {
+  // Everything about the list rests on this. A registry that quietly decided who could collect a
+  // real credential would be the worst kind of bug, because nobody would think to look for it.
+  assert.equal(
+    DEMO_REGISTRY_ENABLED,
+    process.env.NEXT_PUBLIC_DEMO_REGISTRY === 'true',
+    'the demo registry must follow the environment rather than a default of its own'
+  );
+  assert.equal(DEMO_REGISTRY_ENABLED, false, 'and it must be off in this tree');
+});
+
+check('the demonstration registry measures the same window the real one does', () => {
+  const now = new Date('2026-09-26T00:00:00Z');
+
+  assert.equal(withinWindow('2024-07-01', now), true, 'two years ago is inside');
+  assert.equal(withinWindow('2015-07-01', now), false, 'eleven years ago is outside');
+  // The boundary day counts, exactly as it does in the registry.
+  assert.equal(withinWindow('2021-09-26', now), true, 'the boundary day is inside');
+  assert.equal(withinWindow('2021-09-25', now), false, 'the day past the boundary is outside');
+});
+
+check('a listed address is answered by its date, and an unlisted one is never a no', () => {
+  const now = new Date('2026-09-26T00:00:00Z');
+
+  assert.equal(demoEligibilityFor('s.melese+63@gmail.com', now).verdict, 'yes');
+  assert.equal(
+    demoEligibilityFor('S.Melese+63@Gmail.com', now).verdict,
+    'yes',
+    'the address must match whatever its case is'
+  );
+  assert.equal(demoEligibilityFor('alice@demo.smartcollege.test', now).verdict, 'no');
+  assert.equal(demoEligibilityFor('carol@demo.smartcollege.test', now).verdict, 'no');
+
+  const unknown = demoEligibilityFor('somebody@nowhere.test', now);
+  assert.equal(unknown.verdict, 'unknown', 'an address we do not hold is unknown, never no');
+  assert.equal(unknown.name, null);
+});
+
+check('the addresses this deployment was asked to serve are on the list', () => {
+  for (const email of ['s.melese+63@gmail.com', 's.melese+66@gmail.com']) {
+    const student = demoStudentFor(email);
+    assert.ok(student, `${email} must be listed`);
+    assert.match(student.graduationDate, /^\d{4}-\d{2}-\d{2}$/, 'with a date to measure from');
+  }
+});
+
+check('the list holds both sides of the window, so either path can be tried', () => {
+  const now = new Date('2026-09-26T00:00:00Z');
+  const verdicts = new Set(
+    ['s.melese+63@gmail.com', 'alice@demo.smartcollege.test'].map(
+      (email) => demoEligibilityFor(email, now).verdict
+    )
+  );
+  assert.deepEqual([...verdicts].sort(), ['no', 'yes'], 'the list must demonstrate both answers');
 });
 
 // ── report ────────────────────────────────────────────────────────────────────────────────

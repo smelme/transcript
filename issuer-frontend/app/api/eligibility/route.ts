@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { askRegistry } from '../../lib/registry';
+import { DEMO_REGISTRY_ENABLED, demoEligibilityFor } from '../../lib/demo-registry';
 
 /**
  * Whether the institution holds this person, and whether they finished inside the window.
@@ -34,6 +35,39 @@ export async function POST(request: Request) {
 
   const answer = await askRegistry('/v1/registry/eligibility', { email });
 
+  // The real registry answers first, and when it answers, its answer is the answer. Everything
+  // below this block only fills its silence, which is why the demo list can never turn a real `no`
+  // into a `yes`.
+  if (answer.reached) {
+    const verdict = String(answer.body?.verdict || '');
+    if (verdict === 'yes' || verdict === 'no') {
+      return NextResponse.json({
+        verdict,
+        name: typeof answer.body?.name === 'string' ? answer.body.name : null,
+        completedYear:
+          typeof answer.body?.completedYear === 'number' ? answer.body.completedYear : null,
+      });
+    }
+  }
+
+  // The demonstration registry, on only when a deployment has asked for it. Without it, a
+  // deployment whose database is unreachable cannot demonstrate anything at all.
+  if (DEMO_REGISTRY_ENABLED) {
+    const demo = demoEligibilityFor(email);
+    return NextResponse.json({
+      verdict: demo.verdict,
+      // An address the demo list does not hold is a record we looked for and did not find, so the
+      // applicant reads the sentence for a missing match rather than the one for a failure. Both
+      // lead to the checked path; only one of them is true.
+      reason: demo.reason === 'demo_not_listed' ? 'no_match' : demo.reason,
+      name: demo.name,
+      // No year, deliberately: the demonstrated credential is generated and will hold its own, so a
+      // page that stated one from this list would disagree with the document it is about to make.
+      completedYear: null,
+      demo: true,
+    });
+  }
+
   if (!answer.reached) {
     // Deliberately `unknown` rather than an error page: the applicant is owed a way forward, and
     // the checked path is open to everyone.
@@ -41,15 +75,5 @@ export async function POST(request: Request) {
     return NextResponse.json({ verdict: 'unknown', reason: 'registry_unreachable' });
   }
 
-  const verdict = String(answer.body?.verdict || 'unknown');
-  if (verdict !== 'yes' && verdict !== 'no') {
-    return NextResponse.json({ verdict: 'unknown', reason: 'registry_unrecognised_answer' });
-  }
-
-  return NextResponse.json({
-    verdict,
-    name: typeof answer.body?.name === 'string' ? answer.body.name : null,
-    completedYear:
-      typeof answer.body?.completedYear === 'number' ? answer.body.completedYear : null,
-  });
+  return NextResponse.json({ verdict: 'unknown', reason: 'registry_unrecognised_answer' });
 }
