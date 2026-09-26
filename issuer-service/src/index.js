@@ -2523,6 +2523,7 @@ app.post('/requests/:id/checkout', async (req, res) => {
 
     // Where the applicant comes back to. The handle travels in it because the return is a fresh page
     // load with no memory of the wizard, and the same handle is what lets them see their own case.
+    // The provider replaces the session placeholder, so the return carries which payment it was.
     const back = `${ISSUE_SITE_URL}/request?reference=${encodeURIComponent(row.request_id)}&token=${encodeURIComponent(cash)}`;
     const session = await paymentService.createCheckout({
       requestId: row.request_id,
@@ -2530,9 +2531,12 @@ app.post('/requests/:id/checkout', async (req, res) => {
       currency: row.fee_currency,
       productName: `Credential request: ${row.school}`,
       description: 'Checking your record and issuing your credential',
-      successUrl: `${back}&paid=1`,
+      successUrl: `${back}&paid=1&session_id={CHECKOUT_SESSION_ID}`,
       cancelUrl: `${back}&cancelled=1`,
     });
+
+    // Recorded as well as returned, so confirming does not depend on the return keeping its query.
+    requestService.recordCheckout({ requestId: row.request_id, sessionId: session.sessionId });
 
     res.json({
       success: true,
@@ -2560,7 +2564,7 @@ app.post('/requests/:id/payment/confirm', async (req, res) => {
       return res.json({ success: true, paid: true, alreadyPaid: true, status: row.status, dueAt: row.due_at });
     }
 
-    const sessionId = String(req.body?.session_id || '').trim();
+    const sessionId = String(req.body?.session_id || row.payment_ref || '').trim();
     if (!sessionId) {throw new Error('The payment session is required');}
     if (!paymentService.configured) {throw new Error('Payment is not configured');}
 

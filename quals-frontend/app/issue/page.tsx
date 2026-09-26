@@ -285,6 +285,18 @@ export default function IssuePage() {
           >
             {busy ? 'Sending…' : 'Send me a code'}
           </button>
+
+          {/* The other door. Anybody whose record is older than the window will not get a code
+              whatever they type here, so the way out is offered before they are stuck rather than
+              after a failed attempt. */}
+          <p className="issue-note">
+            Nothing prepared for you, or it is longer ago than five years?{' '}
+            <a href={`/request${emailFromLink ? `?email=${encodeURIComponent(emailFromLink)}` : ''}`}>
+              Ask us for your credentials
+            </a>{' '}
+            — you confirm your identity, tell us what you need, and the school checks its record by
+            hand.
+          </p>
         </>
       )}
 

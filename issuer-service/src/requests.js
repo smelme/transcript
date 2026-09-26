@@ -299,6 +299,8 @@ export class RequestService {
     return {
       requestId: row.request_id,
       school: row.school,
+      // Their own address, so the status page can offer the collection link once it is issued.
+      email: row.applicant_email,
       status,
       whatHappensNext: APPLICANT_WORDING[status],
       dueAt: row.due_at,
@@ -418,6 +420,25 @@ export class RequestService {
 
     const next = row.status === STATUS.DRAFT ? STATUS.DETAILS_CAPTURED : row.status;
     return this._transition(row, next, { actor: 'applicant', event: 'request.details_captured', patch });
+  }
+
+  /**
+   * Remember which payment session belongs to this request.
+   *
+   * The applicant comes back from the provider as a fresh page load with no memory of the wizard,
+   * so the session they were sent to is recorded here: confirming then needs nothing from the URL,
+   * and a return that loses its query string still settles the right request.
+   */
+  recordCheckout({ requestId, sessionId }) {
+    const row = this._row(requestId);
+    if (!row) {throw new Error('Request not found');}
+    if (row.payment_status === 'paid') {return row;}
+
+    getDb()
+      .prepare('UPDATE credential_requests SET payment_ref = ?, payment_status = ?, updated_at = ? WHERE request_id = ?')
+      .run(sessionId, 'pending', new Date().toISOString(), requestId);
+    this._event(requestId, 'payment.started', { actor: 'applicant', detail: { sessionId } });
+    return this._row(requestId);
   }
 
   /**
