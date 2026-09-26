@@ -520,16 +520,19 @@ export default function IssuePage() {
         </>
       )}
 
+      {/*
+        The end of the flow, and nothing more than that. What the issuer does with its own records,
+        and why it no longer holds a copy, is our business rather than the holder's: they asked for
+        a credential, it arrived, and the screen says so in as many words as that takes.
+      */}
       {stage === 'done' && settled && (
         <>
-          <span className="issue-eyebrow">All done</span>
-          <h1>Thank you for confirming</h1>
+          <span className="issue-eyebrow">Thank you</span>
+          <h1>All done</h1>
           <p className="issue-lede">
             {settled.items.length === 1
-              ? 'It is in your wallet now, signed by the institution that issued it.'
-              : `All ${settled.items.length} are in your wallet now, signed by the institution that issued them.`}{' '}
-            Nothing here is waiting for you any more, and we have stopped holding a copy of the
-            documents themselves — what we keep is the record that they were issued.
+              ? 'Your credential is in your wallet.'
+              : 'Your credentials are in your wallet.'}
           </p>
 
           <ul className="issue-list">
@@ -546,15 +549,7 @@ export default function IssuePage() {
             ))}
           </ul>
 
-          <p className="issue-note">
-            You can close this page. If you ever need another copy — for a new phone, or for a
-            credential you have removed — ask your institution to publish again and it is issued
-            again.
-          </p>
-          <p className="issue-note">
-            Nothing was shared with anybody by adding these. Sharing is a separate step you take
-            later, from the wallet.
-          </p>
+          <p className="issue-note">You can close this page.</p>
         </>
       )}
 

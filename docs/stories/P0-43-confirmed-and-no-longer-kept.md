@@ -48,10 +48,23 @@ memory has no remaining purpose.
 
 ## What the holder is told
 
-> **Thank you for confirming — that is everything.**
-> Everything you chose is in your wallet now, signed by Smart Academy. Nothing here is waiting for
-> you, and we are no longer holding a copy of the documents themselves: what we keep is the record
-> that they were issued.
+> **Thank you**
+> # All done
+> Your credential is in your wallet.
+>
+> - Academic transcript — Master of Data Science · **In your wallet**
+>   Graduated 30 Jul 2024
+>
+> You can close this page.
+
+And no more than that, which is a rule rather than an accident. The first version ran to ninety-odd
+words: that nothing was waiting, that the issuer had stopped holding a copy of the documents, what it
+keeps instead, when to ask for another copy, and that sharing is a separate step. That is our
+business, on a screen a holder reaches once, at the end of something that has already worked — and a
+screen that explains itself at that length reads as though something still needs explaining.
+
+So the end screen says the one thing the holder came for — it arrived — and stops. The record-keeping
+that makes it true is in the story above and in the tests, where it belongs.
 
 When something has **not** arrived the holder is not told it failed — the wallet may still be
 finishing — so the page says what it cannot see yet, and offers to look again.
