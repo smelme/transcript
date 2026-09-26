@@ -1,28 +1,28 @@
 /**
- * The two paths, and the words for each answer (P0-35).
+ * One way in, one way out, and the words for each answer (P0-35).
  *
  * Written as a plain module rather than inside the page so that the wording can be checked
  * without a browser. The wording *is* the feature here: a wrong sentence turns a legitimate
  * graduate away, or accuses them of something.
  *
- * There are **two separate ways** to ask for a credential, and which one applies turns on when the
- * applicant studied. That is the one thing they know without being asked and the one thing we do not
- * have to guess at, so the two paths are offered side by side and they choose. Neither is hidden
- * behind a question, and neither is described as the lesser one.
+ * There is **one way in**: sign in with the address the institution holds, which is the thing
+ * everybody already knows how to do. Somebody we cannot serve that way - because they finished
+ * longer ago, or because we cannot match them at all - is offered the checked path, exactly the way
+ * a sign-in screen offers "forgot your password?": quietly, underneath, and without suggesting they
+ * have done anything wrong.
  *
- * The institution's records still have the last word. Somebody who takes the first path but whose
- * record is older than the window, or cannot be matched, is sent down the second one rather than
- * turned away: offering the paths is not the same as promising the answer.
+ * The alternative is not hidden, and it is not the punishment for failing. It is a second road that
+ * happens to be slower and cost more, and the applicant is told that plainly when they need it.
  *
  * Three rules the copy has to keep to:
  *
  *   1. **There are three answers, and the third one is honest.** *We could not match that address
  *      to a record* is allowed. *Verification failed* is not. A registry that can only say yes or
  *      no says no to a changed name, an old address, or two people who share a birthday.
- *   2. **Nothing redirects on its own.** The applicant chooses the path, and the last step is theirs
- *      to take. Nothing here moves them.
- *   3. **The first path's answer is the institution's, never the applicant's word about themselves.**
- *      Somebody who picks the wrong path is corrected by the record, not blamed for it.
+ *   2. **Nothing redirects on its own.** Signing in is the step, and taking the other road is a
+ *      choice. Nothing here moves anybody.
+ *   3. **The answer is the institution's, never the applicant's word about themselves.** Somebody
+ *      who cannot be served is corrected by the record, not blamed for it.
  */
 
 /**
@@ -44,42 +44,29 @@ export const REQUEST_PAGE_URL =
  * once and shown on both.
  */
 /**
- * The two paths.
+ * The second road, for somebody the sign-in cannot serve.
  *
- * `name` is the path as the applicant recognises it — when they finished — because that is what they
- * know and what they are choosing between. The figure comes from the constant above so the two
- * labels cannot drift apart, or away from the rule the institution measures by.
+ * `prompt` is the line under the sign-in form, and it is deliberately shaped like "forgot your
+ * password?": a question about circumstances rather than a verdict about the person. Somebody who
+ * reads it and recognises themselves takes it; somebody who does not can ignore it and sign in.
  *
- * The keys are `self` and `checked` because the decision function returns them; the labels are what
- * a reader sees.
+ * The figure comes from the constant above so the prompt cannot drift away from the rule the
+ * institution measures by.
  */
-export const DOORS = {
-  self: {
-    key: 'self',
-    name: `I finished in the last ${ELIGIBILITY_WINDOW_YEARS} years`,
-    what: 'Collect them yourself',
-    cost: 'Nothing',
-    wait: 'Straight away',
-    needs: 'The email address Smart Academy holds for you',
-    action: 'Collect my credentials',
-  },
-  checked: {
-    key: 'checked',
-    name: `I finished more than ${ELIGIBILITY_WINDOW_YEARS} years ago`,
-    what: 'Ask us to check',
-    cost: 'A fee, charged when you send the request',
-    wait: 'Up to 10 working days',
-    needs: 'Proof of who you are, which we take on Quals',
-    action: 'Ask us to check',
-  },
+export const CHECKED_PATH = {
+  /** The line under the form, shaped like the familiar way out of a sign-in screen. */
+  prompt: `Finished with us more than ${ELIGIBILITY_WINDOW_YEARS} years ago?`,
+  action: 'Ask us to check',
+  cost: 'A fee, charged when you send the request',
+  wait: 'Up to 10 working days',
+  needs: 'Proof of who you are, which we take on Quals',
 };
 
 /** The words for each outcome. Every one of them leaves the applicant somewhere to go. */
 export const COPY = {
   windowYears: ELIGIBILITY_WINDOW_YEARS,
 
-  intro:
-    'There are two ways to ask Smart Academy for your credentials, and which one applies depends on when you finished. Choose the one that describes you.',
+  intro: `Sign in with the email address Smart Academy holds for you. If we hold a record from the last ${ELIGIBILITY_WINDOW_YEARS} years, your credentials are ready to collect, straight away.`,
 
   yes: (name, year) => ({
     title: 'We hold your record',
@@ -169,9 +156,9 @@ export function outcomeFor(answer) {
 export function allCopy() {
   return [
     COPY.intro,
-    // The path labels are copy too: they are the first thing a reader chooses between.
-    DOORS.self.name,
-    DOORS.checked.name,
+    // The prompt is copy too: it is the line that offers the second road, and the one place the
+    // window figure is stated to the applicant.
+    CHECKED_PATH.prompt,
     COPY.yes('Ada Lovelace', 2024).title,
     COPY.yes('Ada Lovelace', 2024).body,
     COPY.no('Ada Lovelace').title,

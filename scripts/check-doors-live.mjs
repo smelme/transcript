@@ -76,48 +76,39 @@ console.log(`Checking the decision point at ${ACADEMY_URL}\n`);
 
 // ── the pages ──────────────────────────────────────────────────────────────────────────────
 //
-// Two paths, told apart by when somebody studied, each with its own way in. The figure is matched
-// as a digit rather than as "5" so that changing the window on the registry does not break this
-// check - what matters is that both paths state the same shape of answer, not what the number is.
-const RECENT = /finished in the last \d+ years/i;
-const EARLIER = /finished more than \d+ years ago/i;
+// The section that was removed, and the way out that replaced it. Asserting the absence is the
+// point: "get rid of this section" is a review criterion, and a criterion nothing checks is a
+// criterion that comes back.
+const REMOVED_SECTION = /I finished (in the last|more than) \d+ years/i;
+const WAY_OUT = /Finished with us more than \d+ years ago\?/i;
 const CHECKED_PATH = `${REQUEST_SITE_URL}/request`;
 
 const home = await get('/');
 const homeText = visibleText(home.text);
 check('the home page is served', home.status === 200, `status ${home.status}`);
+check('the home page offers the sign-in', /Sign in with your email/i.test(homeText));
 check(
-  'the home page offers both paths, told apart by when somebody studied',
-  RECENT.test(homeText) && EARLIER.test(homeText)
+  'and a quiet way out for anybody it cannot serve',
+  WAY_OUT.test(homeText) && home.text.includes(CHECKED_PATH),
+  'the way out must be described and linked'
 );
-check(
-  'and states what each costs, how long each takes and what each needs',
-  /costs/i.test(homeText) && /takes/i.test(homeText) && /you\s+need/i.test(homeText)
-);
-check(
-  'and each path has its own way in',
-  /href="\/get-credentials"/.test(home.text) && home.text.includes(CHECKED_PATH),
-  'both paths must be reachable from the page people read first'
-);
+check('and the two-path section with its cost tables is gone', !REMOVED_SECTION.test(homeText));
 
-// The first path: where the address is entered, and the other one is never hidden.
-const chooser = await get('/get-credentials');
-const chooserText = visibleText(chooser.text);
-check('the first path is served', chooser.status === 200, `status ${chooser.status}`);
+// The sign-in itself: one field, one button, and the way out under it.
+const signIn = await get('/get-credentials');
+const signInText = visibleText(signIn.text);
+check('the sign-in page is served', signIn.status === 200, `status ${signIn.status}`);
+check('and its heading says what it is', /Sign in with your email/i.test(signInText));
+check('and asks for the address', /Email address/i.test(signInText));
 check(
-  'and says which path it is, in the applicant\'s own terms',
-  /finished with us in the last \d+ years/i.test(chooserText),
-  'the page must not leave somebody guessing whether it applies to them'
+  'and carries the way out under the form',
+  WAY_OUT.test(signInText) && signIn.text.includes(CHECKED_PATH)
 );
-check('and is where the address is entered', /Email address/i.test(chooserText));
-check(
-  'and offers the second path without hiding it',
-  chooser.text.includes(CHECKED_PATH) && EARLIER.test(chooserText)
-);
+check('and carries no cost table', !REMOVED_SECTION.test(signInText));
 check(
   'and does not forward on its own',
-  !/<meta[^>]+http-equiv=["']?refresh/i.test(chooser.text) &&
-    !/window\.location\s*=/.test(chooser.text),
+  !/<meta[^>]+http-equiv=["']?refresh/i.test(signIn.text) &&
+    !/window\.location\s*=/.test(signIn.text),
   'the page must wait for the applicant to act'
 );
 
@@ -125,12 +116,12 @@ const credentialsPage = await get('/credentials');
 const credentialsText = visibleText(credentialsPage.text);
 check('the credentials page is served', credentialsPage.status === 200, `status ${credentialsPage.status}`);
 check(
-  'and offers both paths with a way into each',
-  RECENT.test(credentialsText) &&
-    EARLIER.test(credentialsText) &&
-    /href="\/get-credentials"/.test(credentialsPage.text) &&
+  'and offers the sign-in and the way out',
+  /Sign in with your email/i.test(credentialsText) &&
+    WAY_OUT.test(credentialsText) &&
     credentialsPage.text.includes(CHECKED_PATH)
 );
+check('and its cost tables are gone too', !REMOVED_SECTION.test(credentialsText));
 
 // ── the question ───────────────────────────────────────────────────────────────────────────
 const answered = await post('/api/eligibility', { email: 'nobody@example.com' });

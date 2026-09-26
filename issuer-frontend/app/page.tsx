@@ -1,5 +1,5 @@
 import Link from 'next/link';
-import { COPY, DOORS, REQUEST_PAGE_URL } from './lib/doors';
+import { CHECKED_PATH, COPY, REQUEST_PAGE_URL } from './lib/doors';
 
 export default function Home() {
   return (
@@ -95,55 +95,22 @@ export default function Home() {
 
       <section className="section">
         <div className="container">
-          <h2 style={{ margin: '0 0 8px', fontSize: 22 }}>Two ways to get your credentials</h2>
-          <p className="muted" style={{ margin: '0 0 20px', fontSize: 15, lineHeight: 1.6 }}>
-            {COPY.intro}
-          </p>
-
-          {/* Two paths, side by side, each with its own way in. Neither is behind a question, and
-              neither is described as the lesser one. */}
-          <div
-            style={{
-              display: 'grid',
-              gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))',
-              gap: 16,
-            }}
-          >
-            <div className="panel">
-              <h3 style={{ margin: '0 0 6px', fontSize: 18 }}>{DOORS.self.name}</h3>
-              <p className="muted" style={{ margin: '0 0 6px', fontSize: 15, fontWeight: 600 }}>
-                {DOORS.self.what}
-              </p>
-              <p className="muted" style={{ margin: 0, fontSize: 14, lineHeight: 1.55 }}>
-                Costs {DOORS.self.cost.toLowerCase()} · takes {DOORS.self.wait.toLowerCase()} · you
-                need {DOORS.self.needs.toLowerCase()}
-              </p>
-              <Link
-                href="/get-credentials"
-                className="btn btn-dark"
-                style={{ marginTop: 18, minHeight: 44, display: 'inline-flex', alignItems: 'center' }}
-              >
-                {DOORS.self.action}
-              </Link>
-            </div>
-
-            <div className="panel">
-              <h3 style={{ margin: '0 0 6px', fontSize: 18 }}>{DOORS.checked.name}</h3>
-              <p className="muted" style={{ margin: '0 0 6px', fontSize: 15, fontWeight: 600 }}>
-                {DOORS.checked.what}
-              </p>
-              <p className="muted" style={{ margin: 0, fontSize: 14, lineHeight: 1.55 }}>
-                Costs {DOORS.checked.cost.toLowerCase()} · takes {DOORS.checked.wait.toLowerCase()} ·
-                you need {DOORS.checked.needs.toLowerCase()}
-              </p>
-              <a
-                className="btn"
-                href={REQUEST_PAGE_URL}
-                style={{ marginTop: 18, minHeight: 44, display: 'inline-flex', alignItems: 'center' }}
-              >
-                {DOORS.checked.action}
-              </a>
-            </div>
+          <div className="panel">
+            <h2 style={{ margin: '0 0 8px', fontSize: 22 }}>Get your credentials</h2>
+            <p className="muted" style={{ margin: '0 0 18px', fontSize: 15, lineHeight: 1.6 }}>
+              {COPY.intro}
+            </p>
+            <Link
+              href="/get-credentials"
+              className="btn btn-dark"
+              style={{ minHeight: 44, display: 'inline-flex', alignItems: 'center' }}
+            >
+              Sign in with your email
+            </Link>
+            <p className="muted" style={{ margin: '14px 0 0' }}>
+              {CHECKED_PATH.prompt}{' '}
+              <a href={REQUEST_PAGE_URL}>{CHECKED_PATH.action.toLowerCase()}</a>.
+            </p>
           </div>
         </div>
       </section>

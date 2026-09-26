@@ -2,19 +2,20 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
-import { DOORS, ELIGIBILITY_WINDOW_YEARS, REQUEST_PAGE_URL, outcomeFor } from '../lib/doors';
+import { CHECKED_PATH, COPY, REQUEST_PAGE_URL, outcomeFor } from '../lib/doors';
 
 /**
- * Collect your credentials - the first of the two paths.
+ * Sign in with your email - the one way in.
  *
- * This page is the path for people who finished recently: the academy knows who they are from the
- * address it holds, so it can publish their record and hand them over in one go. The other path,
- * for people who finished longer ago or cannot be matched, is on Quals and is linked from here.
+ * Shaped like the sign-in everybody has already done a hundred times: one field, one button, and a
+ * quiet line underneath for the case it cannot serve. That line is the whole of P0-35, and it is
+ * deliberately the shape every sign-in screen uses for "forgot your password?" - a question about
+ * circumstances rather than a verdict about the person reading it.
  *
- * Two things make it the path it is rather than a question in front of a path. The heading says
- * which path this is, so nobody has to guess whether it applies to them, and the link to the other
- * one is always on screen. Nothing here decides for the applicant; the record decides whether this
- * path can serve them, and the answer to that is never "you are not who you say you are".
+ * Somebody who finished longer ago, or whom we cannot match, takes that line and lands on the
+ * checked path. Nothing here accuses them of anything, and nothing here decides on their behalf:
+ * the record says whether this way in can serve them, and the answer to that is never "you are not
+ * who you say you are".
  *
  * The academy's part in issuing is one thing: it knows who you are from the address it holds, and
  * publishing your record is what happens here. Everything after that belongs to Quals, where the
@@ -119,51 +120,11 @@ export default function GetCredentialsPage() {
           Smart Academy
         </span>
         <h1 style={{ fontSize: 32, letterSpacing: '-0.02em', margin: '14px 0 12px' }}>
-          Collect your credentials
+          Sign in with your email
         </h1>
-        <p style={{ fontSize: 16, lineHeight: 1.65, color: 'var(--muted)', marginBottom: 14 }}>
-          This is the path for people who finished with us in the last {ELIGIBILITY_WINDOW_YEARS}{' '}
-          years. Enter the email address Smart Academy holds for you and we will look at our own
-          records.
+        <p style={{ fontSize: 16, lineHeight: 1.65, color: 'var(--muted)', marginBottom: 30 }}>
+          {COPY.intro}
         </p>
-        <p className="muted" style={{ marginBottom: 30 }}>
-          Finished earlier than that, or not sure?{' '}
-          <a href={REQUEST_PAGE_URL}>{DOORS.checked.action.toLowerCase()}</a> instead — that path is
-          open to everyone, and it is the one we will point you to if we cannot match your address.
-        </p>
-
-        {/* The two paths, so somebody on the wrong one can see the other without hunting for it. */}
-        <div
-          style={{
-            display: 'grid',
-            gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))',
-            gap: 16,
-            marginBottom: 28,
-          }}
-        >
-          {Object.values(DOORS).map((door) => (
-            <div className="card" key={door.key}>
-              <p style={{ margin: 0, fontWeight: 600 }}>{door.name}</p>
-              <p className="muted" style={{ margin: '4px 0 0', fontSize: 14 }}>{door.what}</p>
-              <dl
-                style={{
-                  margin: '12px 0 0',
-                  display: 'grid',
-                  gridTemplateColumns: 'auto 1fr',
-                  gap: '6px 12px',
-                }}
-              >
-                <dt style={{ color: 'var(--muted)', fontSize: 14 }}>Costs</dt>
-                <dd style={{ margin: 0, fontSize: 14 }}>{door.cost}</dd>
-                <dt style={{ color: 'var(--muted)', fontSize: 14 }}>Takes</dt>
-                <dd style={{ margin: 0, fontSize: 14 }}>{door.wait}</dd>
-                <dt style={{ color: 'var(--muted)', fontSize: 14 }}>You need</dt>
-                <dd style={{ margin: 0, fontSize: 14 }}>{door.needs}</dd>
-              </dl>
-            </div>
-          ))}
-        </div>
-
         {refusal ? (
           <>
             <div className="card">
@@ -179,7 +140,7 @@ export default function GetCredentialsPage() {
                   href={REQUEST_PAGE_URL}
                   style={{ minHeight: 44, display: 'inline-flex', alignItems: 'center' }}
                 >
-                  {DOORS.checked.action}
+                  {CHECKED_PATH.action}
                 </a>
                 <button
                   type="button"
@@ -191,9 +152,9 @@ export default function GetCredentialsPage() {
                 </button>
               </div>
               <p className="muted" style={{ marginTop: 16 }}>
-                Asking us to check costs {DOORS.checked.cost.toLowerCase()} and takes{' '}
-                {DOORS.checked.wait.toLowerCase()}. You will need{' '}
-                {DOORS.checked.needs.toLowerCase()}.
+                Asking us to check costs {CHECKED_PATH.cost.toLowerCase()} and takes{' '}
+                {CHECKED_PATH.wait.toLowerCase()}. You will need{' '}
+                {CHECKED_PATH.needs.toLowerCase()}.
               </p>
             </div>
             <p className="muted" style={{ marginTop: 18 }}>
@@ -259,13 +220,15 @@ export default function GetCredentialsPage() {
                   style={{ marginTop: 16, minHeight: 44, display: 'inline-flex', alignItems: 'center' }}
                   disabled={busy || !email.trim()}
                 >
-                  {busy ? 'Looking…' : 'Check what we hold'}
+                  {busy ? 'Signing in…' : 'Sign in'}
                 </button>
               </form>
+              {/* The way out, shaped like the one every sign-in screen has: quiet, under the form,
+                  and a question about circumstances rather than a verdict about the person. */}
               <p className="muted" style={{ marginTop: 16 }}>
-                We look at our own records. If we hold one for you from the last{' '}
-                {ELIGIBILITY_WINDOW_YEARS} years, you can collect your credentials straight away.
-                Otherwise, and if we cannot tell, you can ask us to check.
+                {CHECKED_PATH.prompt}{' '}
+                <a href={REQUEST_PAGE_URL}>{CHECKED_PATH.action.toLowerCase()}</a> — a person will
+                look at it for you, and it is open to everyone.
               </p>
             </div>
           </>

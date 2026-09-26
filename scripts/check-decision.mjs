@@ -13,7 +13,7 @@
 import assert from 'node:assert/strict';
 import {
   allCopy,
-  DOORS,
+  CHECKED_PATH,
   ELIGIBILITY_WINDOW_YEARS,
   outcomeFor,
   REQUEST_PAGE_URL,
@@ -139,26 +139,30 @@ check('every year figure in the copy is the configured window', () => {
   }
 });
 
-check('the two paths are told apart by when the applicant studied, not by what we decide', () => {
-  for (const door of Object.values(DOORS)) {
-    assert.match(
-      door.name,
-      new RegExp(`${ELIGIBILITY_WINDOW_YEARS} years`),
-      `the ${door.key} path must be recognisable by timeframe, because that is how it is chosen`
-    );
-  }
-  assert.notEqual(DOORS.self.name, DOORS.checked.name, 'the two paths must be distinguishable');
+check('the way out is offered the way a sign-in screen offers one', () => {
+  // The shape is the point. "Forgot your password?" is a question about circumstances, and it is
+  // what makes the second road something an applicant takes rather than something they are told
+  // they need. A prompt that read as a verdict would turn a legitimate graduate away.
+  assert.match(CHECKED_PATH.prompt, /\?$/, 'the prompt must be a question to the applicant');
+  assert.match(
+    CHECKED_PATH.prompt,
+    new RegExp(`${ELIGIBILITY_WINDOW_YEARS} years`),
+    'the prompt must state the same window the institution measures by'
+  );
+  assert.doesNotMatch(
+    CHECKED_PATH.prompt,
+    /you did not|you failed|unable to|not eligible/i,
+    'the prompt must not characterise the applicant'
+  );
 });
 
 // ── 4. Both doors are always described, with their costs and waits ─────────────────────────
-check('both paths state what they cost, how long they take and what is needed', () => {
-  for (const [name, door] of Object.entries(DOORS)) {
-    for (const field of ['name', 'what', 'cost', 'wait', 'needs', 'action']) {
-      assert.ok(
-        typeof door[field] === 'string' && door[field].trim() !== '',
-        `the ${name} path must state its ${field}`
-      );
-    }
+check('the way out states what it costs, how long it takes and what is needed', () => {
+  for (const field of ['prompt', 'action', 'cost', 'wait', 'needs']) {
+    assert.ok(
+      typeof CHECKED_PATH[field] === 'string' && CHECKED_PATH[field].trim() !== '',
+      `the second road must state its ${field}`
+    );
   }
 });
 
