@@ -12,6 +12,11 @@
 const ACADEMY_URL = (process.argv[2] || process.env.ACADEMY_URL || 'https://academy-production-8262.up.railway.app')
   .replace(/\/+$/, '');
 
+// Where the second path lives. Link text is not enough to check: a path that is described but not
+// linked is a path an applicant cannot take, so the assertions look for the address as well.
+const REQUEST_SITE_URL = (process.argv[3] || process.env.REQUEST_SITE_URL || 'https://quals-production.up.railway.app')
+  .replace(/\/+$/, '');
+
 let passed = 0;
 const failures = [];
 
@@ -46,6 +51,27 @@ async function post(path, body) {
   return { status: response.status, json };
 }
 
+/**
+ * What a reader actually sees.
+ *
+ * Next inlines comment markers around interpolated values, so a sentence split across one - "in the
+ * last <!-- -->5<!-- --> years" - does not match a pattern written for the words. Checking the copy
+ * means checking it after those are gone, and after the tags are out of the way.
+ *
+ * Link targets are checked against the raw HTML instead: stripping the tags would strip the hrefs.
+ */
+function visibleText(html) {
+  return String(html)
+    // The separator Next emits between a static and an interpolated value, so that a sentence built
+    // from a constant and some words still reads as one sentence here. Bounded on purpose: an
+    // unbounded comment pattern swallows everything up to the next `-->`, which in this page is the
+    // rest of the copy.
+    .replace(/<!--[\s\S]{0,40}?-->/g, '')
+    .replace(/<[^>]*>/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
 console.log(`Checking the decision point at ${ACADEMY_URL}\n`);
 
 // ── the pages ──────────────────────────────────────────────────────────────────────────────
@@ -55,17 +81,18 @@ console.log(`Checking the decision point at ${ACADEMY_URL}\n`);
 // check - what matters is that both paths state the same shape of answer, not what the number is.
 const RECENT = /finished in the last \d+ years/i;
 const EARLIER = /finished more than \d+ years ago/i;
-const CHECKED_PATH = `${QUALS}/request`;
+const CHECKED_PATH = `${REQUEST_SITE_URL}/request`;
 
 const home = await get('/');
+const homeText = visibleText(home.text);
 check('the home page is served', home.status === 200, `status ${home.status}`);
 check(
   'the home page offers both paths, told apart by when somebody studied',
-  RECENT.test(home.text) && EARLIER.test(home.text)
+  RECENT.test(homeText) && EARLIER.test(homeText)
 );
 check(
   'and states what each costs, how long each takes and what each needs',
-  /costs/i.test(home.text) && /takes/i.test(home.text) && /you\s+need/i.test(home.text)
+  /costs/i.test(homeText) && /takes/i.test(homeText) && /you\s+need/i.test(homeText)
 );
 check(
   'and each path has its own way in',
@@ -75,16 +102,17 @@ check(
 
 // The first path: where the address is entered, and the other one is never hidden.
 const chooser = await get('/get-credentials');
+const chooserText = visibleText(chooser.text);
 check('the first path is served', chooser.status === 200, `status ${chooser.status}`);
 check(
   'and says which path it is, in the applicant\'s own terms',
-  /finished with us in the last \d+ years/i.test(chooser.text),
+  /finished with us in the last \d+ years/i.test(chooserText),
   'the page must not leave somebody guessing whether it applies to them'
 );
-check('and is where the address is entered', /Email address/i.test(chooser.text));
+check('and is where the address is entered', /Email address/i.test(chooserText));
 check(
   'and offers the second path without hiding it',
-  chooser.text.includes(CHECKED_PATH) && EARLIER.test(chooser.text)
+  chooser.text.includes(CHECKED_PATH) && EARLIER.test(chooserText)
 );
 check(
   'and does not forward on its own',
@@ -94,11 +122,12 @@ check(
 );
 
 const credentialsPage = await get('/credentials');
+const credentialsText = visibleText(credentialsPage.text);
 check('the credentials page is served', credentialsPage.status === 200, `status ${credentialsPage.status}`);
 check(
   'and offers both paths with a way into each',
-  RECENT.test(credentialsPage.text) &&
-    EARLIER.test(credentialsPage.text) &&
+  RECENT.test(credentialsText) &&
+    EARLIER.test(credentialsText) &&
     /href="\/get-credentials"/.test(credentialsPage.text) &&
     credentialsPage.text.includes(CHECKED_PATH)
 );
