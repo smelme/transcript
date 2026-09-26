@@ -1,6 +1,8 @@
 # P0-37: The fee, before the review
 
-**Status:** Not started - decided: $30.00 USD, refunds deferred, the period runs from submission
+**Status:** In progress - the fee is taken through the provider's hosted checkout and confirmed
+against the provider rather than the return page; refunds are still by hand, and the payment screen
+itself belongs to the wizard, which is not built
 **Components:** `issuer-service` (checkout, webhook, reconciliation), `quals-frontend` (payment
 step and confirmation)
 **Depends on:** P0-36

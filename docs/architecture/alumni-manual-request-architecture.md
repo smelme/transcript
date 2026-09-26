@@ -135,8 +135,15 @@ than a separate field, so a case cannot be redirected later; and `paid` is a sta
 than a flag, so the promised period starts when the applicant submits and not when the money lands.
 
 The routes below are the contract the wizard and the portal will call. The queue, the decision, the
-file, the preview and the issue are wired; the applicant's wizard and the identity and payment
-integrations are not.
+file, the preview, the issue, the identity check and the fee are wired; the applicant's wizard is
+not, and it is the only thing between this and a person walking the flow.
+
+Identity is a module of its own (`src/identity-service.js`) and so is payment
+(`src/payment-service.js`), which keeps each provider behind one seam: an identity outcome is always
+fetched and only ever stored as the extracted fields, and a payment is always looked up and checked
+against the request's own fee before it settles anything. Both are tested against a stubbed provider,
+and the end-to-end script creates a real checkout session and proves that an unpaid one settles
+nothing.
 
 **A defect repaired while building this.** `InvitationService.create()` stored the institution's
 namespace-keyed claims as the issuance session's `credentialData`, but the document builder reads
