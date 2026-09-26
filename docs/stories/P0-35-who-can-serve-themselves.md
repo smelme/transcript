@@ -29,9 +29,20 @@ This story adds the question, the alternative, and the honest third answer.
 changed, an address that is old, or a record that is thin. *Unknown* is the honest answer and it
 routes to the ordered path, where a person looks. See ADR-5.
 
-**The window is measured on the institution's data, never on the applicant's word.** The chooser
-asks nothing; it only tells the applicant which door applies. Anyone who disagrees with the answer
-can still take the second door.
+**The applicant picks their path; the record decides whether it can serve them.** The two ways in
+are named by when somebody studied — *in the last five years* and *more than five years ago* — and
+both are offered side by side with their costs and waits. That is the one thing the applicant knows
+without being asked and the only thing either path turns on, so nothing is put in front of the
+choice. The institution's records still have the last word: somebody who takes the first path whose
+record is older than the window, or cannot be matched, is sent down the second one rather than turned
+away. Offering the paths is not the same as promising the answer.
+
+*(This story first specified a single page that asked for an address and then told the applicant
+which door applied. That put a question in front of a decision they could already make, and it read
+as a verdict on them. The two paths are now chosen, not assigned.)*
+
+The window is measured on the institution's data, never on the applicant's word — including when
+they choose the wrong path, which corrects them rather than blaming them.
 
 **Nothing redirects on its own.** The applicant chooses. This is the rule we already settled on the
 hand-over screen, and it applies with more force here because the two doors cost different amounts
@@ -73,24 +84,24 @@ of money and time.
 
 | Where | What |
 | --- | --- |
-| `issuer-frontend/app/lib/doors.js` | **New.** The two doors and the words for every answer, as a plain module so the wording can be checked without a browser |
+| `issuer-frontend/app/lib/doors.js` | **New.** The two paths and the words for every answer, as a plain module so the wording can be checked without a browser. The path labels are built from the window constant, so they cannot drift apart |
 | `issuer-frontend/app/api/eligibility/route.ts` | **New.** The server-side question. A registry that does not answer becomes `unknown`, never `no` |
-| `issuer-frontend/app/get-credentials/page.tsx` | Rewritten as the decision point: both doors described first, then the question, then the door that applies |
-| `issuer-frontend/app/page.tsx`, `app/credentials/page.tsx` | Both doors stated with their costs and waits, and both reachable |
-| `scripts/check-decision.mjs` | **New.** 12 checks over the three outcomes and the copy rules |
+| `issuer-frontend/app/get-credentials/page.tsx` | Rewritten as the **first path**: its heading names it, it is where the address is entered, and the second path is linked from it throughout |
+| `issuer-frontend/app/page.tsx`, `app/credentials/page.tsx` | Both paths, each a card with its own link |
+| `scripts/check-decision.mjs` | **New.** 13 checks over the three outcomes and the copy rules |
 | `scripts/check-doors-live.mjs` | **New.** 13 checks against the deployment: both doors stated on all three pages, no self-forwarding, and an unanswerable question coming back as `unknown` with a reason |
 
 The copy rules the check enforces, because they are the acceptance criterion: only a `yes` reaches
-the self-service door; no sentence contains "failed", "invalid", "denied", "rejected", "not
-found", "no record" or "verification failed"; the window figure appears exactly once and the copy
-states the same number the registry measures by; both doors always state their cost, wait and what
-is needed; and every outcome that is not self-service offers the checked path by name.
+the self-service path; no sentence contains "failed", "invalid", "denied", "rejected", "not
+found", "no record" or "verification failed"; **every** year figure in the copy is the configured
+window, so the page cannot state a different number from the one the registry measures by; both
+paths are recognisable by timeframe and state their cost, wait and what is needed; and every outcome
+that is not self-service offers the checked path by name.
 
 **One deliberate departure.** The story's step 5 has the chooser present both doors on "the page
-people read first". Both doors are now described on the home page *and* on `/get-credentials`
-before the form, rather than only on the home page, because the page somebody actually lands on
-from an email link is `/get-credentials`, and it should not be the one page that withholds the
-alternative.
+people read first". Both paths are now offered on the home page, on `/get-credentials` *and* on
+`/credentials`, each with its own way in, because the page somebody actually lands on from an email
+link is `/get-credentials`, and it should not be the one page that withholds the alternative.
 
 **What the responsive check still needs.** `scripts/check-responsive.mjs` reads the live sites, so
 the new sections are checked at 360/390/768 after deployment rather than before it.
