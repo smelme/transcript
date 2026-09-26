@@ -78,6 +78,7 @@ of money and time.
 | `issuer-frontend/app/get-credentials/page.tsx` | Rewritten as the decision point: both doors described first, then the question, then the door that applies |
 | `issuer-frontend/app/page.tsx`, `app/credentials/page.tsx` | Both doors stated with their costs and waits, and both reachable |
 | `scripts/check-decision.mjs` | **New.** 12 checks over the three outcomes and the copy rules |
+| `scripts/check-doors-live.mjs` | **New.** 13 checks against the deployment: both doors stated on all three pages, no self-forwarding, and an unanswerable question coming back as `unknown` with a reason |
 
 The copy rules the check enforces, because they are the acceptance criterion: only a `yes` reaches
 the self-service door; no sentence contains "failed", "invalid", "denied", "rejected", "not
