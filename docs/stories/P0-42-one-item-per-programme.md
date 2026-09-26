@@ -49,7 +49,7 @@ holder's list must not depend on which door they came through.
 | --- | --- |
 | `issuer-service/src/issuance-items.js` | **New.** `programmeKeyOf` and `oneItemPerProgramme`, as plain functions so the rule can be checked without a server |
 | `issuer-service/src/index.js` | `GET /academy/credentials` and `GET /issuance/invitations/:id/items` both collapse before replying |
-| `quals-frontend/app/issue/page.tsx` | No change: the page renders what it is given, which is the point |
+| `quals-frontend/app/issue/page.tsx` | No change to the listing: the page renders what it is given, which is the point. One line of copy: with nothing chosen the button said *Add 0 to wallet*, which is not an instruction, so a count of nought now reads *Add to wallet* — it is disabled either way |
 
 ## What is *not* changed
 

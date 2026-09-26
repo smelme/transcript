@@ -443,11 +443,14 @@ export default function IssuePage() {
                   onClick={collectSelected}
                   disabled={busy || !termsAccepted || selected.length === 0}
                 >
+                  {/* Nothing selected reads as "Add to wallet" rather than "Add 0 to wallet": the
+                      button is disabled until something is chosen, so a count of nought is never
+                      an instruction. */}
                   {busy
                     ? 'Preparing…'
-                    : selected.length === 1
-                      ? 'Add to wallet'
-                      : `Add ${selected.length} to wallet`}
+                    : selected.length > 1
+                      ? `Add ${selected.length} to wallet`
+                      : 'Add to wallet'}
                 </button>
                 <button
                   className="btn"
