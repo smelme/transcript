@@ -161,8 +161,7 @@ export default function DigitalCredentialsPage() {
               Sign in with your email
             </Link>
             <p className="muted" style={{ margin: '14px 0 0' }}>
-              {CHECKED_PATH.prompt}{' '}
-              <a href={REQUEST_PAGE_URL}>{CHECKED_PATH.action.toLowerCase()}</a>.
+              {CHECKED_PATH.prompt} <a href={REQUEST_PAGE_URL}>{CHECKED_PATH.action}</a>.
             </p>
           </div>
         </div>

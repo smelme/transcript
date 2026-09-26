@@ -229,9 +229,8 @@ export default function GetCredentialsPage() {
               {/* The way out, shaped like the one every sign-in screen has: quiet, under the form,
                   and a question about circumstances rather than a verdict about the person. */}
               <p className="muted" style={{ marginTop: 16 }}>
-                {CHECKED_PATH.prompt}{' '}
-                <a href={REQUEST_PAGE_URL}>{CHECKED_PATH.action.toLowerCase()}</a> — a person will
-                look at it for you, and it is open to everyone.
+                {CHECKED_PATH.prompt} <a href={REQUEST_PAGE_URL}>{CHECKED_PATH.action}</a>. A person
+                will look at it for you, and it is open to everyone.
               </p>
             </div>
           </>
