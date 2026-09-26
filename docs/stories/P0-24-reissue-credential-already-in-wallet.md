@@ -1,5 +1,11 @@
 # P0-24. A credential in a wallet must not block issuing it again
 
+> **Superseded by P0-44 (2026-09-27).** A credential already in a wallet is no longer issued again on
+> request. The issuer hands the document over once, when the wallet collects it, and keeps no copy —
+> so a second one is the institution's to publish rather than a button on a page. The behaviour below
+> was deliberate when it was written and is now deliberately reversed; P0-44 records why, and the
+> cost it accepts: if the claim's response is lost, the holder has to ask the institution again.
+
 ## Why
 
 On the academy site, a student whose wallet already held a credential could not ask for it again.
@@ -39,7 +45,7 @@ after deleting it, and the product had no way to say yes.
 | `issuer-service/src/credential-generator.js` | `todayIso` exported, so a re-issue is dated by the same definition of "today" as every other path |
 | `issuer-frontend/app/claim/page.tsx` | A held credential is selectable; the blocking `alreadyInWallet` branch is gone; the offer step states a new copy is being issued |
 | `issuer-frontend/app/get-credentials/page.tsx` | Badge reads "In your wallet · you can add it again" |
-| `scripts/check-reissue.mjs` | Live check against a running issuer: sign in, list credentials, ask for an offer for one already held, require `reissued: true` |
+| `scripts/check-claimed-once.mjs` | Live check against a running issuer. **Rewritten by P0-44:** it signs in, lists an account's credentials, asks for an offer for one already in a wallet, and requires the refusal |
 
 ## Verification
 

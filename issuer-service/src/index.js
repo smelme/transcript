@@ -34,7 +34,6 @@ import {
   labelOfCredentialData,
   academicNamespacesOf,
   validateAcademicClaims,
-  todayIso,
 } from './credential-generator.js';
 import * as emailService from './email-service.js';
 import { oneItemPerProgramme, programmeKeyOf } from './issuance-items.js';
@@ -739,7 +738,13 @@ class IssuerService {
     }
     const session = this.getMdocSession(credentialId);
     if (!session) {
-      return { success: false, error: 'mdoc session expired. Re-issue the credential to retrieve the mdoc' };
+      // The ordinary case now (P0-44): the document is handed over in the response to the claim
+      // that issued it, and nothing is kept afterwards. Saying "expired" would suggest a window the
+      // caller missed, when there is no window at all.
+      return {
+        success: false,
+        error: 'No document is held for this credential: it was handed to the wallet that collected it',
+      };
     }
     const verification = verifyIssuerSigned(session.mdocBase64url);
     return {
@@ -987,27 +992,25 @@ class IssuerService {
 
   // Issue a device-bound mdoc for an issuance session, of whatever kind it holds.
   //
-  // A session that has already been claimed is refused unless the caller asks for a re-issue.
-  // That is what stops a double tap or a replayed offer minting a second credential, while still
-  // letting a holder who asks again be issued one - for another device, or to replace a credential
-  // they no longer have. The copy they already hold is untouched: replacing it is an operation on
-  // the status list, not a side effect of issuing another.
-  issueForSession(session, deviceJwk, { allowReissue = false } = {}) {
-    if (session.status === 'issued' && !allowReissue) {
-      return { success: false, error: 'Issuance session already claimed' };
+  // Issue a device-bound mdoc for an issuance session, of whatever kind it holds.
+  //
+  // A session that has already been claimed is refused, and there is no way to ask for it again
+  // (P0-44). The document was handed over once, when it was collected, and the issuer does not keep
+  // it: a holder who needs another copy asks the institution, which publishes again under its own
+  // name. Replacing a credential somebody still holds is an operation on the status list, and it is
+  // the institution's decision rather than the price of asking twice.
+  issueForSession(session, deviceJwk) {
+    if (session.status === 'issued') {
+      return {
+        success: false,
+        error: 'This credential has already been added to a wallet. Ask the institution that issued it if you need another copy',
+      };
     }
     if (session.status === 'superseded') {
       return {
         success: false,
         error: 'This credential was replaced by a newer one. Open your latest invitation link',
       };
-    }
-    if (session.status === 'issued') {
-      // Issuing again is issuing a document, and a document is dated the day it is issued rather
-      // than the day the invitation behind it was prepared. Everything else is the same, so the
-      // new copy says the same thing about the study as the one it replaces.
-      session.credentialData = { ...session.credentialData, issue_date: todayIso() };
-      session.reissuedAt = new Date().toISOString();
     }
     const docType = session.credentialData?.docType || PHOTOID_DOCTYPE;
     const statusIndex = this._allocateStatusIndex();
@@ -1035,7 +1038,9 @@ class IssuerService {
 
     this.credentials.set(credentialId, credential);
     this._persistCredential(credential);
-    this.storeMdocSession(credentialId, mdoc.base64url);
+    // The document is returned to whoever claimed it, in the response to that claim, and is not
+    // kept here afterwards. What the issuer holds once a credential is issued is the record of it
+    // (P0-44): the mdoc exists to be collected, and collecting is the end of our part.
     this.statistics.totalIssued++;
     this.statistics.byType['PhotoID'] = (this.statistics.byType['PhotoID'] || 0) + 1;
 
@@ -1063,13 +1068,18 @@ class IssuerService {
   // Claim an issuance session with a wallet access token + proof-of-possession
   // CWT. The token's `sub` must be linked (via an institute invitation) to the
   // session's studentId, and the CWT must be signed by the wallet's device key.
-  async claimIssuanceSession(sessionId, { accessToken, cwt, allowReissue = false }, walletAccounts) {
+  async claimIssuanceSession(sessionId, { accessToken, cwt }, walletAccounts) {
     const session = this.getIssuanceSession(sessionId);
     if (!session) {return { success: false, status: 404, error: 'Issuance session not found' };}
-    // A session already claimed is refused unless this claim came from an offer that asked for a
-    // re-issue - the holder's own request rather than a retry.
-    if (session.status === 'issued' && !allowReissue) {
-      return { success: false, status: 409, error: 'Issuance session already claimed' };
+    // A session that has been claimed is refused outright (P0-44). The document went with the claim
+    // that took it and is not held here any more, so there is nothing to hand over a second time -
+    // and a second copy is the institution's to decide, not the price of opening the link again.
+    if (session.status === 'issued') {
+      return {
+        success: false,
+        status: 409,
+        error: 'This credential has already been added to a wallet. Ask the institution that issued it if you need another copy',
+      };
     }
     if (session.status === 'superseded') {
       return {
@@ -1114,7 +1124,7 @@ class IssuerService {
       return { success: false, status: 401, error: `Invalid CWT: ${cwtResult.error}` };
     }
 
-    const result = this.issueForSession(session, cwtResult.devicePublicJwk, { allowReissue });
+    const result = this.issueForSession(session, cwtResult.devicePublicJwk);
     return { ...result, status: result.success ? 200 : 400 };
   }
 
@@ -1448,10 +1458,10 @@ const paymentService = new PaymentService({
 
 // Build an OpenID4VCI credential-offer URL that references an issuance session.
 //
-// A re-issue is marked inside the offer itself, because the offer is what travels to the wallet.
-// A session that has already been claimed may only be claimed again from an offer that carries
-// the marker, so a replayed or double-tapped offer cannot mint a second credential by accident.
-function buildCredentialOfferUrl(session, { reissue = false } = {}) {
+// An offer is good once, and it carries nothing that could ask for the credential a second time
+// (P0-44). A second copy is the institution's decision, so there is no marker for a wallet to send
+// and none for a replayed offer to carry: the claim refuses a session that has been claimed.
+function buildCredentialOfferUrl(session) {
   const offer = {
     credential_issuer: process.env.ISSUER_BASE_URL || 'https://issuer.smartcollege.example',
     issuer_id: session.institution,
@@ -1464,23 +1474,8 @@ function buildCredentialOfferUrl(session, { reissue = false } = {}) {
       },
     },
   };
-  if (reissue) {offer.reissue = true;}
   const encoded = Buffer.from(JSON.stringify(offer)).toString('base64url');
   return `openid-credential-offer://?credential_offer=${encoded}`;
-}
-
-// Whether an offer carries the holder's request to be issued the credential again.
-function isReissueOffer(offerUrl) {
-  let encoded = String(offerUrl || '').trim();
-  if (!encoded) {return false;}
-  const q = encoded.match(/[?&]credential_offer=([^&]+)/);
-  if (q) {encoded = q[1];}
-  try {
-    const json = Buffer.from(encoded.replace(/-/g, '+').replace(/_/g, '/'), 'base64').toString('utf8');
-    return JSON.parse(json)?.reissue === true;
-  } catch {
-    return false;
-  }
 }
 
 // When WALLET_APP_LINK_BASE is configured (e.g. https://quals.example/offer),
@@ -2292,6 +2287,12 @@ app.post('/issuance/items/:sessionId/offer', async (req, res) => {
       session.sub === holder.sub ||
       links.some((l) => l.institution === session.institution && l.studentId === session.studentId);
     if (!owns) {return res.status(403).json({ success: false, error: 'This credential belongs to another account' });}
+    if (session.status === 'issued') {
+      return res.status(409).json({
+        success: false,
+        error: 'This has already been added to a wallet. Ask the institution that issued it if you need another copy',
+      });
+    }
     if (session.status === 'superseded') {
       return res.status(409).json({
         success: false,
@@ -2299,9 +2300,8 @@ app.post('/issuance/items/:sessionId/offer', async (req, res) => {
       });
     }
 
-    const reissue = session.status === 'issued';
     if (session.termsRequired && !session.termsAcceptedAt) {issuer.acceptTerms(session.sessionId);}
-    const offerUrl = buildCredentialOfferUrl(session, { reissue });
+    const offerUrl = buildCredentialOfferUrl(session);
     const qrDataUrl = await QRCode.toDataURL(offerUrl, {
       errorCorrectionLevel: 'M',
       type: 'image/png',
@@ -2316,7 +2316,6 @@ app.post('/issuance/items/:sessionId/offer', async (req, res) => {
       kind: kindOf(session),
       label: kindLabel(session),
       offerUrl,
-      reissued: reissue,
       appLinkUrl: buildAppLinkOfferUrl(offerUrl),
       qrDataUrl,
     });
@@ -3330,15 +3329,17 @@ app.post('/academy/credentials/:sessionId/offer', async (req, res) => {
       );
     if (!owns) {return res.status(403).json({ success: false, error: 'This credential belongs to another account' });}
 
-    // A credential already sitting in a wallet is not a reason to refuse it. The holder is asking
-    // for the document, and asking again is asking for another copy: it is issued again, dated the
-    // day it is issued, and the copy they already hold stays valid until the organisation revokes
-    // it - which is the operational way one credential is replaced by another.
-    const reissue = session.status === 'issued';
     if (session.status === 'superseded') {
       return res.status(409).json({
         success: false,
         error: 'This credential was replaced by a newer one. Open your latest invitation link',
+      });
+    }
+    // Already collected, so there is no second copy to offer (P0-44).
+    if (session.status === 'issued') {
+      return res.status(409).json({
+        success: false,
+        error: 'This has already been added to a wallet. Ask the institution that issued it if you need another copy',
       });
     }
 
@@ -3346,7 +3347,7 @@ app.post('/academy/credentials/:sessionId/offer', async (req, res) => {
       issuer.acceptTerms(session.sessionId);
     }
 
-    const offerUrl = buildCredentialOfferUrl(session, { reissue });
+    const offerUrl = buildCredentialOfferUrl(session);
     const qrDataUrl = await QRCode.toDataURL(offerUrl, {
       errorCorrectionLevel: 'M',
       type: 'image/png',
@@ -3361,9 +3362,6 @@ app.post('/academy/credentials/:sessionId/offer', async (req, res) => {
       kind: kindOf(session),
       label: kindLabel(session),
       offerUrl,
-      // True when this offer issues the credential again rather than for the first time, so the
-      // page can say so rather than presenting it as a first issuance.
-      reissued: reissue,
       // Present only when a wallet App Link domain is configured.
       appLinkUrl: buildAppLinkOfferUrl(offerUrl),
       qrDataUrl,
@@ -3440,17 +3438,16 @@ app.post('/issuance-sessions/:id/claim', async (req, res) => {
 // The wallet scans the offer URL, then sends the offer + its access token + a
 // proof-of-possession CWT in ONE request; the mdoc is returned directly.
 app.post('/wallet/issuance', async (req, res) => {
-  const { offerUrl, sessionId, accessToken, cwt, reissue } = req.body || {};
+  const { offerUrl, sessionId, accessToken, cwt } = req.body || {};
   const resolved = sessionId || parseSessionIdFromOffer(offerUrl);
   if (!resolved) {
     return res.status(400).json({ success: false, error: 'offerUrl or sessionId is required' });
   }
-  // Only an offer that says the holder asked for a re-issue may claim a session a second time.
-  // The marker travels inside the offer, so a wallet replaying an older one is still refused.
-  const allowReissue = reissue === true || isReissueOffer(offerUrl);
+  // An offer is good once: a session that has been claimed is refused here, and there is no marker
+  // a wallet could send to ask for it again (P0-44).
   const result = await issuer.claimIssuanceSession(
     resolved,
-    { accessToken, cwt, allowReissue },
+    { accessToken, cwt },
     walletAccounts,
   );
   if (!result.success) {
@@ -3567,7 +3564,7 @@ app.use((err, req, res, _next) => {
 });
 
 // Export for testing
-export { IssuerService, app, issuer, buildCredentialOfferUrl, isReissueOffer };
+export { IssuerService, app, issuer, buildCredentialOfferUrl };
 
 // Start server if run directly (robust entry-point detection)
 const PORT = process.env.PORT || 3000;

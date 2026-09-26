@@ -4,7 +4,8 @@ import os from 'node:os';
 import path from 'node:path';
 
 /**
- * One row per programme, and what happens once the holder says it has arrived (P0-42, P0-43).
+ * One row per programme, and what the issuer holds once a credential has been collected
+ * (P0-42, P0-43, P0-44).
  *
  * The listing rule and the readback are driven through the real app rather than only through their
  * own functions, because the thing worth proving is that both doors use them and that the answer to
@@ -174,13 +175,14 @@ test('a superseded copy is not a row at all', () => {
 
 // ── the readback, and letting go of the document ──────────────────────────────────────────
 
-test('a collection is read back from the issuer records, and the document is let go of', () => {
+test('a collection is read back from the issuer records, and no document is kept', () => {
   const record = recordFor('SA-READBACK');
   const { session, credentialId } = issuedSessionFor({ studentId: 'SA-READBACK', record });
 
-  assert.ok(
+  assert.equal(
     issuer.getMdocSession(credentialId),
-    'the document is held while it is being collected',
+    null,
+    'nothing is held, not even while it is being collected (P0-44)',
   );
 
   const report = issuer.settleCollected({ confirmed: [session], held: [session] });
@@ -189,8 +191,7 @@ test('a collection is read back from the issuer records, and the document is let
   assert.equal(report.items[0].inWallet, true);
   assert.equal(report.items[0].credentialId, credentialId);
   assert.ok(report.items[0].recordedAt, 'the answer carries when the issuer recorded the issue');
-  assert.equal(report.mdocsForgotten, 1);
-  assert.equal(issuer.getMdocSession(credentialId), null, 'and the document is no longer held');
+  assert.equal(report.mdocsForgotten, 0, 'there was nothing to forget: none is ever held');
 });
 
 test('the record of the issue stays, even though the document goes', () => {
@@ -216,7 +217,7 @@ test('a credential that has not arrived is not treated as collected, and nothing
   assert.equal(report.mdocsForgotten, 0);
 });
 
-test('every copy of a programme the holder already has is let go of, not only the one named', () => {
+test('a programme held in two copies settles as one thing, and leaves no document behind', () => {
   const record = recordFor('SA-TWO-COPIES');
   const older = issuedSessionFor({ studentId: 'SA-TWO-COPIES', record });
   const newer = issuedSessionFor({ studentId: 'SA-TWO-COPIES', record });
@@ -226,9 +227,11 @@ test('every copy of a programme the holder already has is let go of, not only th
     held: [older.session, newer.session],
   });
 
-  assert.equal(report.mdocsForgotten, 2, 'the same person holds the same programme twice');
+  assert.equal(report.allInWallet, true, 'the same person holds the same programme twice');
+  assert.equal(report.mdocsForgotten, 0, 'and there is nothing held to forget');
   assert.equal(issuer.getMdocSession(older.credentialId), null);
   assert.equal(issuer.getMdocSession(newer.credentialId), null);
+  assert.equal(issuer.getCredentialMdoc(newer.credentialId).success, false);
 });
 
 // ── the route ─────────────────────────────────────────────────────────────────────────────

@@ -20,7 +20,7 @@ process.on('exit', () => {
 
 const { IssuerService } = await import('../src/index.js');
 const { WalletAccountService } = await import('../src/wallet-account-service.js');
-const { buildCwt, generateDeviceKeyPair } = await import('../../mdoc-core.js');
+const { buildCwt, generateDeviceKeyPair, verifyIssuerSigned } = await import('../../mdoc-core.js');
 
 // Access tokens are signed with the dedicated wallet-token-signer key (separate
 // from the mdoc document-signer key).
@@ -134,11 +134,18 @@ test('claim issues a device-bound mdoc when the wallet is linked', async () => {
   assert.strictEqual(claim.deviceBound, true);
   assert.ok(claim.mdocBase64url);
 
-  const mdoc = issuer.getCredentialMdoc(claim.credentialId);
-  assert.strictEqual(mdoc.verification.signatureValid, true);
-  assert.strictEqual(mdoc.verification.digestsValid, true);
-  assert.strictEqual(mdoc.verification.deviceKey.x, Buffer.from(publicJwk.x, 'base64url').toString('base64'));
-  assert.strictEqual(mdoc.verification.deviceKey.y, Buffer.from(publicJwk.y, 'base64url').toString('base64'));
+  // The document arrives with the claim and is not kept here afterwards (P0-44), so what the holder
+  // is handed is what gets checked.
+  const mdoc = verifyIssuerSigned(claim.mdocBase64url);
+  assert.strictEqual(mdoc.signatureValid, true);
+  assert.strictEqual(mdoc.digestsValid, true);
+  assert.strictEqual(mdoc.deviceKey.x, Buffer.from(publicJwk.x, 'base64url').toString('base64'));
+  assert.strictEqual(mdoc.deviceKey.y, Buffer.from(publicJwk.y, 'base64url').toString('base64'));
+  assert.strictEqual(
+    issuer.getCredentialMdoc(claim.credentialId).success,
+    false,
+    'and nothing is left behind to fetch a second time',
+  );
 
   // The link matches: the session student id == the invited student id.
   assert.strictEqual(inv.sub, (await accounts.verifyAccessToken(accessToken)).sub);

@@ -46,7 +46,6 @@ type Offer = {
   qrDataUrl: string;
   appLinkUrl?: string | null;
   label?: string | null;
-  reissued?: boolean;
 };
 
 /**
@@ -257,8 +256,7 @@ export default function IssuePage() {
   /**
    * The end of the flow. The holder saying "done" is not evidence that anything arrived, so this
    * asks the issuer to read its own records: it checks the session and the row the issue was
-   * recorded in, and once they agree it stops holding the documents themselves. Only when
-   * everything chosen is in the wallet is the collection finished.
+   * recorded in. Only when everything chosen is in the wallet is the collection finished.
    */
   async function confirmCollection() {
     if (!accessToken || selected.length === 0) {return;}
@@ -285,6 +283,16 @@ export default function IssuePage() {
 
   /** What the issuer could not see in the wallet yet, asked before telling anybody it failed. */
   const notArrived = settled?.items.filter((item) => !item.inWallet) ?? [];
+
+  /**
+   * Whether an item can still be added.
+   *
+   * A credential that has already been added is finished: the issuer handed the document over when
+   * the wallet collected it and keeps no copy, so a second one is the institution's decision rather
+   * than a button on this page (P0-44). Offering it here would only lead to a refusal.
+   */
+  const offerable = (item: Item) => item.status !== 'issued';
+  const offerableItems = items.filter(offerable);
 
   const subtitleFor = (item: Item) => {
     const parts: string[] = [];
@@ -404,62 +412,87 @@ export default function IssuePage() {
               <ul className="issue-list">
                 {items.map((item) => (
                   <li key={item.sessionId} className="issue-item">
-                    <label className="issue-choice">
-                      <input
-                        type="checkbox"
-                        checked={selected.includes(item.sessionId)}
-                        onChange={() => toggle(item.sessionId)}
-                      />
-                      <span>
-                        <span className="issue-item-head">
-                          <strong>{item.title}</strong>
-                          {item.label && <span className="badge kind">{item.label}</span>}
-                          {item.inWallet && <span className="badge ok">In your wallet</span>}
+                    {offerable(item) ? (
+                      <label className="issue-choice">
+                        <input
+                          type="checkbox"
+                          checked={selected.includes(item.sessionId)}
+                          onChange={() => toggle(item.sessionId)}
+                        />                        <span>
+                          <span className="issue-item-head">
+                            <strong>{item.title}</strong>
+                            {item.label && <span className="badge kind">{item.label}</span>}
+                          </span>
+                          {subtitleFor(item) && (
+                            <span className="issue-item-sub">{subtitleFor(item)}</span>
+                          )}
+                          {item.holderName && (
+                            <span className="issue-item-sub">Issued to {item.holderName}</span>
+                          )}
                         </span>
-                        {subtitleFor(item) && (
-                          <span className="issue-item-sub">{subtitleFor(item)}</span>
-                        )}
-                        {item.holderName && (
-                          <span className="issue-item-sub">Issued to {item.holderName}</span>
-                        )}
+                      </label>
+                    ) : (
+                      <span className="issue-choice">
+                        <span>
+                          <span className="issue-item-head">
+                            <strong>{item.title}</strong>
+                            {item.label && <span className="badge kind">{item.label}</span>}
+                            <span className="badge ok">In your wallet</span>
+                          </span>
+                          {subtitleFor(item) && (
+                            <span className="issue-item-sub">{subtitleFor(item)}</span>
+                          )}
+                          <span className="issue-item-sub">
+                            Ask your institution if you need another copy.
+                          </span>
+                        </span>
                       </span>
-                    </label>
+                    )}
                   </li>
                 ))}
               </ul>
 
-              <label className="issue-terms">
-                <input
-                  type="checkbox"
-                  checked={termsAccepted}
-                  onChange={(e) => setTermsAccepted(e.target.checked)}
-                />
-                I agree to hold these credentials in my wallet and to the terms of issue.
-              </label>
+              {offerableItems.length === 0 ? (
+                <p className="issue-note">
+                  Everything above is already in your wallet. Ask your institution if you need another
+                  copy.
+                </p>
+              ) : (
+                <>
+                  <label className="issue-terms">
+                    <input
+                      type="checkbox"
+                      checked={termsAccepted}
+                      onChange={(e) => setTermsAccepted(e.target.checked)}
+                    />
+                    I agree to hold these credentials in my wallet and to the terms of issue.
+                  </label>
 
-              <div className="issue-actions">
-                <button
-                  className="btn btn-primary"
-                  onClick={collectSelected}
-                  disabled={busy || !termsAccepted || selected.length === 0}
-                >
-                  {/* Nothing selected reads as "Add to wallet" rather than "Add 0 to wallet": the
-                      button is disabled until something is chosen, so a count of nought is never
-                      an instruction. */}
-                  {busy
-                    ? 'Preparing…'
-                    : selected.length > 1
-                      ? `Add ${selected.length} to wallet`
-                      : 'Add to wallet'}
-                </button>
-                <button
-                  className="btn"
-                  onClick={() => setSelected(items.map((item) => item.sessionId))}
-                  disabled={busy || selected.length === items.length}
-                >
-                  Select all
-                </button>
-              </div>
+                  <div className="issue-actions">
+                    <button
+                      className="btn btn-primary"
+                      onClick={collectSelected}
+                      disabled={busy || !termsAccepted || selected.length === 0}
+                    >
+                      {/* Nothing selected reads as "Add to wallet" rather than "Add 0 to wallet": the
+                          button is disabled until something is chosen, so a count of nought is never
+                          an instruction. */}
+                      {busy
+                        ? 'Preparing…'
+                        : selected.length > 1
+                          ? `Add ${selected.length} to wallet`
+                          : 'Add to wallet'}
+                    </button>
+                    <button
+                      className="btn"
+                      onClick={() => setSelected(offerableItems.map((item) => item.sessionId))}
+                      disabled={busy || selected.length === offerableItems.length}
+                    >
+                      Select all
+                    </button>
+                  </div>
+                </>
+              )}
             </>
           )}
         </>
@@ -470,7 +503,7 @@ export default function IssuePage() {
           <span className="issue-eyebrow">
             Credential {offerIndex + 1} of {offers.length}
           </span>
-          <h1>{current.reissued ? 'Add another copy' : 'Add it to your wallet'}</h1>
+          <h1>Add it to your wallet</h1>
           <p className="issue-lede">
             Scan this with your Quals wallet, or open it directly if the wallet is on this device. The
             code expires quickly, so use it now.

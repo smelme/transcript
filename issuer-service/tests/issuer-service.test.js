@@ -21,7 +21,7 @@ process.on('exit', () => {
   }
 });
 
-const { IssuerService, sameClaimSet, buildCredentialOfferUrl, isReissueOffer } = await import('../src/index.js');
+const { IssuerService, sameClaimSet, buildCredentialOfferUrl } = await import('../src/index.js');
 const { getDb } = await import('../../db.js');
 const {
   generateAcademicRecord,
@@ -29,7 +29,6 @@ const {
   shapeForEnrolment,
   kindOfCredentialData,
   academicNamespacesOf,
-  todayIso,
 } = await import(
   '../src/credential-generator.js'
 );
@@ -108,7 +107,7 @@ test('Credential dates - a caller may state the issue date it is issuing for', (
   );
 });
 
-test('Re-issue - a credential already in a wallet is issued again as a new document', () => {
+test('a session that has been claimed is refused, and offers no way to ask for another copy', () => {
   const issuer = new IssuerService();
   const { records } = generateAcademicRecord({
     institution: 'Smart Academy',
@@ -127,19 +126,42 @@ test('Re-issue - a credential already in a wallet is issued again as a new docum
 
   const retry = issuer.issueForSession(session, null);
   assert.strictEqual(retry.success, false, 'a retry must not mint a second credential');
-  assert.match(retry.error, /already claimed/);
+  assert.match(retry.error, /already been added to a wallet/);
+  assert.match(retry.error, /ask the institution/i, 'and it says where another copy comes from');
 
-  const again = issuer.issueForSession(session, null, { allowReissue: true });
-  assert.strictEqual(again.success, true, again.error);
-  assert.notStrictEqual(again.credentialId, first.credentialId, 'a re-issue is its own credential');
   assert.strictEqual(
     issuer.getCredential(first.credentialId).credential.status,
     'active',
-    'the copy the holder already has is untouched by the re-issue',
+    'the copy the holder already has is untouched',
   );
 });
 
-test('Re-issue - the new copy is dated the day it is issued, not the day of the invitation', () => {
+test('the document is handed over once and not kept afterwards', () => {
+  const issuer = new IssuerService();
+  const { records } = generateAcademicRecord({
+    institution: 'Smart Academy',
+    studentId: 'SA-R1b',
+    include: 'both',
+  });
+  const session = issuer.createIssuanceSession({
+    studentId: 'SA-R1b',
+    institution: 'Smart Academy',
+    credentialData: records[0].credentialData,
+    display: records[0].display,
+  });
+
+  const issued = issuer.issueForSession(session, null);
+  assert.strictEqual(issued.success, true, issued.error);
+  assert.ok(issued.mdocBase64url, 'the claimant is given the document in the answer itself');
+
+  // P0-44: nothing is left behind for a later fetch, because collection is the end of our part.
+  assert.strictEqual(issuer.getMdocSession(issued.credentialId), null);
+  const afterwards = issuer.getCredentialMdoc(issued.credentialId);
+  assert.strictEqual(afterwards.success, false);
+  assert.match(afterwards.error, /no document is held/i);
+});
+
+test('a document is dated from the claims, and one invitation issues one document', () => {
   const issuer = new IssuerService();
   const { records } = generateAcademicRecord({
     institution: 'Smart Academy',
@@ -158,33 +180,19 @@ test('Re-issue - the new copy is dated the day it is issued, not the day of the 
   assert.strictEqual(first.success, true, first.error);
   assert.strictEqual(issuer.getCredential(first.credentialId).credential.issue_date, '2020-01-31');
 
-  const again = issuer.issueForSession(session, null, { allowReissue: true });
-  assert.strictEqual(again.success, true, again.error);
-  assert.strictEqual(
-    issuer.getCredential(again.credentialId).credential.issue_date,
-    todayIso(),
-    'a re-issue is dated when it is issued',
-  );
+  const again = issuer.issueForSession(session, null);
+  assert.strictEqual(again.success, false, 'issuing twice from one invitation is not a thing');
 });
 
-test('Re-issue - only an offer that asks for a re-issue may be claimed again', () => {
+test('an offer asks for one credential and carries nothing that could ask for another', () => {
   const session = { sessionId: 's-1', institution: 'Smart Academy', nonce: 'n-1' };
+  const encoded = buildCredentialOfferUrl(session).match(/[?&]credential_offer=([^&]+)/)[1];
+  const offer = JSON.parse(
+    Buffer.from(encoded.replace(/-/g, '+').replace(/_/g, '/'), 'base64').toString('utf8'),
+  );
 
-  assert.strictEqual(
-    isReissueOffer(buildCredentialOfferUrl(session)),
-    false,
-    'the first offer claims the session once',
-  );
-  assert.strictEqual(
-    isReissueOffer(buildCredentialOfferUrl(session, { reissue: true })),
-    true,
-    'the holder\'s request for another copy travels in the offer itself',
-  );
-  assert.strictEqual(
-    isReissueOffer('openid-credential-offer://?credential_offer=%7B%7D'),
-    false,
-    'an offer with no marker is not a re-issue',
-  );
+  assert.deepStrictEqual(Object.keys(offer).sort(), ['credential_issuer', 'credentials', 'grants', 'issuer_id']);
+  assert.ok(!JSON.stringify(offer).includes('reissue'), 'there is no marker a wallet could send back');
 });
 
 test('Credential kinds - both is ONE credential holding both', () => {

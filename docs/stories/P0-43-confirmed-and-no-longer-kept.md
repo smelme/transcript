@@ -6,6 +6,10 @@ own records, never taken from the browser)
 **Depends on:** P0-42 (one item per programme), P0-30 (add credential and scan)
 **Blocks:** nothing
 
+> **Extended by P0-44 (2026-09-27).** The document is not held at all now: it is handed over in the
+> response to the claim that issues it. The confirmation below is therefore about *checking* what
+> arrived, and the forgetting it does is belt and braces for anything issued before that change.
+
 ## The problem
 
 Two things were missing at the end of the flow.
