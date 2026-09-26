@@ -49,34 +49,58 @@ async function post(path, body) {
 console.log(`Checking the decision point at ${ACADEMY_URL}\n`);
 
 // ── the pages ──────────────────────────────────────────────────────────────────────────────
+//
+// Two paths, told apart by when somebody studied, each with its own way in. The figure is matched
+// as a digit rather than as "5" so that changing the window on the registry does not break this
+// check - what matters is that both paths state the same shape of answer, not what the number is.
+const RECENT = /finished in the last \d+ years/i;
+const EARLIER = /finished more than \d+ years ago/i;
+const CHECKED_PATH = `${QUALS}/request`;
+
 const home = await get('/');
 check('the home page is served', home.status === 200, `status ${home.status}`);
 check(
-  'the home page states both doors and what each costs and takes',
-  /Collect them yourself/.test(home.text) &&
-    /Ask us to check/.test(home.text) &&
-    /costs/i.test(home.text) &&
-    /takes/i.test(home.text)
+  'the home page offers both paths, told apart by when somebody studied',
+  RECENT.test(home.text) && EARLIER.test(home.text)
+);
+check(
+  'and states what each costs, how long each takes and what each needs',
+  /costs/i.test(home.text) && /takes/i.test(home.text) && /you\s+need/i.test(home.text)
+);
+check(
+  'and each path has its own way in',
+  /href="\/get-credentials"/.test(home.text) && home.text.includes(CHECKED_PATH),
+  'both paths must be reachable from the page people read first'
 );
 
+// The first path: where the address is entered, and the other one is never hidden.
 const chooser = await get('/get-credentials');
-check('the chooser is served', chooser.status === 200, `status ${chooser.status}`);
+check('the first path is served', chooser.status === 200, `status ${chooser.status}`);
 check(
-  'the chooser describes both doors before it asks anything',
-  /Collect them yourself/.test(chooser.text) && /Ask us to check/.test(chooser.text)
+  'and says which path it is, in the applicant\'s own terms',
+  /finished with us in the last \d+ years/i.test(chooser.text),
+  'the page must not leave somebody guessing whether it applies to them'
+);
+check('and is where the address is entered', /Email address/i.test(chooser.text));
+check(
+  'and offers the second path without hiding it',
+  chooser.text.includes(CHECKED_PATH) && EARLIER.test(chooser.text)
 );
 check(
-  'the chooser does not forward on its own',
+  'and does not forward on its own',
   !/<meta[^>]+http-equiv=["']?refresh/i.test(chooser.text) &&
     !/window\.location\s*=/.test(chooser.text),
-  'the page must wait for the applicant to choose'
+  'the page must wait for the applicant to act'
 );
 
 const credentialsPage = await get('/credentials');
 check('the credentials page is served', credentialsPage.status === 200, `status ${credentialsPage.status}`);
 check(
-  'the credentials page offers the checked path too',
-  /Ask us to check/.test(credentialsPage.text)
+  'and offers both paths with a way into each',
+  RECENT.test(credentialsPage.text) &&
+    EARLIER.test(credentialsPage.text) &&
+    /href="\/get-credentials"/.test(credentialsPage.text) &&
+    credentialsPage.text.includes(CHECKED_PATH)
 );
 
 // ── the question ───────────────────────────────────────────────────────────────────────────

@@ -1,21 +1,28 @@
 /**
- * The two doors, and the words for each answer (P0-35).
+ * The two paths, and the words for each answer (P0-35).
  *
  * Written as a plain module rather than inside the page so that the wording can be checked
  * without a browser. The wording *is* the feature here: a wrong sentence turns a legitimate
  * graduate away, or accuses them of something.
  *
- * Four things were settled before any of this was written, and they are the rules the copy has to
- * keep to:
+ * There are **two separate ways** to ask for a credential, and which one applies turns on when the
+ * applicant studied. That is the one thing they know without being asked and the one thing we do not
+ * have to guess at, so the two paths are offered side by side and they choose. Neither is hidden
+ * behind a question, and neither is described as the lesser one.
+ *
+ * The institution's records still have the last word. Somebody who takes the first path but whose
+ * record is older than the window, or cannot be matched, is sent down the second one rather than
+ * turned away: offering the paths is not the same as promising the answer.
+ *
+ * Three rules the copy has to keep to:
  *
  *   1. **There are three answers, and the third one is honest.** *We could not match that address
  *      to a record* is allowed. *Verification failed* is not. A registry that can only say yes or
  *      no says no to a changed name, an old address, or two people who share a birthday.
- *   2. **Nothing redirects on its own.** The applicant chooses. Nothing here moves them.
- *   3. **The window is measured on the institution's data, never on the applicant's word.** The
- *      chooser asks nothing; it only says which door applies.
- *   4. **Both doors are always visible.** Someone who disagrees with the answer can still take the
- *      other one, and it is never described as a failure.
+ *   2. **Nothing redirects on its own.** The applicant chooses the path, and the last step is theirs
+ *      to take. Nothing here moves them.
+ *   3. **The first path's answer is the institution's, never the applicant's word about themselves.**
+ *      Somebody who picks the wrong path is corrected by the record, not blamed for it.
  */
 
 /**
@@ -36,10 +43,21 @@ export const REQUEST_PAGE_URL =
  * Costs and waits are properties of the doors, not of any particular answer, so they are written
  * once and shown on both.
  */
+/**
+ * The two paths.
+ *
+ * `name` is the path as the applicant recognises it — when they finished — because that is what they
+ * know and what they are choosing between. The figure comes from the constant above so the two
+ * labels cannot drift apart, or away from the rule the institution measures by.
+ *
+ * The keys are `self` and `checked` because the decision function returns them; the labels are what
+ * a reader sees.
+ */
 export const DOORS = {
   self: {
     key: 'self',
-    name: 'Collect them yourself',
+    name: `I finished in the last ${ELIGIBILITY_WINDOW_YEARS} years`,
+    what: 'Collect them yourself',
     cost: 'Nothing',
     wait: 'Straight away',
     needs: 'The email address Smart Academy holds for you',
@@ -47,7 +65,8 @@ export const DOORS = {
   },
   checked: {
     key: 'checked',
-    name: 'Ask us to check',
+    name: `I finished more than ${ELIGIBILITY_WINDOW_YEARS} years ago`,
+    what: 'Ask us to check',
     cost: 'A fee, charged when you send the request',
     wait: 'Up to 10 working days',
     needs: 'Proof of who you are, which we take on Quals',
@@ -60,7 +79,7 @@ export const COPY = {
   windowYears: ELIGIBILITY_WINDOW_YEARS,
 
   intro:
-    'Enter the email address Smart Academy holds for you. We will look at our own records and tell you which way to collect your credentials.',
+    'There are two ways to ask Smart Academy for your credentials, and which one applies depends on when you finished. Choose the one that describes you.',
 
   yes: (name, year) => ({
     title: 'We hold your record',
@@ -150,6 +169,9 @@ export function outcomeFor(answer) {
 export function allCopy() {
   return [
     COPY.intro,
+    // The path labels are copy too: they are the first thing a reader chooses between.
+    DOORS.self.name,
+    DOORS.checked.name,
     COPY.yes('Ada Lovelace', 2024).title,
     COPY.yes('Ada Lovelace', 2024).body,
     COPY.no('Ada Lovelace').title,

@@ -123,20 +123,40 @@ check('the unknown answers differ from the unmatchable one, so the sentence stay
   assert.notEqual(outcomeFor({ verdict: 'unknown', reason: 'no_match' }).body, outcomeFor({ verdict: 'unknown', reason: 'registry_unreachable' }).body);
 });
 
-// ── 3. The window figure appears once, and the copy states it ──────────────────────────────
-check('the five-year figure appears exactly once across the copy', () => {
-  const mentions = allCopy().filter((sentence) => sentence.includes(String(ELIGIBILITY_WINDOW_YEARS)));
-  assert.equal(mentions.length, 1, `the figure appears in ${mentions.length} sentences: ${mentions.join(' | ')}`);
-  assert.match(mentions[0], new RegExp(`more than ${ELIGIBILITY_WINDOW_YEARS} years ago`));
+// ── 3. Every year figure in the copy is the window's, so the two cannot drift ─────────────
+check('every year figure in the copy is the configured window', () => {
+  // The figure is stated in both path labels, which is the point of them: the two paths are how
+  // somebody picks, and they pick by when they studied. What must never happen is a *second*
+  // figure appearing, because then the page and the rule the institution measures by would
+  // disagree and the applicant would be told something untrue.
+  const figures = allCopy().flatMap((sentence) =>
+    [...String(sentence).matchAll(/(\d+)\s*years?/g)].map((match) => Number(match[1]))
+  );
+
+  assert.ok(figures.length >= 2, 'the window figure must be stated where the paths are described');
+  for (const figure of figures) {
+    assert.equal(figure, ELIGIBILITY_WINDOW_YEARS, `the copy states "${figure} years" somewhere`);
+  }
+});
+
+check('the two paths are told apart by when the applicant studied, not by what we decide', () => {
+  for (const door of Object.values(DOORS)) {
+    assert.match(
+      door.name,
+      new RegExp(`${ELIGIBILITY_WINDOW_YEARS} years`),
+      `the ${door.key} path must be recognisable by timeframe, because that is how it is chosen`
+    );
+  }
+  assert.notEqual(DOORS.self.name, DOORS.checked.name, 'the two paths must be distinguishable');
 });
 
 // ── 4. Both doors are always described, with their costs and waits ─────────────────────────
-check('both doors state what they cost, how long they take and what is needed', () => {
+check('both paths state what they cost, how long they take and what is needed', () => {
   for (const [name, door] of Object.entries(DOORS)) {
-    for (const field of ['name', 'cost', 'wait', 'needs', 'action']) {
+    for (const field of ['name', 'what', 'cost', 'wait', 'needs', 'action']) {
       assert.ok(
         typeof door[field] === 'string' && door[field].trim() !== '',
-        `the ${name} door must state its ${field}`
+        `the ${name} path must state its ${field}`
       );
     }
   }

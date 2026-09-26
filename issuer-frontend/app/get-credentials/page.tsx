@@ -2,10 +2,19 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
-import { DOORS, REQUEST_PAGE_URL, outcomeFor } from '../lib/doors';
+import { DOORS, ELIGIBILITY_WINDOW_YEARS, REQUEST_PAGE_URL, outcomeFor } from '../lib/doors';
 
 /**
- * Get your credentials.
+ * Collect your credentials - the first of the two paths.
+ *
+ * This page is the path for people who finished recently: the academy knows who they are from the
+ * address it holds, so it can publish their record and hand them over in one go. The other path,
+ * for people who finished longer ago or cannot be matched, is on Quals and is linked from here.
+ *
+ * Two things make it the path it is rather than a question in front of a path. The heading says
+ * which path this is, so nobody has to guess whether it applies to them, and the link to the other
+ * one is always on screen. Nothing here decides for the applicant; the record decides whether this
+ * path can serve them, and the answer to that is never "you are not who you say you are".
  *
  * The academy's part in issuing is one thing: it knows who you are from the address it holds, and
  * publishing your record is what happens here. Everything after that belongs to Quals, where the
@@ -106,7 +115,24 @@ export default function GetCredentialsPage() {
   return (
     <section className="section" style={{ minHeight: '62vh' }}>
       <div className="container-narrow">
-        {/* Both doors, described before anything is asked of the applicant. */}
+        <span className="eyebrow" style={{ color: 'var(--link)' }}>
+          Smart Academy
+        </span>
+        <h1 style={{ fontSize: 32, letterSpacing: '-0.02em', margin: '14px 0 12px' }}>
+          Collect your credentials
+        </h1>
+        <p style={{ fontSize: 16, lineHeight: 1.65, color: 'var(--muted)', marginBottom: 14 }}>
+          This is the path for people who finished with us in the last {ELIGIBILITY_WINDOW_YEARS}{' '}
+          years. Enter the email address Smart Academy holds for you and we will look at our own
+          records.
+        </p>
+        <p className="muted" style={{ marginBottom: 30 }}>
+          Finished earlier than that, or not sure?{' '}
+          <a href={REQUEST_PAGE_URL}>{DOORS.checked.action.toLowerCase()}</a> instead — that path is
+          open to everyone, and it is the one we will point you to if we cannot match your address.
+        </p>
+
+        {/* The two paths, so somebody on the wrong one can see the other without hunting for it. */}
         <div
           style={{
             display: 'grid',
@@ -118,6 +144,7 @@ export default function GetCredentialsPage() {
           {Object.values(DOORS).map((door) => (
             <div className="card" key={door.key}>
               <p style={{ margin: 0, fontWeight: 600 }}>{door.name}</p>
+              <p className="muted" style={{ margin: '4px 0 0', fontSize: 14 }}>{door.what}</p>
               <dl
                 style={{
                   margin: '12px 0 0',
@@ -178,9 +205,9 @@ export default function GetCredentialsPage() {
             <span className="eyebrow" style={{ color: 'var(--link)' }}>
               Issued by Quals
             </span>
-            <h1 style={{ fontSize: 32, letterSpacing: '-0.02em', margin: '14px 0 12px' }}>
+            <h2 style={{ fontSize: 24, letterSpacing: '-0.02em', margin: '14px 0 12px' }}>
               Your credentials are ready
-            </h1>
+            </h2>
             <p style={{ fontSize: 16, lineHeight: 1.65, color: 'var(--muted)', marginBottom: 24 }}>
               They are waiting for you on Quals, where you can add them to your wallet. We have also
               emailed you the same link.
@@ -215,17 +242,6 @@ export default function GetCredentialsPage() {
           </>
         ) : (
           <>
-            <span className="eyebrow" style={{ color: 'var(--link)' }}>
-              Smart Academy
-            </span>
-            <h1 style={{ fontSize: 32, letterSpacing: '-0.02em', margin: '14px 0 12px' }}>
-              Get your credentials
-            </h1>
-            <p style={{ fontSize: 16, lineHeight: 1.65, color: 'var(--muted)', marginBottom: 30 }}>
-              Tell us the email address Smart Academy holds for you. We look at our own records and
-              tell you which way to collect your credentials.
-            </p>
-
             <div className="card">
               <form onSubmit={publish}>
                 <label htmlFor="email">Email address</label>
@@ -247,9 +263,9 @@ export default function GetCredentialsPage() {
                 </button>
               </form>
               <p className="muted" style={{ marginTop: 16 }}>
-                We look at our own records. If we hold one for you that finished inside the window,
-                you can collect your credentials straight away. Otherwise, and if we cannot tell,
-                you can ask us to check.
+                We look at our own records. If we hold one for you from the last{' '}
+                {ELIGIBILITY_WINDOW_YEARS} years, you can collect your credentials straight away.
+                Otherwise, and if we cannot tell, you can ask us to check.
               </p>
             </div>
           </>

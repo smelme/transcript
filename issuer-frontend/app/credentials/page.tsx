@@ -1,5 +1,5 @@
 import Link from 'next/link';
-import { DOORS, REQUEST_PAGE_URL } from '../lib/doors';
+import { COPY, DOORS, REQUEST_PAGE_URL } from '../lib/doors';
 
 export const metadata = {
   title: 'Digital credentials: Smart Academy',
@@ -148,36 +148,53 @@ export default function DigitalCredentialsPage() {
 
       <section className="section">
         <div className="container">
-          <div className="panel" style={{ display: 'flex', justifyContent: 'space-between', gap: 24, flexWrap: 'wrap', alignItems: 'center' }}>
-            <div style={{ maxWidth: 620 }}>
-              <h2 style={{ margin: '0 0 8px', fontSize: 22 }}>Get your credentials</h2>
-              <p className="muted" style={{ margin: 0, fontSize: 15, lineHeight: 1.6 }}>
-                You will need the email address Smart Academy holds for you.
-              </p>
-            </div>
-            <Link
-              href="/get-credentials"
-              className="btn btn-dark"
-              style={{ minHeight: 44, display: 'inline-flex', alignItems: 'center' }}
-            >
-              Check what we hold
-            </Link>
-          </div>
+          <h2 style={{ margin: '0 0 8px', fontSize: 22 }}>Two ways to get your credentials</h2>
+          <p className="muted" style={{ margin: '0 0 20px', fontSize: 15, lineHeight: 1.6 }}>
+            {COPY.intro}
+          </p>
 
-          <div className="panel" style={{ marginTop: 20 }}>
-            <h3 style={{ margin: '0 0 8px', fontSize: 18 }}>Or ask us to check</h3>
-            <p className="muted" style={{ margin: 0, fontSize: 15, lineHeight: 1.6 }}>
-              {DOORS.checked.name} costs {DOORS.checked.cost.toLowerCase()}, takes{' '}
-              {DOORS.checked.wait.toLowerCase()}, and needs {DOORS.checked.needs.toLowerCase()}. It is
-              open to everyone, including anyone the page above cannot match.
-            </p>
-            <a
-              className="btn"
-              href={REQUEST_PAGE_URL}
-              style={{ marginTop: 16, minHeight: 44, display: 'inline-flex', alignItems: 'center' }}
-            >
-              {DOORS.checked.action}
-            </a>
+          <div
+            style={{
+              display: 'grid',
+              gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))',
+              gap: 16,
+            }}
+          >
+            <div className="panel">
+              <h3 style={{ margin: '0 0 6px', fontSize: 18 }}>{DOORS.self.name}</h3>
+              <p className="muted" style={{ margin: '0 0 6px', fontSize: 15, fontWeight: 600 }}>
+                {DOORS.self.what}
+              </p>
+              <p className="muted" style={{ margin: 0, fontSize: 14, lineHeight: 1.55 }}>
+                Costs {DOORS.self.cost.toLowerCase()} · takes {DOORS.self.wait.toLowerCase()} · you
+                need {DOORS.self.needs.toLowerCase()}
+              </p>
+              <Link
+                href="/get-credentials"
+                className="btn btn-dark"
+                style={{ marginTop: 18, minHeight: 44, display: 'inline-flex', alignItems: 'center' }}
+              >
+                {DOORS.self.action}
+              </Link>
+            </div>
+
+            <div className="panel">
+              <h3 style={{ margin: '0 0 6px', fontSize: 18 }}>{DOORS.checked.name}</h3>
+              <p className="muted" style={{ margin: '0 0 6px', fontSize: 15, fontWeight: 600 }}>
+                {DOORS.checked.what}
+              </p>
+              <p className="muted" style={{ margin: 0, fontSize: 14, lineHeight: 1.55 }}>
+                Costs {DOORS.checked.cost.toLowerCase()} · takes {DOORS.checked.wait.toLowerCase()} ·
+                you need {DOORS.checked.needs.toLowerCase()}
+              </p>
+              <a
+                className="btn"
+                href={REQUEST_PAGE_URL}
+                style={{ marginTop: 18, minHeight: 44, display: 'inline-flex', alignItems: 'center' }}
+              >
+                {DOORS.checked.action}
+              </a>
+            </div>
           </div>
         </div>
       </section>
