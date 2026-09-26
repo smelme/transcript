@@ -49,6 +49,26 @@ type Offer = {
   reissued?: boolean;
 };
 
+/**
+ * What the issuer answers when the holder says they are finished: its own records, item by item,
+ * plus what it has stopped holding as a result.
+ */
+type Settled = {
+  success: boolean;
+  items: {
+    sessionId: string;
+    title: string;
+    degreeLevel?: string | null;
+    graduationDate?: string | null;
+    inWallet: boolean;
+    credentialId?: string | null;
+    recordedAt?: string | null;
+  }[];
+  allInWallet: boolean;
+  mdocsForgotten: number;
+  error?: string;
+};
+
 const MONTH_NAMES = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 
 /** Dates arrive as `YYYY-MM-DD` or `YYYYMMDD`; a reader wants one shape. */
@@ -78,8 +98,10 @@ export default function IssuePage() {
   const [offerIndex, setOfferIndex] = useState(0);
   const [termsAccepted, setTermsAccepted] = useState(false);
   const [busy, setBusy] = useState(false);
+  const [checking, setChecking] = useState(false);
+  const [settled, setSettled] = useState<Settled | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [stage, setStage] = useState<'loading' | 'signin' | 'code' | 'ready' | 'collecting'>('loading');
+  const [stage, setStage] = useState<'loading' | 'signin' | 'code' | 'ready' | 'collecting' | 'done'>('loading');
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
@@ -231,6 +253,38 @@ export default function IssuePage() {
   const current = offers[offerIndex];
   // The offer carries machine names, so what the holder is shown comes from the item they chose.
   const currentItem = items.find((item) => item.sessionId === current?.sessionId);
+
+  /**
+   * The end of the flow. The holder saying "done" is not evidence that anything arrived, so this
+   * asks the issuer to read its own records: it checks the session and the row the issue was
+   * recorded in, and once they agree it stops holding the documents themselves. Only when
+   * everything chosen is in the wallet is the collection finished.
+   */
+  async function confirmCollection() {
+    if (!accessToken || selected.length === 0) {return;}
+    setChecking(true);
+    setError(null);
+    try {
+      const res = await fetch('/api/issuance/collection/confirmed', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${accessToken}` },
+        body: JSON.stringify({ sessionIds: selected }),
+      });
+      const data = (await res.json()) as Settled;
+      if (!res.ok || !data.success) {
+        throw new Error(data.error || 'We could not check that just now');
+      }
+      setSettled(data);
+      if (data.allInWallet) {setStage('done');}
+    } catch (e) {
+      setError((e as Error).message);
+    } finally {
+      setChecking(false);
+    }
+  }
+
+  /** What the issuer could not see in the wallet yet, asked before telling anybody it failed. */
+  const notArrived = settled?.items.filter((item) => !item.inWallet) ?? [];
 
   const subtitleFor = (item: Item) => {
     const parts: string[] = [];
@@ -438,11 +492,18 @@ export default function IssuePage() {
                 Next credential ({offerIndex + 2} of {offers.length})
               </button>
             ) : (
-              <button className="btn" onClick={() => setStage('ready')}>
-                Done
+              <button className="btn" onClick={confirmCollection} disabled={checking}>
+                {checking ? 'Checking…' : 'Done'}
               </button>
             )}
           </div>
+          {notArrived.length > 0 && (
+            <p className="issue-note">
+              Not in your wallet yet: {notArrived.map((item) => item.title).join(', ')}. If your
+              wallet is still finishing, give it a moment and choose Done again. Nothing is lost by
+              waiting.
+            </p>
+          )}
           {currentItem && (
             <p className="issue-note">
               You are adding: {currentItem.title}
@@ -452,6 +513,44 @@ export default function IssuePage() {
           <p className="issue-note">
             Nothing was shared with anybody by adding this. Sharing is a separate step you take later,
             from the wallet.
+          </p>
+        </>
+      )}
+
+      {stage === 'done' && settled && (
+        <>
+          <span className="issue-eyebrow">All done</span>
+          <h1>Thank you for confirming</h1>
+          <p className="issue-lede">
+            {settled.items.length === 1
+              ? 'It is in your wallet now, signed by the institution that issued it.'
+              : `All ${settled.items.length} are in your wallet now, signed by the institution that issued them.`}{' '}
+            Nothing here is waiting for you any more, and we have stopped holding a copy of the
+            documents themselves — what we keep is the record that they were issued.
+          </p>
+
+          <ul className="issue-list">
+            {settled.items.map((item) => (
+              <li key={item.sessionId} className="issue-item">
+                <span className="issue-item-head">
+                  <strong>{item.title}</strong>
+                  <span className="badge ok">In your wallet</span>
+                </span>
+                {item.graduationDate && (
+                  <span className="issue-item-sub">Graduated {formatDate(item.graduationDate)}</span>
+                )}
+              </li>
+            ))}
+          </ul>
+
+          <p className="issue-note">
+            You can close this page. If you ever need another copy — for a new phone, or for a
+            credential you have removed — ask your institution to publish again and it is issued
+            again.
+          </p>
+          <p className="issue-note">
+            Nothing was shared with anybody by adding these. Sharing is a separate step you take
+            later, from the wallet.
           </p>
         </>
       )}

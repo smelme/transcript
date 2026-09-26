@@ -37,6 +37,7 @@ import {
   todayIso,
 } from './credential-generator.js';
 import * as emailService from './email-service.js';
+import { oneItemPerProgramme, programmeKeyOf } from './issuance-items.js';
 import { getDb } from '../../db.js';
 import {
   packStatusList,
@@ -466,6 +467,88 @@ class IssuerService {
       return null;
     }
     return session;
+  }
+
+  /**
+   * The metadata row an issued credential was recorded in, as the database holds it (P0-43).
+   *
+   * This is the issuer's own record that a credential exists, and it is what "is it in the wallet"
+   * is answered from: the session says what the issuer did, and this says what it recorded, and a
+   * document is only treated as collected when the two agree.
+   */
+  getCredentialRecord(credentialId) {
+    if (!credentialId) {return null;}
+    try {
+      return this.db
+        .prepare('SELECT credential_id, status, created_at FROM credentials WHERE credential_id = ?')
+        .get(String(credentialId)) || null;
+    } catch (e) {
+      console.error('[issuer] credential record lookup failed:', e.message);
+      return null;
+    }
+  }
+
+  /**
+   * Stop holding one credential document (P0-43).
+   *
+   * The mdoc is the credential itself: signed bytes that can be presented. The issuer holds them
+   * only so a wallet can collect them - they are never written to the database - so once the holder
+   * has the document, a copy in this process has no remaining purpose. The record of the issue is a
+   * separate thing and is kept: what goes is the document.
+   *
+   * Returns whether there was anything to forget, so a caller can say what happened.
+   */
+  forgetMdoc(credentialId) {
+    if (!credentialId) {return false;}
+    return this.mdocSessions.delete(String(credentialId));
+  }
+
+  /**
+   * Read a collection back from the issuer's records, and stop keeping what has arrived (P0-43).
+   *
+   * The browser saying "done" is a hint, not evidence, so nothing here trusts it: a credential
+   * counts as collected only when the session says `issued` *and* the metadata row for the issued
+   * credential is there. Only then are the bytes forgotten, because forgetting them earlier would
+   * leave somebody who scanned the code holding nothing.
+   *
+   * Every copy of that programme which is already in a wallet is forgotten too. It is the same person
+   * holding the same programme, and no wallet is waiting for the second one.
+   */
+  settleCollected({ confirmed = [], held = [] } = {}) {
+    const groups = new Map();
+    for (const session of held) {
+      const key = programmeKeyOf(session);
+      if (!groups.has(key)) {groups.set(key, []);}
+      groups.get(key).push(session);
+    }
+
+    let forgotten = 0;
+    const items = confirmed.map((session) => {
+      const record = this.getCredentialRecord(session.credentialId);
+      const inWallet = session.status === 'issued' && !!record;
+      if (inWallet) {
+        for (const copy of groups.get(programmeKeyOf(session)) || [session]) {
+          if (copy.status === 'issued' && this.forgetMdoc(copy.credentialId)) {forgotten += 1;}
+        }
+      }
+      return {
+        sessionId: session.sessionId,
+        title: session.display?.title || 'Academic credential',
+        degreeLevel: session.display?.degreeLevel || null,
+        graduationDate: session.display?.graduationDate || null,
+        inWallet,
+        credentialId: session.credentialId || null,
+        // When the issuer recorded it, which is what makes the answer checkable rather than asserted.
+        recordedAt: record?.created_at || null,
+      };
+    });
+
+    return {
+      success: true,
+      items,
+      allInWallet: items.length > 0 && items.every((item) => item.inWallet),
+      mdocsForgotten: forgotten,
+    };
   }
 
   // Remove timed-out mdoc sessions
@@ -2106,7 +2189,11 @@ app.get('/issuance/invitations/:id/items', async (req, res) => {
     const token = bearerToken(req);
     if (!token) {return res.status(401).json({ success: false, error: 'Sign in required' });}
     const holder = await walletAccounts.verifyAccessToken(token);
-    const items = invitationService.items({ invitationId: req.params.id, email: holder.email });
+    // One row per programme: two sessions for one programme are normal (a collected copy, and a
+    // current one published later), and listing both asks the holder to add what they already hold.
+    const items = oneItemPerProgramme(
+      invitationService.items({ invitationId: req.params.id, email: holder.email }),
+    );
     res.json({
       success: true,
       credentials: items.map((session) => ({
@@ -2137,6 +2224,53 @@ app.post('/issuance/invitations/:id/claimed', async (req, res) => {
     await walletAccounts.verifyAccessToken(token);
     invitationService.markClaimed(req.params.id);
     res.json({ success: true });
+  } catch (e) {
+    res.status(400).json({ success: false, error: e.message });
+  }
+});
+
+// The holder has finished at the wallet and says so (P0-43).
+//
+// Saying so is not evidence, so the answer is read from the issuer's own records: the session must
+// say `issued`, and the metadata row for the issued credential must be there. Once that is true of
+// everything they chose, the documents stop being held here - the record of the issue is kept, the
+// credential itself is not - and the page can tell them the thing is done.
+app.post('/issuance/collection/confirmed', async (req, res) => {
+  try {
+    const token = bearerToken(req);
+    if (!token) {return res.status(401).json({ success: false, error: 'Sign in required' });}
+    const holder = await walletAccounts.verifyAccessToken(token);
+
+    const requested = Array.isArray(req.body?.sessionIds)
+      ? req.body.sessionIds.map((id) => String(id || '').trim()).filter(Boolean)
+      : [];
+    if (requested.length === 0) {
+      // Refused rather than read as "nothing to do": a page that sent no ids is broken, and saying
+      // "done" to a broken request would confirm a collection nobody made.
+      return res.status(400).json({
+        success: false,
+        error: 'Tell us which credentials you added, so we can check them',
+      });
+    }
+
+    const links = walletAccounts.getLinks(holder.sub);
+    const confirmed = [];
+    for (const sessionId of requested) {
+      const session = issuer.getIssuanceSession(sessionId);
+      if (!session) {return res.status(404).json({ success: false, error: 'Credential not found' });}
+      const owns =
+        session.sub === holder.sub ||
+        links.some((l) => l.institution === session.institution && l.studentId === session.studentId);
+      if (!owns) {
+        return res.status(403).json({ success: false, error: 'This credential belongs to another account' });
+      }
+      confirmed.push(session);
+    }
+
+    // The holder's whole list, so a programme held in more than one copy settles as one thing rather
+    // than only the copy that happened to be named.
+    const held = issuer.listIssuanceSessions({ sub: holder.sub, email: holder.email, links });
+    res.json(issuer.settleCollected({ confirmed, held }));
   } catch (e) {
     res.status(400).json({ success: false, error: e.message });
   }
@@ -3151,7 +3285,7 @@ app.get('/academy/credentials', async (req, res) => {
     res.json({
       success: true,
       email: payload.email,
-      credentials: sessions.map((session) => ({
+      credentials: oneItemPerProgramme(sessions).map((session) => ({
         sessionId: session.sessionId,
         status: session.status,
         inWallet: session.status === 'issued',
