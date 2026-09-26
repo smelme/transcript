@@ -213,6 +213,9 @@ export default function GetCredentialsPage() {
                   value={email}
                   onChange={(event) => setEmail(event.target.value)}
                   placeholder="you@example.com"
+                  // The shared input styling works out at about 37px, which is under the 44px the flow
+                  // asks for on the one control the whole page turns on.
+                  style={{ minHeight: 44 }}
                 />
                 <button
                   type="submit"
