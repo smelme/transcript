@@ -147,6 +147,88 @@ function migrate(database) {
 
     CREATE INDEX IF NOT EXISTS idx_invitations_email ON invitations (holder_email);
     CREATE INDEX IF NOT EXISTS idx_invitations_institution ON invitations (institution);
+
+    -- A request for a credential from somebody the institution cannot identify from an address
+    -- alone: identity checked, details given, fee paid, the institution decides, and only then
+    -- does it state the record. The applicant's handle is stored as a hash for the same reason
+    -- an invitation's token is: it arrives in a link, so a database read must not yield it.
+    --
+    -- The claimed name is kept separately from the identity extraction on purpose. What the
+    -- applicant typed is not evidence; what the document says is, and a reviewer needs to see
+    -- both to notice a difference.
+    CREATE TABLE IF NOT EXISTS credential_requests (
+      request_id       TEXT PRIMARY KEY,
+      institution      TEXT NOT NULL,
+      school           TEXT NOT NULL,
+      applicant_email  TEXT NOT NULL,
+      applicant_phone  TEXT,
+      applicant_name   TEXT,
+      wanted           TEXT NOT NULL,
+      status           TEXT NOT NULL,
+      token_hash       TEXT NOT NULL,
+      identity_ref     TEXT,
+      identity_status  TEXT NOT NULL DEFAULT 'pending',
+      identity_summary TEXT,
+      extract_json     TEXT,
+      fee_amount       INTEGER,
+      fee_currency     TEXT,
+      payment_ref      TEXT,
+      payment_status   TEXT NOT NULL DEFAULT 'none',
+      terms_version    TEXT,
+      submitted_at     TEXT,
+      due_at           TEXT,
+      reviewed_by      TEXT,
+      reviewed_at      TEXT,
+      decision         TEXT,
+      decision_reason  TEXT,
+      reviewer_note    TEXT,
+      issued_at        TEXT,
+      invitation_id    TEXT,
+      expires_at       TEXT,
+      created_at       TEXT NOT NULL,
+      updated_at       TEXT NOT NULL
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_credential_requests_queue
+      ON credential_requests (institution, status);
+    CREATE INDEX IF NOT EXISTS idx_credential_requests_email
+      ON credential_requests (applicant_email);
+    CREATE INDEX IF NOT EXISTS idx_credential_requests_invitation
+      ON credential_requests (invitation_id);
+
+    -- Everything that happens to a request, in order: the audit trail, and the clock the queue
+    -- ages against. An event is never rewritten, so a reviewer's mistake is visible rather than
+    -- corrected in place.
+    CREATE TABLE IF NOT EXISTS request_events (
+      event_id    TEXT PRIMARY KEY,
+      request_id  TEXT NOT NULL,
+      event       TEXT NOT NULL,
+      actor       TEXT,
+      detail_json TEXT,
+      created_at  TEXT NOT NULL,
+      FOREIGN KEY (request_id) REFERENCES credential_requests (request_id) ON DELETE CASCADE
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_request_events_request
+      ON request_events (request_id, created_at DESC);
+
+    -- What the institution states the record to be, kept exactly as it was sent. Written only
+    -- when it validates, because this is the text the issuer signs: a rejected file must leave
+    -- nothing behind that could later be mistaken for an accepted one.
+    CREATE TABLE IF NOT EXISTS request_payloads (
+      payload_id      TEXT PRIMARY KEY,
+      request_id      TEXT NOT NULL,
+      filename        TEXT,
+      row_count       INTEGER NOT NULL DEFAULT 0,
+      validation_json TEXT,
+      claims_json     TEXT NOT NULL,
+      uploaded_by     TEXT,
+      uploaded_at     TEXT NOT NULL,
+      FOREIGN KEY (request_id) REFERENCES credential_requests (request_id) ON DELETE CASCADE
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_request_payloads_request
+      ON request_payloads (request_id, uploaded_at DESC);
   `);
 
   // Administrators belong to a client organisation; NULL means a platform
