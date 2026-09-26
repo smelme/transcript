@@ -1,6 +1,8 @@
 # P0-38: Quals reviews a request
 
-**Status:** Not started - the queue and the decision are built in the service; the portal section is not
+**Status:** In progress - the queue, the case, the decision, the applicant notification and the
+portal's Manual requests section are built and exercised end to end. Evidence access waits on the
+identity story, and the ageing reminders are recorded but not yet sent.
 **Components:** `quals-portal` (new Manual requests section), `issuer-service` (queue, detail,
 decision, evidence access, notifications)
 **Depends on:** P0-36, P0-37

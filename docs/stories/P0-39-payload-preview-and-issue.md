@@ -1,8 +1,10 @@
 # P0-39: The payload, the preview, and issuing
 
-**Status:** Not started
-**Components:** `issuer-service` (CSV validation, preview, issue), `quals-portal` (payload screen),
-`share-document.js` and `pdf.js` (reused for the preview)
+**Status:** In progress - the file, its validation, the preview and issuing are built and exercised
+end to end. The preview is rendered on the screen rather than through `renderSharePdf()`, so the
+operator is shown the same fields and modules that will be signed but not yet the finished PDF.
+**Components:** `issuer-service` (`src/request-payload.js`, `src/requests.js`), `quals-portal`
+(the payload, preview and issue screens), `share-document.js` and `pdf.js` (for the PDF preview)
 **Depends on:** P0-38 (an accepted decision)
 **Blocks:** P0-40 (nothing is delivered until something is issued)
 

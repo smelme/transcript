@@ -134,8 +134,18 @@ from the sketch are deliberate: the delivery address is the applicant's own veri
 than a separate field, so a case cannot be redirected later; and `paid` is a state of its own rather
 than a flag, so the promised period starts when the applicant submits and not when the money lands.
 
-The routes below are the contract the wizard and the portal will call. None are wired yet; the queue
-and the payload are the next step.
+The routes below are the contract the wizard and the portal will call. The queue, the decision, the
+file, the preview and the issue are wired; the applicant's wizard and the identity and payment
+integrations are not.
+
+**A defect repaired while building this.** `InvitationService.create()` stored the institution's
+namespace-keyed claims as the issuance session's `credentialData`, but the document builder reads
+fields (`education_qualification`, `full_name`). Nothing converted between the two shapes, so a
+credential published through the API produced no namespaces and built as **nothing at all** —
+`buildCredentialMdoc` returns `null` when it recognises no fields. The existing end-to-end test could
+not catch it because it stops at the offer; the only step that would have noticed is the wallet's
+claim, which nothing exercised. `credentialDataFromClaims()` and `claimsFromCredentialData()` now
+hold the relationship in one place, and `tests/invitation-claims.test.js` asserts it.
 
 ```sql
 requests
