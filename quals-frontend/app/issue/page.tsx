@@ -14,6 +14,7 @@
  */
 
 import { useCallback, useEffect, useState } from 'react';
+import { chooserCopy } from '../lib/issue-copy.js';
 import './issue.css';
 
 type Preview = {
@@ -81,6 +82,11 @@ function formatDate(value?: string | null): string {
   return `${day} ${MONTH_NAMES[month]} ${match[1]}`;
 }
 
+/**
+ * What the page says above the list, which has three states rather than one: something to add;
+ * nothing to add because it is all in the wallet already; and nothing waiting for this address at
+ * all. The wording lives in `issue-copy.js` so it can be checked without a browser.
+ */
 export default function IssuePage() {
   const [invitationId, setInvitationId] = useState('');
   const [token, setToken] = useState('');
@@ -293,6 +299,7 @@ export default function IssuePage() {
    */
   const offerable = (item: Item) => item.status !== 'issued';
   const offerableItems = items.filter(offerable);
+  const ready = chooserCopy(items.length, offerableItems.length);
 
   const subtitleFor = (item: Item) => {
     const parts: string[] = [];
@@ -396,17 +403,8 @@ export default function IssuePage() {
 
       {stage === 'ready' && (
         <>
-          <h1>{items.length === 1 ? 'Your credential is ready' : 'Your credentials are ready'}</h1>
-          <p className="issue-lede">
-            Choose the ones you would like in your wallet. They stay there, signed by the institution
-            that issued them, and adding one does not send it anywhere.
-          </p>
-          {items.length === 0 && (
-            <p className="issue-note">
-              Nothing is waiting for this address. If you were expecting a credential, check that
-              your institution used this address, or ask them to publish again.
-            </p>
-          )}
+          <h1>{ready.heading}</h1>
+          <p className="issue-lede">{ready.lede}</p>
           {items.length > 0 && (
             <>
               <ul className="issue-list">
@@ -418,7 +416,8 @@ export default function IssuePage() {
                           type="checkbox"
                           checked={selected.includes(item.sessionId)}
                           onChange={() => toggle(item.sessionId)}
-                        />                        <span>
+                        />
+                        <span>
                           <span className="issue-item-head">
                             <strong>{item.title}</strong>
                             {item.label && <span className="badge kind">{item.label}</span>}
@@ -452,12 +451,7 @@ export default function IssuePage() {
                 ))}
               </ul>
 
-              {offerableItems.length === 0 ? (
-                <p className="issue-note">
-                  Everything above is already in your wallet. Ask your institution if you need another
-                  copy.
-                </p>
-              ) : (
+              {offerableItems.length > 0 && (
                 <>
                   <label className="issue-terms">
                     <input
