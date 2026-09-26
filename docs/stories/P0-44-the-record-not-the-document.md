@@ -44,6 +44,20 @@ part worth fixing properly: a rule that holds because nobody configured a variab
 `settleCollected` still forgets any document for the credentials it confirms. It is now belt and
 braces rather than the mechanism — and it still matters for anything issued before this change.
 
+## What the chooser says, which this story had to fix twice
+
+Removing the offer path made a state reachable that the page had no words for: a list where **nothing
+can be added** because it is all in the wallet already. The heading and the line under it were written
+for the state where something can be chosen and shown in all of them, so a reader with nothing to
+choose was told *"Your credentials are ready — choose the ones you would like"*, and a reader with
+nothing waiting at all was told the same thing.
+
+The copy now follows the state — something to add, nothing to add, nothing waiting — and lives in
+`quals-frontend/app/lib/issue-copy.js` as a plain module, the way the academy keeps its door copy, so
+`scripts/check-issue-copy.mjs` can assert it without a browser. Two assertions in particular: **no state
+is ever asked to choose from nothing**, and **nothing waiting is never reported as readiness**. This
+screen has been corrected by eye twice, which is the argument for the check.
+
 ## The consequence, stated plainly
 
 The document is handed over **once**, in the response to the wallet's claim. If that response is lost
