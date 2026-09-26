@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import { DOORS, REQUEST_PAGE_URL } from '../lib/doors';
 
 export const metadata = {
   title: 'Digital credentials: Smart Academy',
@@ -154,9 +155,29 @@ export default function DigitalCredentialsPage() {
                 You will need the email address Smart Academy holds for you.
               </p>
             </div>
-            <Link href="/get-credentials" className="btn btn-dark">
-              Start
+            <Link
+              href="/get-credentials"
+              className="btn btn-dark"
+              style={{ minHeight: 44, display: 'inline-flex', alignItems: 'center' }}
+            >
+              Check what we hold
             </Link>
+          </div>
+
+          <div className="panel" style={{ marginTop: 20 }}>
+            <h3 style={{ margin: '0 0 8px', fontSize: 18 }}>Or ask us to check</h3>
+            <p className="muted" style={{ margin: 0, fontSize: 15, lineHeight: 1.6 }}>
+              {DOORS.checked.name} costs {DOORS.checked.cost.toLowerCase()}, takes{' '}
+              {DOORS.checked.wait.toLowerCase()}, and needs {DOORS.checked.needs.toLowerCase()}. It is
+              open to everyone, including anyone the page above cannot match.
+            </p>
+            <a
+              className="btn"
+              href={REQUEST_PAGE_URL}
+              style={{ marginTop: 16, minHeight: 44, display: 'inline-flex', alignItems: 'center' }}
+            >
+              {DOORS.checked.action}
+            </a>
           </div>
         </div>
       </section>

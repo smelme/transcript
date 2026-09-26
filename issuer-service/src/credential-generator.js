@@ -806,6 +806,91 @@ export function generateStudentItems({
   });
 }
 
+/**
+ * What a set of claims has to carry before it may be published (P0-41).
+ *
+ * The publish API exists so an institution can hand over the claims it actually holds. Nothing
+ * stops a caller sending a namespace of its own invention, or an award with no date, and the
+ * credential is signed with whatever arrives — so the shape is checked at the boundary rather
+ * than discovered by whoever opens the wallet. This is not a substitute for the producer being
+ * right; it is what turns a quiet mistake into a refusal.
+ *
+ * A field the institution does not hold is a different matter: it is absent, and absence is
+ * honest. Only the fields a credential cannot mean anything without are required here.
+ */
+const REQUIRED_CLAIM_FIELDS = {
+  [QUALIFICATION_NAMESPACE]: [
+    'institution_name',
+    'programme_title',
+    'degree_level',
+    'graduation_date',
+  ],
+  [TRANSCRIPT_NAMESPACE]: ['institution_name', 'student_id', 'courses'],
+};
+
+const CLAIM_DATE_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
+
+/**
+ * @returns {{ ok: boolean, errors: string[], namespaces: string[] }}
+ */
+export function validateAcademicClaims(claims) {
+  if (!claims || typeof claims !== 'object' || Array.isArray(claims)) {
+    return { ok: false, errors: ['claims must be an object keyed by namespace'], namespaces: [] };
+  }
+
+  const namespaces = academicNamespacesOf(claims);
+  if (namespaces.length === 0) {
+    return {
+      ok: false,
+      errors: [
+        `claims carry no recognised academic namespace (expected ${QUALIFICATION_NAMESPACE} or ${TRANSCRIPT_NAMESPACE})`,
+      ],
+      namespaces: [],
+    };
+  }
+
+  const errors = [];
+
+  for (const namespace of namespaces) {
+    const value = claims[namespace];
+    if (!value || typeof value !== 'object' || Array.isArray(value)) {
+      errors.push(`${namespace} must be an object`);
+      continue;
+    }
+
+    for (const field of REQUIRED_CLAIM_FIELDS[namespace] || []) {
+      if (value[field] === undefined || value[field] === null || String(value[field]).trim() === '') {
+        errors.push(`${field} is required`);
+      }
+    }
+
+    if (value.graduation_date && !CLAIM_DATE_PATTERN.test(String(value.graduation_date).trim())) {
+      errors.push('graduation_date must be a date in the form YYYY-MM-DD');
+    }
+
+    if (namespace === TRANSCRIPT_NAMESPACE) {
+      // Accepts either the JSON string the CSV import produces or an array a caller assembled.
+      const courses = Array.isArray(value.courses) ? value.courses : parseCoursesFromJson(value.courses);
+      if (!courses || courses.length === 0) {
+        errors.push('courses must carry at least one module');
+      }
+    }
+  }
+
+  return { ok: errors.length === 0, errors, namespaces };
+}
+
+/** A transcript's modules, however the caller chose to write them. */
+function parseCoursesFromJson(value) {
+  if (typeof value !== 'string' || value.trim() === '') return null;
+  try {
+    const parsed = JSON.parse(value);
+    return Array.isArray(parsed) ? parsed : null;
+  } catch {
+    return null;
+  }
+}
+
 export default {
   generateAcademicRecord,
   generateStudentItems,

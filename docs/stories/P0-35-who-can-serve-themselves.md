@@ -1,6 +1,6 @@
 # P0-35: Who can serve themselves
 
-**Status:** Not started
+**Status:** ✅ Done — 2026-09-26 (`node scripts/check-decision.mjs`, 12 checks)
 **Components:** `issuer-frontend` (`/`, `/get-credentials`, `/credentials`), `issuer-service`
 (eligibility answer), Smart College registry (the data — separate repository)
 **Blocks:** P0-36 (nothing else can be sized until we know how many people the second door is for)
@@ -66,3 +66,30 @@ of money and time.
 - The responsive check extended to the new sections at the three widths.
 - A copy review against the rules above, since the wording is the acceptance criterion.
 - One manual walk: a real address inside the window, and one deliberately outside it.
+
+---
+
+## What was built
+
+| Where | What |
+| --- | --- |
+| `issuer-frontend/app/lib/doors.js` | **New.** The two doors and the words for every answer, as a plain module so the wording can be checked without a browser |
+| `issuer-frontend/app/api/eligibility/route.ts` | **New.** The server-side question. A registry that does not answer becomes `unknown`, never `no` |
+| `issuer-frontend/app/get-credentials/page.tsx` | Rewritten as the decision point: both doors described first, then the question, then the door that applies |
+| `issuer-frontend/app/page.tsx`, `app/credentials/page.tsx` | Both doors stated with their costs and waits, and both reachable |
+| `scripts/check-decision.mjs` | **New.** 12 checks over the three outcomes and the copy rules |
+
+The copy rules the check enforces, because they are the acceptance criterion: only a `yes` reaches
+the self-service door; no sentence contains "failed", "invalid", "denied", "rejected", "not
+found", "no record" or "verification failed"; the window figure appears exactly once and the copy
+states the same number the registry measures by; both doors always state their cost, wait and what
+is needed; and every outcome that is not self-service offers the checked path by name.
+
+**One deliberate departure.** The story's step 5 has the chooser present both doors on "the page
+people read first". Both doors are now described on the home page *and* on `/get-credentials`
+before the form, rather than only on the home page, because the page somebody actually lands on
+from an email link is `/get-credentials`, and it should not be the one page that withholds the
+alternative.
+
+**What the responsive check still needs.** `scripts/check-responsive.mjs` reads the live sites, so
+the new sections are checked at 360/390/768 after deployment rather than before it.

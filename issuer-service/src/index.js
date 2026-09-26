@@ -33,6 +33,7 @@ import {
   kindOfCredentialData,
   labelOfCredentialData,
   academicNamespacesOf,
+  validateAcademicClaims,
   todayIso,
 } from './credential-generator.js';
 import * as emailService from './email-service.js';
@@ -2009,6 +2010,25 @@ function bearerToken(req) {
 app.post('/issuance/invitations', async (req, res) => {
   try {
     if (!(await requireApiKey(req, res))) {return;}
+
+    // The claims are checked before they are stored. A credential is signed with whatever
+    // arrives here, so a namespace of the caller's own invention, or an award with no date,
+    // would otherwise be discovered by whoever opens the wallet rather than at the boundary.
+    // This does not make a thin record publishable; it makes a malformed one refusable.
+    const published = Array.isArray(req.body?.credentials) ? req.body.credentials : [];
+    if (published.length === 0) {
+      return res.status(400).json({ success: false, error: 'Publish at least one credential' });
+    }
+    for (const [index, item] of published.entries()) {
+      const checked = validateAcademicClaims(item?.claims);
+      if (!checked.ok) {
+        return res.status(400).json({
+          success: false,
+          error: `credential ${index + 1}: ${checked.errors.join('; ')}`,
+        });
+      }
+    }
+
     const result = await invitationService.create({
       institution: req.clientOrg.institution,
       apiKeyId: req.clientOrg.keyId || null,
@@ -2734,6 +2754,28 @@ async function tellApplicant(request) {
 
 app.post('/academy/requests', async (req, res) => {
   try {
+    // The generator is fenced, not deleted (P0-41).
+    //
+    // This route does not publish a record, it *invents* one: the graduation year is picked from
+    // a range, the modules come from a demo fixture, and the credits are computed. It is what the
+    // self-service path used to run on, and every credential it produced was synthetic. A silent
+    // fallback to generated claims is the most dangerous thing this codebase could do, because
+    // the result looks exactly like a real credential and is not.
+    //
+    // The demo sites still need a recognisable record to show, so the route stays behind a flag
+    // that has to be set deliberately. It is off unless somebody says otherwise, which means the
+    // live deployments must publish through /issuance/invitations instead.
+    if (process.env.ALLOW_DEMO_RECORDS !== 'true') {
+      return res.status(409).json({
+        success: false,
+        error:
+          'This route invents a record and is disabled. Publish the institution\u2019s real claims '
+          + 'through POST /issuance/invitations with an API key. Set ALLOW_DEMO_RECORDS=true only on '
+          + 'a demonstration deployment.',
+        code: 'DEMO_RECORDS_DISABLED',
+      });
+    }
+
     const email = String(req.body?.email || '').trim().toLowerCase();
     if (!isEmail(email)) {
       return res.status(400).json({ success: false, error: 'Please provide a valid email address' });

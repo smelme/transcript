@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import { DOORS, REQUEST_PAGE_URL } from './lib/doors';
 
 export default function Home() {
   return (
@@ -94,17 +95,45 @@ export default function Home() {
 
       <section className="section">
         <div className="container">
-          <div className="panel" style={{ display: 'flex', justifyContent: 'space-between', gap: 24, flexWrap: 'wrap', alignItems: 'center' }}>
-            <div style={{ maxWidth: 560 }}>
-              <h2 style={{ margin: '0 0 8px', fontSize: 22 }}>Ready when you are</h2>
-              <p className="muted" style={{ margin: 0, fontSize: 15, lineHeight: 1.6 }}>
-                Request your digital credentials now and add them to your wallet in a couple of
-                minutes. You will need the Quals wallet app on your phone.
-              </p>
+          <div className="panel">
+            <h2 style={{ margin: '0 0 8px', fontSize: 22 }}>Two ways to get your credentials</h2>
+            <p className="muted" style={{ margin: '0 0 20px', fontSize: 15, lineHeight: 1.6 }}>
+              Which one applies to you depends on when you finished. Tell us your address and we
+              will say, or take either one directly.
+            </p>
+            <div
+              style={{
+                display: 'grid',
+                gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))',
+                gap: 16,
+              }}
+            >
+              {Object.values(DOORS).map((door) => (
+                <div key={door.key}>
+                  <p style={{ margin: 0, fontWeight: 600 }}>{door.name}</p>
+                  <p className="muted" style={{ margin: '6px 0 0', fontSize: 14, lineHeight: 1.55 }}>
+                    Costs {door.cost.toLowerCase()} · takes {door.wait.toLowerCase()} · you need{' '}
+                    {door.needs.toLowerCase()}
+                  </p>
+                </div>
+              ))}
             </div>
-            <Link href="/get-credentials" className="btn btn-dark">
-              Get your digital credentials
-            </Link>
+            <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', marginTop: 22 }}>
+              <Link
+                href="/get-credentials"
+                className="btn btn-dark"
+                style={{ minHeight: 44, display: 'inline-flex', alignItems: 'center' }}
+              >
+                Check what we hold
+              </Link>
+              <a
+                className="btn"
+                href={REQUEST_PAGE_URL}
+                style={{ minHeight: 44, display: 'inline-flex', alignItems: 'center' }}
+              >
+                {DOORS.checked.action}
+              </a>
+            </div>
           </div>
         </div>
       </section>

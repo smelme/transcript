@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
-import { requestCredentials } from '../lib/api';
+import { DOORS, REQUEST_PAGE_URL, outcomeFor } from '../lib/doors';
 
 /**
  * Get your credentials.
@@ -37,28 +37,67 @@ export default function GetCredentialsPage() {
   const [published, setPublished] = useState(false);
   const [expiresAt, setExpiresAt] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [refusal, setRefusal] = useState<{ title: string; body: string } | null>(null);
 
   const issueUrl = `${ISSUE_SITE_URL}/issue?email=${encodeURIComponent(email.trim())}`;
   const expiry = formatDay(expiresAt);
 
+  function startAgain() {
+    setEmail('');
+    setPublished(false);
+    setExpiresAt(null);
+    setRefusal(null);
+  }
+
   async function publish(event: React.FormEvent) {
     event.preventDefault();
     setBusy(true);
-    setError(null);
+    setRefusal(null);
+
+    const address = email.trim();
+    const answered = (reason: string, missing?: string[]) => {
+      const fallback = outcomeFor({ verdict: 'unknown', reason, missing });
+      setRefusal({ title: fallback.title, body: fallback.body });
+    };
+
     try {
-      // Publishing is what puts the credential where it can be collected, and the email carries the
-      // holder their own copy of the same link.
-      const result = (await requestCredentials({ email: email.trim() })) as
-        | { success?: boolean; error?: string; expiresAt?: string }
-        | undefined;
-      if (result && result.success === false) {
-        throw new Error(result.error || 'We could not prepare your credentials.');
+      // The question comes first: whether we hold this person, and whether they finished inside
+      // the window. The answer decides which door this page shows, and only a positive one is
+      // published for.
+      const checked = await fetch('/api/eligibility', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: address }),
+      }).then((response) => response.json());
+
+      const outcome = outcomeFor(checked);
+      if (outcome.door !== 'self') {
+        setRefusal({ title: outcome.title, body: outcome.body });
+        return;
       }
-      setExpiresAt(result?.expiresAt || null);
+
+      // Publishing is the institution's own act, from the record it holds. Nothing here asks
+      // anybody to invent a record, which is what this call replaced.
+      const result = (await fetch('/api/publish', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: address }),
+      }).then((response) => response.json())) as {
+        success?: boolean;
+        reason?: string;
+        missing?: string[];
+        expiresAt?: string;
+      };
+
+      if (!result?.success) {
+        answered(result?.reason || 'unreachable', result?.missing);
+        return;
+      }
+
+      setExpiresAt(result.expiresAt || null);
       setPublished(true);
-    } catch (err) {
-      setError((err as Error).message);
+    } catch {
+      answered('unreachable');
     } finally {
       setBusy(false);
     }
@@ -67,7 +106,74 @@ export default function GetCredentialsPage() {
   return (
     <section className="section" style={{ minHeight: '62vh' }}>
       <div className="container-narrow">
-        {published ? (
+        {/* Both doors, described before anything is asked of the applicant. */}
+        <div
+          style={{
+            display: 'grid',
+            gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))',
+            gap: 16,
+            marginBottom: 28,
+          }}
+        >
+          {Object.values(DOORS).map((door) => (
+            <div className="card" key={door.key}>
+              <p style={{ margin: 0, fontWeight: 600 }}>{door.name}</p>
+              <dl
+                style={{
+                  margin: '12px 0 0',
+                  display: 'grid',
+                  gridTemplateColumns: 'auto 1fr',
+                  gap: '6px 12px',
+                }}
+              >
+                <dt style={{ color: 'var(--muted)', fontSize: 14 }}>Costs</dt>
+                <dd style={{ margin: 0, fontSize: 14 }}>{door.cost}</dd>
+                <dt style={{ color: 'var(--muted)', fontSize: 14 }}>Takes</dt>
+                <dd style={{ margin: 0, fontSize: 14 }}>{door.wait}</dd>
+                <dt style={{ color: 'var(--muted)', fontSize: 14 }}>You need</dt>
+                <dd style={{ margin: 0, fontSize: 14 }}>{door.needs}</dd>
+              </dl>
+            </div>
+          ))}
+        </div>
+
+        {refusal ? (
+          <>
+            <div className="card">
+              <h2 style={{ fontSize: 20, letterSpacing: '-0.01em', margin: '0 0 10px' }}>
+                {refusal.title}
+              </h2>
+              <p style={{ margin: 0, fontSize: 16, lineHeight: 1.65, color: 'var(--muted)' }}>
+                {refusal.body}
+              </p>
+              <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', marginTop: 18 }}>
+                <a
+                  className="btn btn-primary"
+                  href={REQUEST_PAGE_URL}
+                  style={{ minHeight: 44, display: 'inline-flex', alignItems: 'center' }}
+                >
+                  {DOORS.checked.action}
+                </a>
+                <button
+                  type="button"
+                  className="btn"
+                  onClick={startAgain}
+                  style={{ minHeight: 44, display: 'inline-flex', alignItems: 'center' }}
+                >
+                  Try another address
+                </button>
+              </div>
+              <p className="muted" style={{ marginTop: 16 }}>
+                Asking us to check costs {DOORS.checked.cost.toLowerCase()} and takes{' '}
+                {DOORS.checked.wait.toLowerCase()}. You will need{' '}
+                {DOORS.checked.needs.toLowerCase()}.
+              </p>
+            </div>
+            <p className="muted" style={{ marginTop: 18 }}>
+              Nothing has been changed on your record by this page.
+            </p>
+          </>
+        ) : published ? (
           <>
             <span className="eyebrow" style={{ color: 'var(--link)' }}>
               Issued by Quals
@@ -116,8 +222,8 @@ export default function GetCredentialsPage() {
               Get your credentials
             </h1>
             <p style={{ fontSize: 16, lineHeight: 1.65, color: 'var(--muted)', marginBottom: 30 }}>
-              Sign in with the email address Smart Academy holds for you. We will prepare what you
-              hold and send you straight to Quals, where it is added to your wallet.
+              Tell us the email address Smart Academy holds for you. We look at our own records and
+              tell you which way to collect your credentials.
             </p>
 
             <div className="card">
@@ -131,19 +237,19 @@ export default function GetCredentialsPage() {
                   onChange={(event) => setEmail(event.target.value)}
                   placeholder="you@example.com"
                 />
-                {error && <p style={{ color: 'var(--err)' }}>{error}</p>}
                 <button
                   type="submit"
                   className="btn btn-primary"
-                  style={{ marginTop: 16 }}
+                  style={{ marginTop: 16, minHeight: 44, display: 'inline-flex', alignItems: 'center' }}
                   disabled={busy || !email.trim()}
                 >
-                  {busy ? 'Preparing…' : 'Prepare my credentials'}
+                  {busy ? 'Looking…' : 'Check what we hold'}
                 </button>
               </form>
               <p className="muted" style={{ marginTop: 16 }}>
-                Nothing is issued here. Your credentials are published to Quals, and you collect them
-                there.
+                We look at our own records. If we hold one for you that finished inside the window,
+                you can collect your credentials straight away. Otherwise, and if we cannot tell,
+                you can ask us to check.
               </p>
             </div>
           </>
