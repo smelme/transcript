@@ -2605,14 +2605,14 @@ app.post('/requests/:id/payment/confirm', async (req, res) => {
 
 /**
  * Development only: stand in for the identity check and the fee, so the ordered path can be walked
- * end to end before those integrations exist.
+ * end to end without a person entering a card.
  *
- * Fenced behind the same flag that lets a sign-in code be returned instead of emailed, and refused
- * everywhere else. This is a scaffold, not a feature: the identity and payment stories replace it,
- * and it must be gone before either of them is called done.
+ * Behind a flag of its own rather than the one that returns sign-in codes, because that flag is
+ * useful in a demo and this one moves a request past its payment. Refused everywhere else, and it
+ * cannot move a case that has already finished.
  */
 app.post('/requests/:id/advance', async (req, res) => {
-  if (process.env.ALLOW_DEV_OTP !== 'true') {
+  if (process.env.ALLOW_DEV_REQUEST_ADVANCE !== 'true') {
     return res.status(403).json({ success: false, error: 'Not available' });
   }
   try {

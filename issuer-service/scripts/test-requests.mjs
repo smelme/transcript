@@ -3,8 +3,8 @@
  * from an address alone.
  *
  * Runs against a test issuer (ISSUER_URL, default http://127.0.0.1:3006) started with a throwaway
- * database, ALLOW_DEV_OTP=true and no mail provider, so the identity check and the fee can be stood
- * in for and nothing is emailed.
+ * database, DIDIT_MOCK_MODE=true, ALLOW_DEV_REQUEST_ADVANCE=true and no mail provider, so the
+ * identity check and the fee can be stood in for and nothing is emailed.
  *
  * It walks the whole flow as the people involved: an applicant opens a request, the institution's
  * own administrator works it in the queue, decides, states the record as a file, looks at what
@@ -297,7 +297,7 @@ const applicantAfter = await call(`/requests/${requestId}?token=${encodeURICompo
 check('the applicant is told their credentials are ready', applicantAfter.data.status === 'sent', JSON.stringify(applicantAfter.data).slice(0, 160));
 check('and never sees the reviewer\u2019s note', !JSON.stringify(applicantAfter.data).includes('Checked the transcript too'), JSON.stringify(applicantAfter.data).slice(0, 160));
 
-// 11. The scaffold is not a feature: it is fenced by ALLOW_DEV_OTP, and it cannot move a case that
+// 11. The scaffold is not a feature: it is behind a flag of its own, and it cannot move a case that
 // has already finished, so it cannot be used to rewrite history either.
 const devOnFinished = await call(`/requests/${requestId}/advance`, { method: 'POST', body: { token: applicantToken } });
 check('the development stand-in cannot move a finished case', devOnFinished.status === 400, `status ${devOnFinished.status}`);
