@@ -261,7 +261,11 @@ function claimsForRow(row, header, context) {
   const email = read('email').toLowerCase();
   if (email && !isEmail(email)) {errors.push('email is not a valid address');}
   if (email && context.email && email !== context.email) {
-    errors.push(`email ${email} is not the address this request was opened for`);
+    // Naming the address it should be turns the refusal into an instruction: without it the operator
+    // knows the file is wrong and not what to change.
+    errors.push(
+      `email ${email} is not the address this request was opened for: that address is ${context.email}`,
+    );
   }
 
   for (const column of ['graduation_date', 'enrolment_start', 'enrolment_end', 'date_of_birth']) {

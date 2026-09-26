@@ -4,7 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { PageHeader, formatDate, shortId } from '../components/ui';
 import { isPlatformAdmin, useAdmin } from '../components/session';
 import {
-  CSV_TEMPLATE,
+  csvExampleFor,
   decideRequest,
   getRequest,
   issueRequest,
@@ -506,8 +506,7 @@ export default function RequestsPage() {
                         type="button"
                         className="btn btn-secondary btn-sm"
                         onClick={() => {
-                          setCsv(CSV_TEMPLATE);
-                          setFilename('example.csv');
+                          setCsv(csvExampleFor(selected.applicantEmail, selected.institution));
                         }}
                       >
                         Use the example
@@ -522,6 +521,10 @@ export default function RequestsPage() {
                       placeholder="email,full_name,student_id,credential,..."
                       style={{ width: '100%' }}
                     />
+                    <div className="muted" style={{ marginTop: 6 }}>
+                      The email column must be {selected.applicantEmail}. The record belongs to the
+                      person who asked for it.
+                    </div>
                     <div className="toolbar">
                       <button type="button" className="btn btn-primary" onClick={submitPayload} disabled={busy || csv.trim() === ''}>
                         {busy ? 'Uploading…' : 'Upload the record'}

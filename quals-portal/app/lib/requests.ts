@@ -155,8 +155,55 @@ export async function issueRequest(
   return request(`/admin/requests/${encodeURIComponent(requestId)}/issue`, { method: 'POST' });
 }
 
-/** The columns the file may carry, so the screen can say what is expected rather than only refuse. */
-export const CSV_TEMPLATE = [
-  'email,full_name,student_id,credential,programme_title,degree_level,field_of_study,graduation_date,institution_name,total_credits,courses',
-  'holder@example.com,Ada Lovelace,SA-1001,both,BSc Computer Science,Bachelor,Computer Science,2024-06-30,Smart Academy,3,"[{""courseCode"":""CS101"",""courseName"":""Introduction to Programming"",""credits"":3,""grade"":""A"",""gradePoints"":4}]"',
-].join('\n');
+/**
+ * The columns the file may carry, with one row filled in for this request.
+ *
+ * The address is the request's own, because the issuer checks it: a file is only ever the record of
+ * the person who asked for it. This used to be a hard-coded `holder@example.com`, which meant the
+ * example could only ever be refused - an example that cannot be used is worse than none, because it
+ * looks like a working starting point. Everything else in the row is invented, and is there to be
+ * replaced with the real record.
+ */
+export function csvExampleFor(applicantEmail: string, institution: string): string {
+  const header = [
+    'email',
+    'full_name',
+    'student_id',
+    'credential',
+    'programme_title',
+    'degree_level',
+    'field_of_study',
+    'graduation_date',
+    'institution_name',
+    'total_credits',
+    'courses',
+  ];
+  const example = [
+    applicantEmail,
+    'Ada Lovelace',
+    'SA-1001',
+    'both',
+    'BSc Computer Science',
+    'Bachelor',
+    'Computer Science',
+    '2024-06-30',
+    institution,
+    '3',
+    JSON.stringify([
+      {
+        courseCode: 'CS101',
+        courseName: 'Introduction to Programming',
+        credits: 3,
+        grade: 'A',
+        gradePoints: 4,
+      },
+    ]),
+  ];
+
+  return [header.join(','), example.map(csvField).join(',')].join('\n');
+}
+
+/** One field, quoted only where it has to be — which the courses column always does. */
+function csvField(value: string): string {
+  return /[",\n]/.test(value) ? `"${value.replace(/"/g, '""')}"` : value;
+}
