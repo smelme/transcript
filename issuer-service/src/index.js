@@ -3238,6 +3238,19 @@ if (isMain) {
   const server = app.listen(PORT, () => {
     console.log(`Issuer Service listening on port ${PORT}`);
     console.log(`API available at http://localhost:${PORT}`);
+
+    // Which integrations this deployment actually has, named at startup rather than discovered by
+    // the first applicant who cannot get past a step. Values are never printed, only whether they
+    // are present, because a log is as public as a repository in most deployments.
+    const integrations = [
+      ['identity checks', identityService.configured],
+      ['payment', paymentService.configured],
+      ['email', emailService.isEmailConfigured()],
+      ['the request queue address', Boolean(process.env.REQUEST_QUEUE_EMAIL)],
+    ];
+    for (const [name, ready] of integrations) {
+      console.log(`${ready ? '[ready]' : '[missing]'} ${name}`);
+    }
   });
   
   server.on('error', (err) => {
