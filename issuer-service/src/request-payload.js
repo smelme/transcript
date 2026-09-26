@@ -18,16 +18,26 @@
 import {
   ACADEMIC_RECORD_NAMESPACE,
   CREDENTIAL_KINDS,
+  PHOTOID_NAMESPACE,
   QUALIFICATION_NAMESPACE,
   TRANSCRIPT_NAMESPACE,
   academicNamespacesOf,
+  claimsFromCredentialData,
+  credentialDataFromClaims,
   kindOfCredentialData,
   labelOfCredentialData,
   todayIso,
 } from './credential-generator.js';
 
 /** The namespaces this module writes into, re-exported so callers need not reach past it. */
-export { ACADEMIC_RECORD_NAMESPACE, QUALIFICATION_NAMESPACE, TRANSCRIPT_NAMESPACE };
+export {
+  ACADEMIC_RECORD_NAMESPACE,
+  PHOTOID_NAMESPACE,
+  QUALIFICATION_NAMESPACE,
+  TRANSCRIPT_NAMESPACE,
+  claimsFromCredentialData,
+  credentialDataFromClaims,
+};
 
 /**
  * The columns a file may carry. Everything listed as required must appear in the header for the
@@ -317,10 +327,12 @@ function claimsForRow(row, header, context) {
   }
 
   // Built through the same helpers the published path uses, so what this file produces is
-  // indistinguishable from what an API caller would have sent.
+  // indistinguishable from what an API caller would have sent. The record is assembled in the shape
+  // the document builder needs and then described by namespace, because that is the shape publishing
+  // speaks.
   const claimKind = kindOfCredentialData(claims);
   return {
-    claims,
+    claims: claimsFromCredentialData(claims),
     kind: claimKind,
     label: labelOfCredentialData(claims),
     namespaces: academicNamespacesOf(claims),
@@ -435,6 +447,25 @@ export function buildPayload({ csv, expectedEmail = null, institution = null, is
 
 /** What a file of this kind is: the kinds a request may ask for. */
 export const WANTED_KINDS = ['qualification', 'transcript', 'both'];
+
+/**
+ * The module list a credential holds, whichever way it travelled: an array, or a JSON string, which
+ * is how modules have always been carried in these claims. Read here so that nothing outside this
+ * module has to know which namespace a transcript lives in.
+ */
+export function coursesOfClaims(claims) {
+  const value = claims?.[TRANSCRIPT_NAMESPACE]?.courses;
+  if (Array.isArray(value)) {return value;}
+  if (typeof value === 'string' && value.trim() !== '') {
+    try {
+      const parsed = JSON.parse(value);
+      return Array.isArray(parsed) ? parsed : [];
+    } catch {
+      return [];
+    }
+  }
+  return [];
+}
 
 /** The namespaces each kind carries, for the preview and for a reviewer's summary. */
 export function namespacesForKind(kind) {

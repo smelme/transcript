@@ -8,6 +8,7 @@ import Ajv from 'ajv';
 import addFormats from 'ajv-formats';
 import QRCode from 'qrcode';
 import { InvitationService } from './invitations.js';
+import { RequestService } from './requests.js';
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath, pathToFileURL } from 'url';
@@ -1337,6 +1338,15 @@ const invitationService = new InvitationService({
   siteUrl: ISSUE_SITE_URL,
 });
 
+// Requests: credentials for somebody the institution cannot identify from an address alone. The
+// case owns the identity check, the fee and the decision; issuing a case produces an invitation, so
+// the holder collects through the same page as anybody else.
+const requestService = new RequestService({
+  invitationService,
+  emailSender: emailService.sendEmail,
+  siteUrl: ISSUE_SITE_URL,
+});
+
 // Build an OpenID4VCI credential-offer URL that references an issuance session.
 //
 // A re-issue is marked inside the offer itself, because the offer is what travels to the wallet.
@@ -2131,6 +2141,295 @@ app.get('/issuance/invitations', async (req, res) => {
   const scoped = req.admin.institution || null;
   res.json({ success: true, invitations: invitationService.list({ institution: scoped }) });
 });
+
+/* ── Requests: credentials for people the institution cannot identify on its own ──────────
+ *
+ * The institution acts with its own administrator's session, so the institution is read from
+ * the administrator rather than from the body: an organisation's registrar cannot upload a
+ * record or issue against another institution's request, however the call is made.
+ */
+
+/**
+ * A request that is not there, and a request that is not yours, answer the same way.
+ *
+ * A different status code for each would let an administrator of one institution discover that a
+ * case exists somewhere else, which is the thing the scoping is for.
+ */
+function sendRequestError(res, error, { details = null } = {}) {
+  const missing = /not found/i.test(String(error.message));
+  return res
+    .status(missing ? 404 : 400)
+    .json({ success: false, error: error.message, ...(details ? { details } : {}) });
+}
+
+/** What an administrator is shown about a request, without the applicant's identity evidence. */
+function requestSummary(request) {  return {
+    requestId: request.request_id,
+    institution: request.institution,
+    school: request.school,
+    applicantEmail: request.applicant_email,
+    applicantPhone: request.applicant_phone,
+    applicantName: request.applicant_name,
+    wanted: typeof request.wanted === 'string' ? JSON.parse(request.wanted) : request.wanted,
+    status: request.status,
+    applicantStatus: request.applicantStatus,
+    identityStatus: request.identity_status,
+    fee: request.fee_amount ? { amount: request.fee_amount, currency: request.fee_currency } : null,
+    paymentStatus: request.payment_status,
+    submittedAt: request.submitted_at,
+    dueAt: request.due_at,
+    ageWorkingDays: request.ageWorkingDays,
+    overdue: request.overdue,
+    decision: request.decision,
+    decisionReason: request.decision_reason,
+    reviewedBy: request.reviewed_by,
+    reviewedAt: request.reviewed_at,
+    issuedAt: request.issued_at,
+    invitationId: request.invitation_id,
+    expiresAt: request.expires_at,
+    createdAt: request.created_at,
+  };
+}
+
+// The queue. Scoped to the administrator's organisation, and ageing in working days against the
+// period the applicant was promised.
+app.get('/admin/requests', async (req, res) => {  if (!(await requireAdmin(req, res))) {return;}
+  const status = req.query?.status ? String(req.query.status) : null;
+  const requests = requestService.list({ institution: req.admin.institution || null, status });
+  res.json({ success: true, requests: requests.map(requestSummary) });
+});
+
+// One case, with everything a decision needs: the identity outcome, the details, the events.
+app.get('/admin/requests/:id', async (req, res) => {
+  if (!(await requireAdmin(req, res))) {return;}
+  try {
+    const request = requestService.get({
+      requestId: req.params.id,
+      institution: req.admin.institution || null,
+    });
+    res.json({
+      success: true,
+      request: {
+        ...requestSummary(request),
+        extract: request.extract,
+        identitySummary: request.identitySummary,
+        canDecide: request.canDecide,
+        canUpload: request.canUpload,
+        canIssue: request.canIssue,
+        events: request.events.map((event) => ({
+          event: event.event,
+          actor: event.actor,
+          detail: event.detail,
+          createdAt: event.created_at,
+        })),
+        payloads: request.payloads,
+      },
+    });
+  } catch (e) {
+    res.status(404).json({ success: false, error: e.message });
+  }
+});
+
+// Accept or decline. The decision names the administrator who took it, and the applicant is told
+// either way: a decision nobody is told about is not a decision.
+app.post('/admin/requests/:id/decision', async (req, res) => {
+  if (!(await requireAdmin(req, res))) {return;}
+  try {
+    const request = requestService.decide({
+      requestId: req.params.id,
+      institution: req.admin.institution || null,
+      decision: req.body?.decision,
+      reason: req.body?.reason,
+      note: req.body?.note ?? null,
+      reviewedBy: req.admin.email || req.admin.id || 'administrator',
+    });
+    const told = await tellApplicant(request);
+    res.json({ success: true, request: requestSummary(request), emailSent: told.success });
+  } catch (e) {
+    sendRequestError(res, e);
+  }
+});
+
+/**
+ * The applicant's file: what the institution states the record to be.
+ *
+ * Sent as text rather than as a multipart upload, because the file is small, the contract is the
+ * columns, and a rejected file has to come back with the row that failed rather than as a 500.
+ */
+app.post('/admin/requests/:id/payload', express.json({ limit: '2mb' }), async (req, res) => {
+  if (!(await requireAdmin(req, res))) {return;}
+  const csv = typeof req.body?.csv === 'string' ? req.body.csv : null;
+  if (!csv) {
+    return res.status(400).json({ success: false, error: 'Send the file text in the csv field' });
+  }
+
+  try {
+    const result = requestService.attachPayload({
+      requestId: req.params.id,
+      institution: req.admin.institution || null,
+      csv,
+      filename: req.body?.filename ?? null,
+      uploadedBy: req.admin.email || null,
+    });
+    res.json({
+      success: true,
+      payloadId: result.payloadId,
+      rowCount: result.rowCount,
+      credentials: result.credentials.map((credential) => ({
+        kind: credential.kind,
+        label: credential.label,
+        title: credential.display.title,
+        namespaces: credential.namespaces,
+      })),
+    });
+  } catch (e) {
+    // A refused file carries its row-by-row reasons, so the operator can fix and retry rather than
+    // guess which line the institution got wrong.
+    sendRequestError(res, e, { details: e.details || null });
+  }
+});
+
+// What issuing would produce. The last moment a mistake can be caught before it is signed.
+app.get('/admin/requests/:id/payload/preview', (req, res) => {
+  requireAdmin(req, res).then((ok) => {
+    if (!ok) {return undefined;}
+    try {
+      const preview = requestService.preview({
+        requestId: req.params.id,
+        institution: req.admin.institution || null,
+      });
+      return res.json({ success: true, preview });
+    } catch (e) {
+      return res.status(404).json({ success: false, error: e.message });
+    }
+  });
+});
+
+// Issue. Produces the invitation the holder collects from, exactly as a published credential does.
+app.post('/admin/requests/:id/issue', async (req, res) => {
+  if (!(await requireAdmin(req, res))) {return;}
+  try {
+    const result = await requestService.issue({
+      requestId: req.params.id,
+      institution: req.admin.institution || null,
+      actor: req.admin.email || req.admin.id || 'administrator',
+    });
+    res.json({
+      success: true,
+      reused: result.reused,
+      invitationId: result.invitation?.invitationId || result.request.invitation_id,
+      link: result.invitation?.inviteUrl || null,
+      expiresAt: result.invitation?.expiresAt || result.request.expires_at,
+      emailSent: result.invitation?.emailSent ?? null,
+      request: requestSummary(result.request),
+    });
+  } catch (e) {
+    sendRequestError(res, e);
+  }
+});
+
+/**
+ * Open a case. The applicant supplies their own contact details and what they are asking for; the
+ * institution is the one that will be asked, and it is not the applicant's to name.
+ */
+app.post('/requests', async (req, res) => {
+  try {
+    const opened = requestService.open({
+      institution: ACADEMY_NAME,
+      school: req.body?.school || ACADEMY_NAME,
+      applicantEmail: req.body?.email,
+      applicantPhone: req.body?.phone ?? null,
+      applicantName: req.body?.name ?? null,
+      wanted: req.body?.wanted,
+    });
+    res.status(201).json({
+      success: true,
+      requestId: opened.requestId,
+      // The applicant's own handle. It is the only thing that lets them back to their case, so the
+      // wizard keeps it and the status page takes it.
+      token: opened.token,
+      fee: opened.fee,
+      dueWorkingDays: requestService.workingDays,
+    });
+  } catch (e) {
+    res.status(400).json({ success: false, error: e.message });
+  }
+});
+
+/**
+ * The applicant's view of their own case. Deliberately narrow: the internal states, the reviewer's
+ * note and anything the identity check extracted stay inside.
+ */
+app.get('/requests/:id', (req, res) => {
+  try {
+    const view = requestService.applicantView({ requestId: req.params.id, token: req.query?.token });
+    res.json({ success: true, ...view });
+  } catch (e) {
+    res.status(404).json({ success: false, error: e.message });
+  }
+});
+
+/**
+ * Development only: stand in for the identity check and the fee, so the ordered path can be walked
+ * end to end before those integrations exist.
+ *
+ * Fenced behind the same flag that lets a sign-in code be returned instead of emailed, and refused
+ * everywhere else. This is a scaffold, not a feature: the identity and payment stories replace it,
+ * and it must be gone before either of them is called done.
+ */
+app.post('/requests/:id/advance', async (req, res) => {
+  if (process.env.ALLOW_DEV_OTP !== 'true') {
+    return res.status(403).json({ success: false, error: 'Not available' });
+  }
+  try {
+    const row = requestService.resolve({ requestId: req.params.id, token: req.body?.token });
+    if (req.body?.identity !== false) {
+      requestService.attachIdentity({
+        requestId: row.request_id,
+        status: 'verified',
+        sessionRef: 'dev-session',
+        summary: { check: 'development stand-in' },
+        extract: req.body?.extract || { givenName: 'Ada', familyName: 'Lovelace', documentNumber: 'DEV-0001' },
+      });
+    }
+    requestService.markPaid({
+      requestId: row.request_id,
+      paymentRef: 'dev-payment',
+      amount: row.fee_amount,
+      currency: row.fee_currency,
+    });
+    const submitted = requestService.submit({ requestId: row.request_id, termsVersion: 'dev' });
+    res.json({ success: true, status: submitted.status, dueAt: submitted.due_at });
+  } catch (e) {
+    res.status(400).json({ success: false, error: e.message });
+  }
+});
+
+/**
+ * Tell the applicant what was decided. The reviewer's note is not sent: the reason is what the
+ * institution agreed to share, and the note is the reviewer's own record.
+ *
+ * Refunds are not automatic yet, so a decline says the fee is being returned rather than promising
+ * a date the system cannot keep.
+ */
+async function tellApplicant(request) {
+  const accepted = request.decision === 'accepted';
+  const subject = accepted
+    ? 'Your credentials are being prepared'
+    : 'About your request for a credential';
+  const html = `
+    <p>${accepted ? 'Good news.' : 'We have an answer for you.'}</p>
+    <p>${accepted
+      ? 'The school has confirmed your record, and your credentials are being prepared. We will email you again when they are ready to collect.'
+      : `The school could not confirm this request.${request.decision_reason ? ` The reason given: ${request.decision_reason}.` : ''} We are returning the fee to the card you paid with.`}</p>
+    <p>Your reference is ${request.request_id}.</p>`;
+  try {
+    return await emailService.sendEmail({ to: request.applicant_email, subject, html });
+  } catch (e) {
+    console.error('[requests] could not tell the applicant:', e.message);
+    return { success: false, reason: e.message };
+  }
+}
 
 app.post('/academy/requests', async (req, res) => {
   try {

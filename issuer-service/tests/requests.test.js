@@ -13,6 +13,7 @@ process.env.DATABASE_PATH = path.join(
 );
 
 const { RequestService, STATUS, addWorkingDays } = await import('../src/requests.js');
+const { QUALIFICATION_NAMESPACE } = await import('../src/request-payload.js');
 const { getDb } = await import('../../db.js');
 
 const ACADEMY = 'Smart Academy';
@@ -234,11 +235,15 @@ test('nothing is signed before the payload is seen, and issuing produces an invi
   assert.strictEqual(issued.reused, false);
   assert.strictEqual(issued.invitation.invitationId, 'inv-1');
 
-  // The claims handed to the publisher are the institution's, not anything this service invented.
+  // The claims handed to the publisher are the institution's, not anything this service invented,
+  // and they travel keyed by the namespace they belong to.
   const [published] = service.invitationService.created;
   assert.strictEqual(published.institution, ACADEMY);
   assert.strictEqual(published.holderEmail, 'holder@example.com');
-  assert.strictEqual(published.credentials[0].claims.education_qualification.graduation_date, '2024-06-30');
+  assert.strictEqual(
+    published.credentials[0].claims[QUALIFICATION_NAMESPACE].graduation_date,
+    '2024-06-30',
+  );
 
   const row = service.get({ requestId, institution: ACADEMY });
   assert.strictEqual(row.status, STATUS.ISSUED);

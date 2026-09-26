@@ -353,6 +353,75 @@ const IDENTITY_FIELDS = [
 ];
 
 /**
+ * Which block of the record each academic namespace becomes.
+ *
+ * Two shapes of the same claims travel through this system, and they are not interchangeable. A
+ * published credential arrives keyed by namespace - `org.iso.23220.education.qualification.1` -
+ * because that is what an institution sending claims over an API naturally mirrors, and it is what
+ * tells one kind of credential from another. The document builder reads the record keyed by field -
+ * `education_qualification` - because that is the shape it writes into the mdoc's nameSpaces.
+ * These two functions are the only place the two are related, so the conversion cannot be
+ * forgotten in one path and not the other.
+ */
+const FIELD_FOR_NAMESPACE = {
+  [PHOTOID_NAMESPACE]: null, // identity elements sit at the top level, where the builder reads them
+  [QUALIFICATION_NAMESPACE]: 'education_qualification',
+  [TRANSCRIPT_NAMESPACE]: 'education_transcript',
+  [ACADEMIC_RECORD_NAMESPACE]: 'education_academic_record',
+};
+
+/**
+ * Turn published, namespace-keyed claims into the record the document builder reads.
+ *
+ * Without this, a credential published through the API arrives at the builder with no fields it
+ * recognises, produces no namespaces, and yields nothing at all - which is what happened before
+ * this existed, because the only step that would have noticed is the wallet's claim, and nothing
+ * tested that far.
+ *
+ * @param {object} claims claims keyed by ISO namespace
+ * @returns {object} the same record keyed by field, plus any scalars that travelled alongside
+ */
+export function credentialDataFromClaims(claims = {}) {
+  const data = {};
+  for (const [key, value] of Object.entries(claims || {})) {
+    if (value == null || typeof value !== 'object' || Array.isArray(value)) {continue;}
+    if (key === PHOTOID_NAMESPACE) {
+      Object.assign(data, value);
+      continue;
+    }
+    const field = FIELD_FOR_NAMESPACE[key];
+    if (field) {data[field] = value;}
+  }
+  for (const [key, value] of Object.entries(claims || {})) {
+    if (value == null || typeof value === 'object') {continue;}
+    data[key] = value;
+  }
+  return data;
+}
+
+/**
+ * The inverse: describe a record by the namespaces it holds.
+ *
+ * Used where a record has been built in the shape the document needs and has to travel as published
+ * claims - the ordered path, where the institution states the record in a file.
+ *
+ * @param {object} data the record keyed by field
+ * @returns {object} the same record keyed by namespace
+ */
+export function claimsFromCredentialData(data = {}) {
+  const claims = {};
+  const identity = {};
+  for (const field of IDENTITY_FIELDS) {
+    if (data[field] != null) {identity[field] = data[field];}
+  }
+  if (Object.keys(identity).length > 0) {claims[PHOTOID_NAMESPACE] = identity;}
+  if (data.education_qualification) {claims[QUALIFICATION_NAMESPACE] = data.education_qualification;}
+  if (data.education_transcript) {claims[TRANSCRIPT_NAMESPACE] = data.education_transcript;}
+  if (data.education_academic_record) {claims[ACADEMIC_RECORD_NAMESPACE] = data.education_academic_record;}
+  return claims;
+}
+
+/**
  * US-style semesters, oldest first, ending with the term a study finishes in. An academic
  * year N runs Fall N (late August to mid December) then Spring N+1 (mid January to mid May),
  * so the terms of a record are counted backwards from its final one and the record never

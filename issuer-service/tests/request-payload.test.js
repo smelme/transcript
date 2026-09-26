@@ -3,9 +3,12 @@ import assert from 'node:assert';
 
 import {
   ACADEMIC_RECORD_NAMESPACE,
+  PHOTOID_NAMESPACE,
   QUALIFICATION_NAMESPACE,
   TRANSCRIPT_NAMESPACE,
   buildPayload,
+  claimsFromCredentialData,
+  credentialDataFromClaims,
   parseCsv,
 } from '../src/request-payload.js';
 
@@ -113,10 +116,37 @@ test('a completed programme produces one credential holding both academic namesp
     TRANSCRIPT_NAMESPACE,
     ACADEMIC_RECORD_NAMESPACE,
   ]);
-  assert.strictEqual(credential.claims.education_qualification.graduation_date, '2024-06-30');
-  assert.strictEqual(credential.claims.education_transcript.total_credits, 7);
-  assert.strictEqual(credential.claims.education_transcript.courses[0].courseCode, 'CS101');
+  // Published claims are keyed by namespace, which is the shape an institution's API sends and the
+  // shape the invitation path expects.
+  const qualification = credential.claims[QUALIFICATION_NAMESPACE];
+  const transcript = credential.claims[TRANSCRIPT_NAMESPACE];
+  assert.strictEqual(qualification.graduation_date, '2024-06-30');
+  assert.strictEqual(transcript.total_credits, 7);
+  assert.strictEqual(transcript.courses[0].courseCode, 'CS101');
   assert.strictEqual(credential.display.courseCount, 2);
+});
+
+test('the record the document needs and the claims publishing speaks are related in one place', () => {
+  // The builder reads fields (education_qualification), publishing speaks namespaces. A credential
+  // published with the wrong one of these builds as an empty document, which is what happened
+  // before the conversion existed.
+  const data = {
+    full_name: 'Ada Lovelace',
+    date_of_birth: '1999-01-01',
+    education_qualification: { institution_name: 'Smart Academy', degree_level: 'Bachelor' },
+    education_transcript: { student_id: 'SA-1001', total_credits: 7 },
+  };
+
+  const claims = claimsFromCredentialData(data);
+  assert.ok(claims[QUALIFICATION_NAMESPACE], 'the qualification travels as its namespace');
+  assert.strictEqual(claims[QUALIFICATION_NAMESPACE].degree_level, 'Bachelor');
+  assert.strictEqual(claims['org.iso.23220.photoid.1'].full_name, 'Ada Lovelace');
+
+  const back = credentialDataFromClaims(claims);
+  assert.deepStrictEqual(back.education_qualification, data.education_qualification);
+  assert.deepStrictEqual(back.education_transcript, data.education_transcript);
+  assert.strictEqual(back.full_name, 'Ada Lovelace', 'the identity elements sit at the top level');
+  assert.strictEqual(back[QUALIFICATION_NAMESPACE], undefined, 'and the namespaces do not travel on');
 });
 
 test('a transcript-only row carries no qualification block, so the kind reads off the document', () => {
@@ -126,7 +156,7 @@ test('a transcript-only row carries no qualification block, so the kind reads of
   assert.strictEqual(result.ok, true, result.errors.join('; '));
   assert.strictEqual(result.credentials[0].kind, 'transcript');
   assert.strictEqual(result.credentials[0].namespaces.includes(QUALIFICATION_NAMESPACE), false);
-  assert.strictEqual('education_qualification' in result.credentials[0].claims, false);
+  assert.strictEqual(QUALIFICATION_NAMESPACE in result.credentials[0].claims, false);
   // A transcript may be issued without a graduation date: it describes a study, not an award.
   const noAward = buildPayload({
     csv: file(row({ credential: 'transcript', graduationDate: '2024-06-30' })),
@@ -138,7 +168,7 @@ test('a qualification-only row carries no transcript block', () => {
   const result = buildPayload({ csv: file(row({ credential: 'qualification' })) });
   assert.strictEqual(result.ok, true, result.errors.join('; '));
   assert.strictEqual(result.credentials[0].kind, 'qualification');
-  assert.strictEqual('education_transcript' in result.credentials[0].claims, false);
+  assert.strictEqual(TRANSCRIPT_NAMESPACE in result.credentials[0].claims, false);
 });
 
 test('the address must be the one the request was opened for', () => {

@@ -19,7 +19,7 @@
 
 import crypto from 'crypto';
 import { getDb, sha256Hex } from '../../db.js';
-import { WANTED_KINDS, buildPayload } from './request-payload.js';
+import { WANTED_KINDS, buildPayload, coursesOfClaims } from './request-payload.js';
 
 /** The period promised to the applicant, in working days, from the moment the school has it. */
 export const DEFAULT_WORKING_DAYS = 10;
@@ -105,6 +105,19 @@ const APPLICANT_STATUS = {
   [STATUS.DECLINED]: 'declined',
   [STATUS.WITHDRAWN]: 'declined',
   [STATUS.ABANDONED]: 'declined',
+};
+
+/**
+ * What the applicant is told, state by state. Five short sentences rather than a progress bar,
+ * because the honest answer is either "the school has it" or "the school has finished", and
+ * anything in between would be inventing progress nobody can point at.
+ */
+export const APPLICANT_WORDING = {
+  received: 'We have your request. It is with the school now.',
+  'being-checked': 'The school is checking your record.',
+  'being-prepared': 'Your record has been confirmed, and your credentials are being prepared.',
+  sent: 'Your credentials are ready to collect.',
+  declined: 'This request was declined.',
 };
 
 /**
@@ -272,6 +285,32 @@ export class RequestService {
     if (!row) {throw new Error('Request not found');}
     if (sha256Hex(String(token || '')) !== row.token_hash) {throw new Error('Request not found');}
     return row;
+  }
+
+  /**
+   * The applicant's own view of their case. Deliberately small: five states, the period they were
+   * promised, and the outcome. The internal states, the reviewer's note and whatever the identity
+   * check extracted stay inside - an applicant reading "identity_failed" learns nothing they can
+   * act on, and being shown it is worse than being told to try again.
+   */
+  applicantView({ requestId, token }) {
+    const row = this.resolve({ requestId, token });
+    const status = APPLICANT_STATUS[row.status] || 'received';
+    return {
+      requestId: row.request_id,
+      school: row.school,
+      status,
+      whatHappensNext: APPLICANT_WORDING[status],
+      dueAt: row.due_at,
+      overdue: Boolean(row.due_at) && Date.now() > Date.parse(row.due_at) && !this._isFinished(row.status),
+      submittedAt: row.submitted_at,
+      decidedAt: row.reviewed_at,
+      outcome: row.decision,
+      // The reason the institution agreed to share, never the reviewer's own note.
+      reason: row.decision_reason,
+      issuedAt: row.issued_at,
+      expiresAt: row.expires_at,
+    };
   }
 
   /**
@@ -627,6 +666,9 @@ export class RequestService {
         label: credential.label,
         namespaces: credential.namespaces,
         display: credential.display,
+        // The module list on its own, so the screen showing the preview does not have to know which
+        // namespace a transcript lives in or how modules are encoded inside it.
+        courses: coursesOfClaims(credential.claims),
         claims: credential.claims,
       })),
     };

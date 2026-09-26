@@ -19,6 +19,7 @@
 
 import crypto from 'crypto';
 import { getDb, sha256Hex } from '../../db.js';
+import { credentialDataFromClaims } from './credential-generator.js';
 
 /** How long an unclaimed published credential is kept. Matches the share TTL: one rule, two kinds. */
 export const DEFAULT_INVITATION_TTL_DAYS = 30;
@@ -161,7 +162,10 @@ export class InvitationService {
         session: this.issuer.createIssuanceSession({
           studentId: resolvedStudentId,
           institution,
-          credentialData: claims,
+          // Stored in the shape the document builder reads. Published claims arrive keyed by
+          // namespace and the builder reads fields, so without this conversion the credential
+          // would be stored, offered, and then built as an empty document.
+          credentialData: credentialDataFromClaims(claims),
           display,
           email,
           sub,
