@@ -1,7 +1,8 @@
 # P0-36: Asking for a credential
 
-**Status:** In progress - the case, its states, its audit trail and the identity check are built and
-exercised end to end; the wizard the applicant uses is not
+**Status:** Built - the case, its states, its audit trail, the identity check and the wizard on
+Quals are all in place and exercised end to end. Evidence access waits on a reason to hold the
+documents, which the current design deliberately avoids.
 **Components:** `issuer-service` (request domain: `db.js`, `src/requests.js`, `src/identity-service.js`),
 `quals-frontend` (`/request` wizard), Didit integration
 **Depends on:** P0-35 (the door that leads here)

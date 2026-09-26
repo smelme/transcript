@@ -1,8 +1,8 @@
 # P0-37: The fee, before the review
 
-**Status:** In progress - the fee is taken through the provider's hosted checkout and confirmed
-against the provider rather than the return page; refunds are still by hand, and the payment screen
-itself belongs to the wizard, which is not built
+**Status:** Built - the fee is taken through the provider's hosted checkout, confirmed against the
+provider rather than the return page, and the payment screen states the fee, the period and the
+refund rule before the button. Refunds are still by hand, which is what the wording promises.
 **Components:** `issuer-service` (checkout, webhook, reconciliation), `quals-frontend` (payment
 step and confirmation)
 **Depends on:** P0-36

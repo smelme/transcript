@@ -1,6 +1,8 @@
 # P0-40: The applicant is told
 
-**Status:** Not started
+**Status:** Built - the confirmation, the queue notice and the decision email go out, and the
+applicant has a status page carrying the same five states and the period, reachable with the
+reference alone. A slipped promise is not yet notified unprompted.
 **Components:** `issuer-service` (confirmation and status emails, request status route),
 `quals-frontend` (status page and the ordered-path entry on `/issue`)
 **Depends on:** P0-36 (a request exists), P0-37 (a payment was taken)
