@@ -40,27 +40,29 @@ Two of the changes are accessibility fixes rather than taste. The dark sidebar's
 in brand yellow was 1.9:1 on white — decoration reading as content. Both are legible now, which is also
 what makes the pages look considered rather than merely coloured.
 
-## The mark, fixed after looking at the pages
+## The mark, and the black field, fixed after looking at the pages
 
-The redesign left the site wearing a yellow-to-green square with a Q in it: a shape that appears
-nowhere in the app, in a blend of two colours the app does not blend. Being told it "still looks the
-same as the old one" was fair — the one thing on every page had not changed.
+Two corrections, both of them mine.
 
-The wallet's own mark is a **green shield with a white check**, and its palette is **gold first, green
-second**: `QualsGold #FFC400`, `QualsGreen #1B9C5B`, `#0B0F0C` for its black. So:
+**The mark was wrong twice.** The app's mark is `quals_logo`, which its own code describes as "the
+Quals brand mark (white Q)": a white Q with a gold tail. The site first carried a yellow-to-green
+square with a Q, then a green shield — and the app has no green shield. Both of the app's themes put the
+Q on `@color/quals_pure_black`, so the site and the portal now serve that Q, the tab icon is the
+launcher icon, and the field behind it is black exactly as the app gives it one.
 
-- the site's mark is drawn from the app's own `ic_quals_logo.xml` geometry, and the same file is
-  served by the public site and the portal so the two cannot drift apart unnoticed;
-- the green joins the tokens as `--brand-alt`, carrying the shield and the accents rather than being a
-  second brand;
-- **a confirmed record is marked in the app's green** (`#0e6b3d` on `#e2f7ec`) instead of an unrelated
-  one, so "confirmed" looks the same in the wallet as on the site;
-- `--ink` is the app's `#0b0f0c`, because two blacks that almost match are worse than either;
-- the browser tab gets the wallet's launcher icon, black field and all.
+**The site was the inverse of the app.** Its `windowBackground` is pure black, its surfaces are
+near-black, and gold is the colour it acts with: cursors, focus, field labels, buttons, links. A white
+page with gold accents is that photograph's negative, which is why the two never looked like one
+product however carefully the tokens were aligned. **Quals is now black, with gold and white** — the
+dark set is the brand rather than an option.
 
-The collecting and requesting pages stopped looking untouched at the same time: both cards carry the
-gold rule the hero has, both headers gave up a heavy black rule for a hairline now that the mark beside
-it carries the weight, and the wordmark is larger.
+Green left with the shield. The app keeps it as an untouched Material slot (`secondary`, `tertiary`),
+which is a slot rather than a brand, so the site uses it only as the status colour on a badge, where
+confirmed and refused have to be told apart.
+
+Two things the black field broke, found by reading the stylesheet rather than by looking at it:
+browser-drawn placeholders are the browser's own grey and were unreadable on black, and every checkbox
+and radio took its tick from the ink token — black on black on this brand. Both are gold now.
 
 ## Verification
 

@@ -68,24 +68,28 @@ wizard, the collecting screen.
 
 ## The mark
 
-One mark, from one source. `quals-mark.svg` is drawn from the wallet app's own `ic_quals_logo.xml` —
-the green shield with a white check — and the same file is served by the public site and the portal, so
-the tab, the app and the site are the same thing. The site previously carried a yellow-to-green square
-with a Q in it, a shape that appeared nowhere in the app.
-
-The app is **gold first, green second**: gold is what it acts with (buttons, primary), green is what it
-wears (the shield) and what it marks a confirmed record with. The site follows that order —
-`--brand-alt` is an accent, never a second brand — and a confirmed record uses the app's green rather
-than an unrelated one.
+One mark, from one source. `quals-mark.svg` is the app's own `quals_logo` — **a white Q with a gold
+tail**, which the app's code describes as "the Quals brand mark (white Q)" — and the same file is served
+by the public site and the portal, so the tab, the app and the site cannot drift apart. It is a
+transparent mark rather than a tile: the field belongs to the surface, exactly as the app treats it.
+The tab icon is the launcher icon, which is the same Q on black with the padding an icon needs.
 
 ## Where the colours come from
 
+The app is black with gold and white, so Quals is too. This is not a dark *option*: the layout sets
+`data-theme="dark"`, and that block is the brand.
+
 | Token | Quals | Smart Academy |
 | --- | --- | --- |
-| `--brand` | `#ffc400` (wallet `QualsGold`) | `#6d28d9` |
-| `--brand-alt` | `#1b9c5b` (wallet `QualsGreen`) | — |
-| `--ink` | `#0b0f0c` (wallet ink) | `#1b1233` |
-| `--ok` | `#0e6b3d` (wallet `QualsGreenDark`) | `#146c2e` |
+| `--bg` | `#000000` (the app's `quals_pure_black` window) | `#ffffff` |
+| `--surface` | `#0b0f0c` (the app's ink, lifted off the black) | `#ffffff` |
+| `--brand` | `#ffc400` (the app's `QualsGold`) | `#6d28d9` |
+| `--text` | `#ffffff` | `#1c1533` |
+| `--ok` | `#7ee2a8` — status only | `#146c2e` — status only |
+
+**Colours that are deliberately absent.** `QualsGreen`, `QualsGreenDark` and `QualsGreenLight` exist in
+`Theme.kt` as Material `secondary`/`tertiary` slots and never reach a brand surface, so they are not
+part of the site either. If the app starts using them, this table is where the site follows.
 
 ## Accessibility
 

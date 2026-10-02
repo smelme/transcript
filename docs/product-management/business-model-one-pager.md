@@ -1,78 +1,69 @@
-# Business model. One page
+# One page. Who does what, what each gets, what each pays
 
-**Date:** 2026-10-03 · **Companion to:** `business-case-qualification-credentials.md`
-**Basis:** the implementation as it stands today. Status tags: **built**, **partial**, **missing**.
+## Smart Academy — the institution that issues the credentials
 
-## The product in one line
+**What it does with it**
+- Issues a student's qualification and transcript as a digital credential, instead of a paper document or a PDF.
+- The student claims it into a wallet on their phone and holds it there.
+- The registrar uses the portal to see everything it has issued, revoke a credential when it has to, and hand its own systems an API key so they can issue directly.
 
-Not software and not cryptography — **the machine-checkable signature of an institution**. A
-credential's trust is established once, at issuance, then checked arithmetically at every use,
-without the institution being involved in the check.
+**What it gets — cost**
+- **Registrar time.** A manual transcript request takes 10–30 minutes of staff time. An employer or another university checking a credential takes none of it.
+- **Postage and courier.** Often £5–£45 internationally, gone for anything checked digitally.
+- No printing, scanning, filing, storing or redacting documents.
+- **Storage for credentials: nothing.** They are never held on a server, so the cost does not grow as it issues more.
+- **Less fraud.** A forged or edited document fails verification, instead of arriving in the post looking convincing.
+- **A new revenue line.** Transcript and certification fees delivered digitally at a fraction of the old handling cost, plus alumni self-service.
 
-## What the implementation already gives you commercially
+**What it gets — students and reputation**
+- Students receive their qualification when it is awarded, not weeks later.
+- Applications, employer checks and admissions answered in seconds — which it can advertise.
+- Fewer repeat requests landing in the registrar's inbox.
 
-| Capability in the code | Commercial meaning | Status |
-| --- | --- | --- |
-| Client organisations + API keys per institution (`client_orgs`, `api_keys`) | Multi-tenant already. The API key is the natural **metering unit**, and the institution is stamped from the key so one org cannot issue as another | **built** |
-| `credentials` table, durable, scoped per institution | The **issuance meter is billable today** — a real count per organisation that survives restarts | **built** |
-| Issuance fee: `feePence` + `402 Payment required` until paid | A paywall mechanic exists. But the price is **caller-supplied**, there is no pricing table and no payment provider behind it | **partial** |
-| Organisation-scoped admins, API-key management, audit log, portal | Enterprise administration is done, so a per-institution contract can be administered without engineering | **built** |
-| Share flow: one-time session, OTP, terms, PDF, 30-day TTL | A stand-alone **document-delivery service** — monetisable per transaction, independent of the RP side | **built** |
-| Trust registry: 0–100 trust score, approve/block, audit | The seed of a **governance/accreditation** product — but held **in memory**, so it resets on every deploy | **partial** |
-| Verifier: `relyingPartyId`, `/verify/statistics`, verification log | A per-relying-party **verification meter** exists — also **in memory**, so usage is lost on restart and cannot be billed | **partial** |
-| Status list: 1 bit per credential, 60 s cache, no issuer call | **Marginal cost per verification ≈ 0**, which is what makes a free relying-party tier rational | **built** |
-| mdoc bytes never persisted | Storage cost **flat in credentials issued**; no honeypot to breach | **built** |
+**What it pays**
+- A platform subscription, and a fee per credential issued if it charges students.
+- A one-off integration with its student record system.
+- Filling in its own values — grading scale, credit scheme, programme and award titles, term dates, institution identifier. These are placeholders today and must be real before it issues for real.
+- Either holding its own signing keys safely or paying for managed signing.
+- Staff training, and helping students who lose a phone.
+- Privacy notices, and a legal review if identity checking is added.
 
-## Who pays, and for what
+## Quals — the service provider
 
-| Payer | Buys | Price hypothesis | Meter that exists today |
-| --- | --- | --- | --- |
-| **Institute** | Verifiable credentials for its own awards; less document handling; alumni revenue | Annual subscription + per credential | Issuance count (durable) |
-| **Relying party** (My Jobs, Trust University) | Instant, unforgeable checks; decisions instead of documents | Free tier + annual bundle | None durable — **must be built** |
-| **Holder** | Portability, privacy, no fees or couriers | Free to hold; premium per transaction | n/a |
-| **Both sides** | Accreditation and listing; managed signing; status-list hosting with an SLA | Annual | n/a |
+**What it does**
+- Runs the whole platform: the issuing service on the institution's behalf, the wallet app, the verification service, the published revocation list, the management portal and the share page.
+- Onboards institutions, manages their signing keys, gives them portal access and API keys.
+- Serves the relying parties — My Jobs, Trust University, and any employer or admissions office that checks a credential.
+- Publishes the signed revocation list, so anyone can check whether a credential has been cancelled without asking the institution.
 
-## The model I would run
+**What it gets**
+- From institutions: a subscription, plus a fee per credential issued.
+- From relying parties: a fee per verification, or an annual bundle.
+- Accreditation and listing fees, once enough institutions are on board for the registry to be worth subscribing to.
+- Managed signing and hosting, sold as an add-on.
+- Premium holder transactions — expedited delivery, legalisation, certified translation, a lifelong vault.
 
-1. **Institution:** subscription + per-credential issuance, sold against handling-cost reduction and
-   new alumni revenue.
-2. **Relying party:** free discovery tier + paid bundle, priced against the incumbent per-check line.
-   Free is affordable because marginal cost is ~0.
-3. **Holder:** free to hold and share. Premium **transactions** only — expedite, legalisation,
-   translation, lifelong vault, recovery.
-4. **Infrastructure:** managed signing and status-list hosting as a paid add-on. Highest margin,
-   stickiest, and it removes the institution's two hardest duties.
-5. **Governance:** accreditation and listing fees, once more than a handful of issuers exist.
+**What it pays**
+- Hosting for seven services, storage and email. Credentials and verifications both cost roughly nothing in infrastructure — **the money goes on people, not servers.**
+- Engineering: integrations, standards, security.
+- **Support, which is the real cost** — onboarding each institution, wiring up its student system, and helping holders who lose a device.
+- Security operations: key custody, key rotation, monitoring, incident response.
+- **An availability obligation.** If the revocation list is unreachable, nobody can prove anything, so uptime is a contract term rather than an IT detail.
+- Sales and partnerships.
+- Identity-verification vendor fees, if document and face checks are added.
 
-## Unit economics
+## The holder — the student or graduate
 
-- ~**£0** marginal cost per credential stored; ~**£0** per verification.
-- The real cost of goods sold is **integration and support**, not infrastructure. Budget it as the
-  dominant cost per institution, or it eats the margin.
-- Illustrative base case (5 institutions, 4,000 graduates each, 15% presented): **~£138k**, of which
-  **54% subscription**. Bear ~£37k, bull ~£739k.
-- **Volume beats price:** 5 → 20 institutions adds ~**£600k**; doubling every price adds ~**£63k**.
-  Spend on distribution and integration, not price optimisation.
+**What it means for them**
+- They own the record, instead of asking the institution for access to it.
+- They show only what is asked — a landlord checking they are a student does not receive their grades.
+- No fees, no couriers, no waiting.
+- It travels with them: between jobs, courses and countries, for life.
+- Faster outcomes: a job offer, an admission, a visa, a loan, resolved in minutes.
+- It is free. They pay only for extras — expedited official delivery, translation, legalisation.
 
-*All prices and volumes are hypotheses. There is no paying customer yet.*
-
-## What is missing before anyone can be charged
-
-| Gap | Why it blocks revenue | Effort |
-| --- | --- | --- |
-| No payment provider (checkout is a placeholder, confirmation a stub) | The paywall exists but no money can move | **S** |
-| No pricing table or per-organisation default price | Price is caller-supplied, so it is not a commercial construct | **S** |
-| Verification events and statistics are in memory | Relying-party usage cannot be metered, so that revenue line cannot be billed | **M** |
-| Trust registry is in memory | The accreditation product and issuer governance reset on deploy | **M** |
-| No plan, entitlement, invoice or dunning concept | Cannot sell to procurement or collect recurring revenue | **M** |
-
-## The three numbers that decide it
-
-**Issuing organisations** (supply) · **verifications per thousand holders** (demand) ·
-**credential-claim completion rate** (the funnel that turns an issued credential into a usable one).
-
-## The decision being asked for
-
-Fund **Wave 0**: make the paywall real (payment provider + a pricing table), and make the
-**verification meter durable** so the relying-party line can be priced and billed. Those three items
-are the smallest work between the current implementation and a business that can invoice anyone.
+**What they take on**
+- They need a phone and an app.
+- Lose the phone and they lose the credential, so re-issuing has to be free and easy.
+- They consent to a share without being told who is asking. That gap is worth closing.
+- Proving something can depend on Quals being online.
