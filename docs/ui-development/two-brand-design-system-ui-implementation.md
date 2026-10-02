@@ -66,6 +66,27 @@ wizard, the collecting screen.
 - **"Checking with the identity provider…"** is now **"Checking your document…"** — the reader has
   never met the provider.
 
+## The mark
+
+One mark, from one source. `quals-mark.svg` is drawn from the wallet app's own `ic_quals_logo.xml` —
+the green shield with a white check — and the same file is served by the public site and the portal, so
+the tab, the app and the site are the same thing. The site previously carried a yellow-to-green square
+with a Q in it, a shape that appeared nowhere in the app.
+
+The app is **gold first, green second**: gold is what it acts with (buttons, primary), green is what it
+wears (the shield) and what it marks a confirmed record with. The site follows that order —
+`--brand-alt` is an accent, never a second brand — and a confirmed record uses the app's green rather
+than an unrelated one.
+
+## Where the colours come from
+
+| Token | Quals | Smart Academy |
+| --- | --- | --- |
+| `--brand` | `#ffc400` (wallet `QualsGold`) | `#6d28d9` |
+| `--brand-alt` | `#1b9c5b` (wallet `QualsGreen`) | — |
+| `--ink` | `#0b0f0c` (wallet ink) | `#1b1233` |
+| `--ok` | `#0e6b3d` (wallet `QualsGreenDark`) | `#146c2e` |
+
 ## Accessibility
 
 - Body text is `#101012` on `#ffffff` (17.9:1). Quals' brand yellow is never text.

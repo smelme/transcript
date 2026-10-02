@@ -40,6 +40,28 @@ Two of the changes are accessibility fixes rather than taste. The dark sidebar's
 in brand yellow was 1.9:1 on white — decoration reading as content. Both are legible now, which is also
 what makes the pages look considered rather than merely coloured.
 
+## The mark, fixed after looking at the pages
+
+The redesign left the site wearing a yellow-to-green square with a Q in it: a shape that appears
+nowhere in the app, in a blend of two colours the app does not blend. Being told it "still looks the
+same as the old one" was fair — the one thing on every page had not changed.
+
+The wallet's own mark is a **green shield with a white check**, and its palette is **gold first, green
+second**: `QualsGold #FFC400`, `QualsGreen #1B9C5B`, `#0B0F0C` for its black. So:
+
+- the site's mark is drawn from the app's own `ic_quals_logo.xml` geometry, and the same file is
+  served by the public site and the portal so the two cannot drift apart unnoticed;
+- the green joins the tokens as `--brand-alt`, carrying the shield and the accents rather than being a
+  second brand;
+- **a confirmed record is marked in the app's green** (`#0e6b3d` on `#e2f7ec`) instead of an unrelated
+  one, so "confirmed" looks the same in the wallet as on the site;
+- `--ink` is the app's `#0b0f0c`, because two blacks that almost match are worse than either;
+- the browser tab gets the wallet's launcher icon, black field and all.
+
+The collecting and requesting pages stopped looking untouched at the same time: both cards carry the
+gold rule the hero has, both headers gave up a heavy black rule for a hairline now that the mark beside
+it carries the weight, and the wordmark is larger.
+
 ## Verification
 
 - `npx next build` clean in all three apps.
