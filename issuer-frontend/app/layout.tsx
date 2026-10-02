@@ -45,7 +45,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           <div className="container footer-inner">
             <span>Smart Academy. Issuing authority for the Quals network.</span>
             <span>
-              Powered by <strong style={{ color: '#fff' }}>Quals</strong> verifiable credentials
+              Powered by <strong style={{ color: 'var(--on-ink)' }}>Quals</strong> verifiable credentials
             </span>
           </div>
         </footer>

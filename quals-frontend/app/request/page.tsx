@@ -415,7 +415,7 @@ export default function RequestPage() {
         <img className="req-mark" src="/quals-mark.svg" alt="" width={34} height={34} />
         <div className="req-brand">
           <b>Quals</b>
-          <span>Verifiable credentials</span>
+          <span>Digital credentials</span>
         </div>
         <div className="req-from">
           Requesting from {school}
@@ -441,10 +441,8 @@ export default function RequestPage() {
         <>
           <h1>Ask for your credentials</h1>
           <p className="req-lede">
-            Use this if you studied with {school} more than five years ago, or if you are not sure
-            whether we still hold a record for you. We will check with the school by hand, so it takes
-            longer than collecting them from the school&rsquo;s own site — up to {workingDays} working
-            days after you send this.
+            Use this if you studied with {school} more than five years ago, or you are not sure we
+            still hold your record. We check by hand, so it takes up to {workingDays} working days.
           </p>
 
           <form onSubmit={openRequest} className="req-form">
@@ -540,9 +538,8 @@ export default function RequestPage() {
         <>
           <h1>Confirm who you are</h1>
           <p className="req-lede">
-            You will be asked for a photo identity document and a selfie. This is how the school can
-            be sure the record it finds belongs to you, since we cannot check an address on its own
-            for a record this old.
+            You will need a photo ID and a selfie. It is how the school knows the record it finds is
+            yours.
           </p>
 
           {identityProblem && <div className="req-error">{identityProblem}</div>}
@@ -562,8 +559,8 @@ export default function RequestPage() {
             </button>
           </div>
           <p className="req-note">
-            We keep what the document says — your name, date of birth and the document number — for
-            the school to check against its record. We do not keep a copy of the document itself.
+            We keep what the document says — your name, date of birth and document number — for the
+            school to check against its record. We do not keep a copy of the document.
           </p>
         </>
       )}
@@ -572,12 +569,12 @@ export default function RequestPage() {
         <>
           <h1>Waiting for the check</h1>
           <p className="req-lede">
-            The check has not finished yet. This page looks every few seconds and moves on by itself,
-            so you can leave it open or come back to it later.
+            The check has not finished yet. This page moves on by itself, so leave it open or come
+            back to it later.
           </p>
           <div className="req-pending" aria-live="polite">
             <span className="req-spinner" aria-hidden="true" />
-            Checking with the identity provider…
+            Checking your document…
           </div>
           <div className="req-actions">
             <button type="button" className="req-btn" onClick={() => held && settleIdentity(held)} disabled={busy}>
@@ -594,8 +591,8 @@ export default function RequestPage() {
         <>
           <h1>Check this, then pay</h1>
           <p className="req-lede">
-            {school} will check its record against what you have given us. We send it to them as soon
-            as the fee is paid, and you will have an answer within {workingDays} working days.
+            {school} will check its record against what you have given us. We send it as soon as you
+            pay, and you will have an answer within {workingDays} working days.
           </p>
 
           <dl className="req-summary">
@@ -674,8 +671,8 @@ export default function RequestPage() {
         <>
           <h1>Pay {money(fee)}</h1>
           <p className="req-lede">
-            Your card details go straight to our payment provider and never reach us. As soon as the
-            payment is done, {school} is sent your request and the {workingDays} working days start.
+            Your card details go straight to our payment provider and never reach us. When the payment
+            is done, {school} has your request and the {workingDays} working days start.
           </p>
           {/* Stripe mounts its own form here. */}
           <div id="payment-form" />
@@ -700,8 +697,8 @@ export default function RequestPage() {
         <>
           <h1>Your request has been sent</h1>
           <p className="req-lede">
-            {school} has your request. They check the record, and when they have confirmed it we issue
-            your credentials and email you a link to collect them.
+            {school} has your request. They check the record, then we email you a link to collect your
+            credentials.
           </p>
           <dl className="req-summary">
             <div>

@@ -333,7 +333,7 @@ export default function IssuePage() {
   const qrCode = current ? (
     <div className="issue-qr">
       {/* eslint-disable-next-line @next/next/no-img-element */}
-      <img src={current.qrDataUrl} alt="QR code for the credential offer" width={240} height={240} />
+      <img src={current.qrDataUrl} alt="QR code to add this to your wallet" width={240} height={240} />
     </div>
   ) : null;
 
@@ -344,7 +344,7 @@ export default function IssuePage() {
         <img className="issue-mark" src="/quals-mark.svg" alt="" width={34} height={34} />
         <div className="issue-brand">
           <b>Quals</b>
-          <span>Verifiable credentials</span>
+          <span>Digital credentials</span>
         </div>
         {preview?.institution && (
           <div className="issue-from">

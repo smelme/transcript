@@ -323,16 +323,12 @@
 .req-error {
   border: 1px solid var(--err);
   border-radius: var(--radius-sm);
-  background: #fff5f5;
+  background: var(--err-soft);
   color: var(--err);
   font-size: 13px;
   line-height: 1.6;
   padding: 12px 14px;
   margin: 0 0 16px;
-}
-
-[data-theme='dark'] .req-error {
-  background: #2a1414;
 }
 
 @media (max-width: 560px) {

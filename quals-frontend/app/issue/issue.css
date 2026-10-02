@@ -176,8 +176,8 @@
 .issue-error {
   margin-top: 20px;
   padding: 12px 14px;
-  border: 1px solid #f0c2c2;
-  background: #fdecea;
+  border: 1px solid var(--err);
+  background: var(--err-soft);
   border-radius: var(--radius-sm);
   font-size: 13px;
 }

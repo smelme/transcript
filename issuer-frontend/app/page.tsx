@@ -9,9 +9,8 @@ export default function Home() {
           <span className="eyebrow">Smart Academy · Digital credentials</span>
           <h1>Your qualifications, verifiable anywhere.</h1>
           <p className="lede">
-            Smart Academy issues your degree and academic transcript as a digital credential that
-            lives in your own wallet. Prove your qualifications to employers and institutions
-            without waiting for paper documents, and share only what you choose.
+            Your degree and your academic transcript, issued as digital credentials that live in
+            your own wallet. Show an employer in seconds, and share only what you choose.
           </p>
           <div className="hero-actions">
             <Link href="/get-credentials" className="btn btn-primary">
@@ -29,8 +28,8 @@ export default function Home() {
           <div className="section-head">
             <h2>What you receive</h2>
             <p>
-              One wallet, your whole academic record. Each credential is cryptographically signed by
-              Smart Academy and can be verified by anyone you share it with.
+              Your whole academic record, held by you. Every credential is signed by Smart Academy,
+              so anybody you show it to can check it is genuine.
             </p>
           </div>
           <div className="feature-grid">
@@ -38,24 +37,24 @@ export default function Home() {
               <div className="feature-rule" aria-hidden="true" />
               <h3>Qualification certificate</h3>
               <p>
-                Your degree, programme and graduation date, issued as a tamper-evident credential
-                that employers can verify instantly.
+                Your degree, your programme and the date you graduated — enough for an employer to
+                check in seconds.
               </p>
             </article>
             <article className="feature">
               <div className="feature-rule" aria-hidden="true" />
               <h3>Academic transcript</h3>
               <p>
-                Your completed modules, credit totals and overall result, presented in the same
-                verifiable format as the certificate.
+                Every module you completed, your credit totals and your overall result, in the same
+                form as the certificate.
               </p>
             </article>
             <article className="feature">
               <div className="feature-rule" aria-hidden="true" />
-              <h3>Selective sharing</h3>
+              <h3>You choose what to show</h3>
               <p>
-                Share your name only, your qualification, or the full transcript. You decide exactly
-                which fields are disclosed each time.
+                Your name on its own, your qualification, or the full transcript. You decide each
+                time, and nothing else goes with it.
               </p>
             </article>
           </div>
@@ -66,27 +65,22 @@ export default function Home() {
         <div className="container">
           <div className="section-head">
             <h2>How it works</h2>
-            <p>Three steps, once. After that your credentials stay with you.</p>
+            <p>Three steps, once. After that they are yours.</p>
           </div>
           <div className="steps">
             <div className="step">
               <h3>Request your credentials</h3>
-              <p>
-                Enter the email address Smart Academy holds for you. We will send you a secure link.
-              </p>
+              <p>Enter the email address Smart Academy holds for you. We send you a link.</p>
             </div>
             <div className="step">
               <h3>Sign in and choose</h3>
-              <p>
-                Open the link, confirm it is you with a one-time code, and review the credentials
-                that are ready.
-              </p>
+              <p>Open the link, confirm it is you with a code, and review what is ready.</p>
             </div>
             <div className="step">
               <h3>Add to your wallet</h3>
               <p>
-                Scan the code with the Quals wallet app. Your credentials are stored on your device,
-                protected by your biometrics.
+                Scan the code with the Quals wallet app. They stay on your device, unlocked by your
+                fingerprint or your face.
               </p>
             </div>
           </div>
