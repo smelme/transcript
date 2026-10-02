@@ -68,9 +68,18 @@ wizard, the collecting screen.
 
 ## The mark
 
-One mark, drawn once and copied nowhere but the app: **a white Q whose tail is a hand, in gold**,
-redrawn on 3 October 2026 from the logo supplied by the product owner. It replaces a Q with a plain
-tail, which had itself replaced a green shield — both of them marks the app did not have.
+One mark, drawn once and copied nowhere but the site: **a tall white Q with a thin top and bottom,
+whose gold tail leaves its bowl and ends in a hand**, traced on 3 October 2026 from the artwork the
+product owner supplied. It replaces a Q with a plain tail, which had itself replaced a green shield —
+both of them marks the app did not have.
+
+The tracing was measured, not eyeballed. The supplied image is 115 by 121 pixels, so its geometry was
+read out of it: the ink's bounds, the ring's width row by row, the tail's thickness along its length,
+and where the fist and the four fingers sit. Two consequences show up in the file. The ring is a filled
+path with its counter cut out by `evenodd`, because the artwork's ring is thick on the sides and thin
+at the top and bottom and no single stroke width draws that. The tail is two strokes, thicker where it
+leaves the bowl, with the wrist turning down into the fist — not one bar, which is what the first
+attempt looked like next to the artwork.
 
 | Where | What |
 | --- | --- |
@@ -85,15 +94,17 @@ surface is black. The launcher icon supplies its own black, as an adaptive icon 
 logo and its five per-density launcher rasters are gone: minSdk is 26, so the vector foreground is what
 every device in support uses, and a raster cannot be redrawn by reading the repository.
 
-**The artwork leans in the grid it was drawn on** — its ink sits about 4.8 units right and 1.8 down of
-the 64×64 box centre — and every surface centres the box, not the ink, so the mark read as shifted on
-the phone while the layout was already correct. The correction belongs in the drawing rather than in a
-layout, because a per-surface nudge has to be repeated on every new surface and is wrong the moment
-the layout changes. All five copies therefore wrap the paths in a group that centres the ink:
-`translate(-3.51 -0.61) scale(0.9642)` as an SVG group, the equivalent `<group>` in the two drawables,
-and the launcher's foreground nests that wrap inside the group which scales the mark into the adaptive
-icon's safe zone. Its outer scale was retuned (1.19 → 1.207) so the home screen shows the same sized
-mark as before; the ink lands on the icon's centre line at 54 of 108.
+**The drawing is kept in the artwork's own coordinates** — 115 by 121 of them — inside a 120 box, with
+one group lifting it half a unit so the ink is exactly centred. That half unit is the whole of the
+centring work, and it matters because the supplied drawing sits half a pixel left and half a pixel
+above the middle of its own frame while every surface centres the box and not the ink: an uncentred
+mark then reads as a layout fault that no layout change can fix. Keeping the artwork's coordinates
+rather than recentring the paths also means the file can be checked against the artwork by overlaying
+the two, which is how the first attempt's mistakes were found.
+
+The launcher icon is the exception: its foreground scales the mark's box to 73 of the adaptive icon's
+108 grid and centres it there, which leaves the ink at 67 units — inside the inner 72 a launcher keeps,
+and on the icon's centre line rather than off to one side.
 
 **Two golds, deliberately.** The logo's gold is `#c9a227` — the brass in the supplied artwork. The
 interaction gold (`--brand`) is `#ffc400`, which comes from the app's own theme and is what buttons,

@@ -1,27 +1,27 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="Quals">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 120" role="img" aria-label="Quals">
   <!--
-    The Quals mark: a white Q whose tail is a hand, in gold.
+    The Quals mark: a tall white Q with a thin top and bottom, whose gold tail comes out of the bowl
+    and ends in a hand.
 
-    Redrawn from the logo supplied on 3 October 2026, which replaces the Q-with-a-plain-tail this file
-    carried before. It is transparent on purpose: the field belongs to the surface, and the app draws
-    it on pure black.
+    Traced from the artwork the product owner supplied on 3 October 2026, which replaces the
+    Q-with-a-plain-tail this file carried before. It is transparent on purpose: the field belongs to
+    the surface, and the app draws it on pure black.
   -->
-  <g transform="translate(-3.51 -0.61) scale(0.9642)">
-    <ellipse cx="30" cy="26" rx="13.5" ry="18" fill="none" stroke="#ffffff" stroke-width="8.5" />
+  <g transform="translate(0.5 -0.5)">
+    <!-- The Q, with its counter cut out of the ring rather than stroked: the artwork's ring is thick
+         on the sides and thin at the top and bottom, which a single stroke width cannot draw. -->
     <path
-      d="M23.5 37 C31 43 37 37.5 44 43 C48 46.5 50 49 51.5 51.5"
-      fill="none"
-      stroke="#c9a227"
-      stroke-width="5.4"
-      stroke-linecap="round"
+      fill="#ffffff"
+      fill-rule="evenodd"
+      d="M51.5,4.5 C76,4.5 97,28 97,59 C97,90 78,113.5 51.5,113.5 C25,113.5 6,90 6,59 C6,28 27,4.5 51.5,4.5 Z M51.5,15 C63,16 76,36 76,60 C76,80 74,94 66,101 C60,105 49,105 42,99.5 C31,92 27,78 27,60 C27,38 40,16 51.5,15 Z"
     />
-    <circle cx="51.5" cy="51.5" r="2.9" fill="#c9a227" />
-    <path
-      d="M51.5 51.5 L44.5 60.5 M51.5 51.5 L50.5 62.5 M51.5 51.5 L56 61.5 M51.5 51.5 L60 57"
-      fill="none"
-      stroke="#c9a227"
-      stroke-width="2.8"
-      stroke-linecap="round"
-    />
+    <!-- The tail, thicker where it leaves the bowl, and the wrist turning down into the hand. -->
+    <path d="M52,91.5 C56.5,93.5 60,95 63.5,97" fill="none" stroke="#c9a227" stroke-width="9.5" stroke-linecap="round" />
+    <path d="M60,95.5 C66,100 69,102 72,104" fill="none" stroke="#c9a227" stroke-width="6.5" stroke-linecap="round" />
+    <path d="M75,104 C79,107 84,110 88,112" fill="none" stroke="#c9a227" stroke-width="12" stroke-linecap="round" />
+    <!-- The fist, and the four fingers standing out of it. -->
+    <ellipse cx="103" cy="98" rx="7" ry="8.5" fill="#c9a227" />
+    <ellipse cx="101" cy="107" rx="6" ry="4" fill="#c9a227" />
+    <path d="M98,93 L95.5,80.5 M101.5,93 L101,79 M106,93 L106.5,79 M110,93 L112.5,81" fill="none" stroke="#c9a227" stroke-width="2.6" stroke-linecap="round" />
   </g>
 </svg>

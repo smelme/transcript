@@ -69,13 +69,18 @@ whose tail is a hand, in gold. The site serves it as `quals-mark.svg`, the porta
 the app carries the same geometry as a vector drawable in place of the raster logo it used to load — so
 the mark is readable and redrawable from the repository rather than a binary nobody can edit.
 
-The supplied artwork leans in the grid it was drawn on: its ink sits about 4.8 units right and 1.8
-down of the 64×64 box centre. Every surface centres the box rather than the ink, which is why the mark
-looked off-centre on the phone while the layout was already correct. The correction is now in the
-drawing — one wrapping group per copy, five in total, with the launcher nesting it inside the group
-that scales the mark into the adaptive icon's safe zone — so the app, the header, the tab icon and the
-home screen agree without each layout growing a nudge of its own. The launcher's outer scale was
-retuned from 1.19 to 1.207 so the wrap's 0.9642 leaves the mark the same size on the home screen.
+**The centring, and a better drawing.** The first pass at that artwork was drawn by eye, and it showed:
+the mark looked off-centre on the phone while the layout was already correct, because the drawing sat
+about five units right and two down of the middle of its own box, and every surface centres the box
+rather than the ink. The product owner then supplied a better version, and this one was traced from its
+pixels instead — bounds, the ring's width row by row, the tail's thickness, where the fist and fingers
+sit — so the vector can be checked against the artwork by overlaying the two. It is kept in the
+artwork's own 115 by 121 coordinates inside a 120 box, and a single half-unit group centres the ink.
+The ring became a filled path with its counter cut out by `evenodd`, because the artwork's ring is
+thick on the sides and thin at top and bottom, and the tail became two strokes with the wrist turning
+down into the fist, because one bar of one width did not look like the drawing. The launcher icon is
+the one place that scales rather than copies: it fits the mark to 67 of the adaptive icon's 108 grid,
+on the icon's own centre line.
 
 ## Verification
 
