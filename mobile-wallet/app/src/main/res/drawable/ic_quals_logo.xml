@@ -1,13 +1,39 @@
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
-    android:width="108dp"
-    android:height="108dp"
+    android:width="64dp"
+    android:height="64dp"
     android:viewportWidth="64"
     android:viewportHeight="64">
-    <!-- Quals shield: green field with white check mark -->
+    <!--
+        The Quals mark: a white Q whose tail is a hand, in gold.
+
+        Redrawn from the logo supplied on 3 October 2026, which replaces the green shield that stood
+        here. The same geometry is served by the web as quals-mark.svg, so the app and the site cannot
+        drift apart: change one, change the other.
+    -->
+
+    <!-- The Q: a white ring. Two arcs, because a vector drawable has no ellipse element. -->
     <path
-        android:fillColor="#1B9C5B"
-        android:pathData="M32,4 L56,12 L56,28 C56,46 46,56 32,60 C18,56 8,46 8,28 L8,12 Z" />
+        android:fillColor="#00000000"
+        android:strokeColor="#FFFFFF"
+        android:strokeWidth="8.5"
+        android:pathData="M16.5,26 a13.5,18 0 1,0 27,0 a13.5,18 0 1,0 -27,0" />
+
+    <!-- The tail, swinging out of the bowl. -->
     <path
-        android:fillColor="#FFFFFF"
-        android:pathData="M26,32 L31,37 L40,26 L43,29 L31,42 L23,35 Z" />
+        android:fillColor="#00000000"
+        android:strokeColor="#C9A227"
+        android:strokeWidth="5.4"
+        android:strokeLineCap="round"
+        android:pathData="M23.5,37 C31,43 37,37.5 44,43 C48,46.5 50,49 51.5,51.5" />
+
+    <!-- The palm, and four fingers below it. -->
+    <path
+        android:fillColor="#C9A227"
+        android:pathData="M48.6,51.5 a2.9,2.9 0 1,0 5.8,0 a2.9,2.9 0 1,0 -5.8,0" />
+    <path
+        android:fillColor="#00000000"
+        android:strokeColor="#C9A227"
+        android:strokeWidth="2.8"
+        android:strokeLineCap="round"
+        android:pathData="M51.5,51.5 L44.5,60.5 M51.5,51.5 L50.5,62.5 M51.5,51.5 L56,61.5 M51.5,51.5 L60,57" />
 </vector>

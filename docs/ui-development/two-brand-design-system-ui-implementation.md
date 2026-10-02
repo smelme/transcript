@@ -68,11 +68,26 @@ wizard, the collecting screen.
 
 ## The mark
 
-One mark, from one source. `quals-mark.svg` is the app's own `quals_logo` — **a white Q with a gold
-tail**, which the app's code describes as "the Quals brand mark (white Q)" — and the same file is served
-by the public site and the portal, so the tab, the app and the site cannot drift apart. It is a
-transparent mark rather than a tile: the field belongs to the surface, exactly as the app treats it.
-The tab icon is the launcher icon, which is the same Q on black with the padding an icon needs.
+One mark, drawn once and copied nowhere but the app: **a white Q whose tail is a hand, in gold**,
+redrawn on 3 October 2026 from the logo supplied by the product owner. It replaces a Q with a plain
+tail, which had itself replaced a green shield — both of them marks the app did not have.
+
+| Where | What |
+| --- | --- |
+| `quals-frontend/public/quals-mark.svg` | the site's mark, transparent |
+| `quals-frontend/app/icon.svg` | the tab icon: the same mark on a black tile |
+| `quals-portal/app/components/quals-mark.tsx` | the portal's mark, inline — that deployment serves no static files |
+| `mobile-wallet/.../res/drawable/ic_quals_logo.xml` | the app's mark, the same geometry as a vector drawable |
+| `mobile-wallet/.../res/drawable/ic_launcher_foreground.xml` | the launcher icon's foreground, on the app's black |
+
+The web mark is transparent rather than tiled because the field belongs to the surface, and every Quals
+surface is black. The launcher icon supplies its own black, as an adaptive icon must. The app's raster
+logo and its five per-density launcher rasters are gone: minSdk is 26, so the vector foreground is what
+every device in support uses, and a raster cannot be redrawn by reading the repository.
+
+**Two golds, deliberately.** The logo's gold is `#c9a227` — the brass in the supplied artwork. The
+interaction gold (`--brand`) is `#ffc400`, which comes from the app's own theme and is what buttons,
+focus rings and links use. If they should be one colour, the logo's is the one to move, not the app's.
 
 ## Where the colours come from
 

@@ -1,5 +1,5 @@
 /**
- * The Quals mark: the app's white Q with a gold tail.
+ * The Quals mark: a white Q whose tail is a hand, in gold.
  *
  * Inline SVG rather than a file in `public/`, for two measured reasons rather than taste. This
  * deployment does not serve static files at all - every unknown path comes back as the app itself,
@@ -8,7 +8,7 @@
  * behind the old one. Six lines of SVG cost less than either problem.
  *
  * The Q takes its colour from its surroundings so it reads on the black sidebar the way the app draws
- * it, and the tail is the brand gold, always.
+ * it, and the tail and the hand are the gold of the logo, always.
  */
 export default function QualsMark({ size = 30 }: { size?: number }) {
   return (
@@ -20,15 +20,21 @@ export default function QualsMark({ size = 30 }: { size?: number }) {
       role="img"
       aria-label="Quals"
     >
-      <circle cx="31" cy="28" r="17" fill="none" stroke="currentColor" strokeWidth={8.5} />
-      <rect
-        x="33"
-        y="38"
-        width="26"
-        height="9"
-        rx="4.5"
-        transform="rotate(45 46 42.5)"
-        fill="#ffc400"
+      <ellipse cx="30" cy="26" rx="13.5" ry="18" fill="none" stroke="currentColor" strokeWidth={8.5} />
+      <path
+        d="M23.5 37 C31 43 37 37.5 44 43 C48 46.5 50 49 51.5 51.5"
+        fill="none"
+        stroke="#c9a227"
+        strokeWidth={5.4}
+        strokeLinecap="round"
+      />
+      <circle cx="51.5" cy="51.5" r={2.9} fill="#c9a227" />
+      <path
+        d="M51.5 51.5 L44.5 60.5 M51.5 51.5 L50.5 62.5 M51.5 51.5 L56 61.5 M51.5 51.5 L60 57"
+        fill="none"
+        stroke="#c9a227"
+        strokeWidth={2.8}
+        strokeLinecap="round"
       />
     </svg>
   );

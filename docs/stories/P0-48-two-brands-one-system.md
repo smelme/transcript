@@ -64,6 +64,11 @@ Two things the black field broke, found by reading the stylesheet rather than by
 browser-drawn placeholders are the browser's own grey and were unreadable on black, and every checkbox
 and radio took its tick from the ink token — black on black on this brand. Both are gold now.
 
+**Then the mark itself was replaced again, with the artwork the product owner supplied:** a white Q
+whose tail is a hand, in gold. The site serves it as `quals-mark.svg`, the portal draws it inline, and
+the app carries the same geometry as a vector drawable in place of the raster logo it used to load — so
+the mark is readable and redrawable from the repository rather than a binary nobody can edit.
+
 ## Verification
 
 - `npx next build` clean in all three apps.

@@ -1,20 +1,27 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="Quals">
   <!--
-    The browser tab icon: the app's launcher icon, which is this Q on a black field - the app's own
-    window background colour. A tab is small and sits among other tabs, so the mark gets the field
-    there exactly as the app gives it one.
+    The browser tab icon: the same mark on the black the app opens on. A tab is small and sits among
+    other tabs, so the mark gets the field there exactly as the app gives it one.
   -->
   <rect width="64" height="64" rx="14" fill="#000000" />
-  <g transform="translate(32 32) scale(0.62) translate(-32 -32)">
-    <circle cx="31" cy="28" r="17" fill="none" stroke="#ffffff" stroke-width="8.5" />
-    <rect
-      x="33"
-      y="38"
-      width="26"
-      height="9"
-      rx="4.5"
-      transform="rotate(45 46 42.5)"
-      fill="#ffc400"
+  <!-- Centred on the mark's own bounding box rather than the file's 64 grid, because the mark leans
+       up and to the left of that grid. -->
+  <g transform="translate(-0.3 3.2) scale(0.87)">
+    <ellipse cx="30" cy="26" rx="13.5" ry="18" fill="none" stroke="#ffffff" stroke-width="8.5" />
+    <path
+      d="M23.5 37 C31 43 37 37.5 44 43 C48 46.5 50 49 51.5 51.5"
+      fill="none"
+      stroke="#c9a227"
+      stroke-width="5.4"
+      stroke-linecap="round"
+    />
+    <circle cx="51.5" cy="51.5" r="2.9" fill="#c9a227" />
+    <path
+      d="M51.5 51.5 L44.5 60.5 M51.5 51.5 L50.5 62.5 M51.5 51.5 L56 61.5 M51.5 51.5 L60 57"
+      fill="none"
+      stroke="#c9a227"
+      stroke-width="2.8"
+      stroke-linecap="round"
     />
   </g>
 </svg>
