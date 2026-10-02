@@ -1,18 +1,12 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="Quals">
-  <defs>
-    <linearGradient id="quals-mark" x1="0" y1="0" x2="1" y2="1">
-      <stop offset="0" stop-color="#ffc400" />
-      <stop offset="1" stop-color="#1b9c5b" />
-    </linearGradient>
-  </defs>
-  <rect width="64" height="64" rx="14" fill="url(#quals-mark)" />
-  <text
-    x="32"
-    y="45"
-    text-anchor="middle"
-    font-family="Helvetica, Arial, sans-serif"
-    font-size="34"
-    font-weight="700"
-    fill="#111111"
-  >Q</text>
+  <!--
+    The Quals shield: the same mark the wallet app wears, from the same geometry, so the site and the
+    app are recognisably one product rather than two that happen to share a name.
+
+    Before this the site carried a yellow-to-green square with a Q in it - a shape that appeared
+    nowhere in the app, in a colour that belonged to neither. Taken from the wallet's own
+    ic_quals_logo.xml, so redrawing it in the app now means redrawing it here.
+  -->
+  <path fill="#1b9c5b" d="M32 4 L56 12 L56 28 C56 46 46 56 32 60 C18 56 8 46 8 28 L8 12 Z" />
+  <path fill="#ffffff" d="M26 32 L31 37 L40 26 L43 29 L31 42 L23 35 Z" />
 </svg>

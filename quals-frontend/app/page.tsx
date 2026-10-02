@@ -16,6 +16,9 @@ export default function HomePage() {
     <>
       <section className="hero">
         <div className="container">
+          {/* The wallet's own mark, so the first thing on the page is the thing in the app. */}
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img className="hero-mark" src="/quals-mark.svg" alt="" width={52} height={52} />
           <span className="eyebrow">Quals · Digital credentials</span>
           <h1>Open the document somebody shared with you.</h1>
           <p className="lede">

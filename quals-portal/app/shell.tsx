@@ -54,9 +54,8 @@ export default function Shell({ children }: { children: React.ReactNode }) {
         </a>
         <aside className="sidebar">
           <div className="logo">
-            <span className="logo-mark" aria-hidden="true">
-              Q
-            </span>
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img className="logo-mark" src="/quals-mark.svg" alt="" width={30} height={30} />
             <span>
               Quals
               <small>Management portal</small>

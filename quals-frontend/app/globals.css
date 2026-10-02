@@ -16,19 +16,34 @@
   --brand-soft: #fff8e1;
   --brand-ring: rgba(255, 196, 0, 0.28);
 
-  --ink: #0a0a0a;
-  --ink-soft: #17181c;
+  /*
+   * The wallet's second colour.
+   *
+   * The app is gold first and green second: gold is what it acts with, green is what it wears on its
+   * shield and what it marks a confirmed record with. The site carries the same pair in the same
+   * order, so a green tick means the same thing in both places. Without it the site was gold on grey,
+   * which was a brand the app did not have.
+   */
+  --brand-alt: #1b9c5b;
+  --brand-alt-dark: #0e6b3d;
+  --brand-alt-soft: #e2f7ec;
+
+  /* The app's black, which is very slightly green. Using a neutral black here would have left the
+     two products with blacks that almost match, which is worse than either. */
+  --ink: #0b0f0c;
+  --ink-soft: #171d19;
   --on-ink: #ffffff;
   /* Links are ink with the brand under them: yellow cannot be read as text, so the underline
      carries the colour instead of the words. */
   --link: #0a0a0a;
   --link-rule: var(--brand);
 
-  /* Status colours are not brand colours: green means confirmed and red means refused on every
-     site, whichever institution is asking. */
-  --ok: #146c2e;
-  --ok-soft: #eaf7ee;
-  --ok-ink: #0f4f23;
+  /* Status colours are not brand colours: green means confirmed and red means refused on every site,
+     whichever institution is asking. Confirmed is the app's own green, so a record that has been
+     checked looks the same in the wallet as it does here. */
+  --ok: #0e6b3d;
+  --ok-soft: #e2f7ec;
+  --ok-ink: #0b3d24;
   --warn: #8a5a00;
   --err: #b42318;
   --err-soft: #fdecea;
@@ -62,13 +77,16 @@
   --brand-dark: #d9a300;
   --brand-soft: #2a2411;
   --brand-ring: rgba(255, 196, 0, 0.32);
+  --brand-alt: #5bd496;
+  --brand-alt-dark: #1b9c5b;
+  --brand-alt-soft: #123f2a;
   --ink: #000000;
-  --ink-soft: #141416;
+  --ink-soft: #101612;
   --on-ink: #fafafa;
   --link: #fafafa;
   --link-rule: var(--brand);
-  --ok: #7ee2a8;
-  --ok-soft: #10251a;
+  --ok: #5bd496;
+  --ok-soft: #123f2a;
   --ok-ink: #a7e0b8;
   --warn: #f0c46a;
   --err: #f3b8bc;
@@ -495,6 +513,13 @@ hr {
   text-transform: uppercase;
   color: var(--brand);
   margin-bottom: 18px;
+}
+
+.hero-mark {
+  display: block;
+  width: 52px;
+  height: 52px;
+  margin-bottom: 20px;
 }
 
 .hero-actions {

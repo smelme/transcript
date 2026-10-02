@@ -23,8 +23,9 @@
   --border: #e5e5e7;
   --border-strong: #d2d2d6;
 
-  --ok: #146c2e;
-  --ok-bg: #eaf7ee;
+/* The wallet's green, so a confirmed record is the same colour in the app, the site and here. */
+  --ok: #0e6b3d;
+  --ok-bg: #e2f7ec;
   --warn: #8a5a00;
   --warn-bg: #fff6e5;
   --err: #b42318;
@@ -107,18 +108,12 @@ h3 {
 }
 
 .sidebar .logo-mark {
+  /* The wallet's shield, the same mark the app and the public site wear. It needs no tile here: the
+     sidebar is already black, which is the field the app gives it. */
   width: 30px;
   height: 30px;
-  border-radius: 9px;
-  /* One mark in one colour. This used to fade from the brand into a green that belonged to no
-     brand at all. */
-  background: var(--brand);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: var(--on-brand);
-  font-size: 14px;
-  font-weight: 800;
+  flex: 0 0 auto;
+  display: block;
 }
 
 .sidebar .logo small {

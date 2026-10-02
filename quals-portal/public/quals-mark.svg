@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="Quals">
+  <!--
+    The Quals shield, taken from the wallet app's own ic_quals_logo.xml. The same file is served by
+    the public site; keeping a copy here means the portal and the site cannot drift apart without
+    somebody noticing both.
+  -->
+  <path fill="#1b9c5b" d="M32 4 L56 12 L56 28 C56 46 46 56 32 60 C18 56 8 46 8 28 L8 12 Z" />
+  <path fill="#ffffff" d="M26 32 L31 37 L40 26 L43 29 L31 42 L23 35 Z" />
+</svg>
