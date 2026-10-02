@@ -15,6 +15,7 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import { chooserCopy } from '../lib/issue-copy.js';
+import { looksLikePhone } from '../lib/device.js';
 import './issue.css';
 
 type Preview = {
@@ -107,6 +108,10 @@ export default function IssuePage() {
   const [settled, setSettled] = useState<Settled | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [stage, setStage] = useState<'loading' | 'signin' | 'code' | 'ready' | 'collecting' | 'done'>('loading');
+  // Where the wallet is decides what the collecting screen leads with (P0-47): the wallet this phone
+  // is holding, or a code for the wallet that is somewhere else.
+  const [onPhone, setOnPhone] = useState(false);
+  const [showQrCode, setShowQrCode] = useState(false);
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
@@ -115,6 +120,19 @@ export default function IssuePage() {
     // An institution may redirect somebody here with the address it holds, instead of sending a
     // link. That is the same journey, so it works here rather than on a second page.
     setEmailFromLink(params.get('email') || '');
+  }, []);
+
+  // Which device this is, read after mount: the answer only exists in the browser, and arriving at it
+  // while rendering would be a guess the server and the browser could disagree about.
+  useEffect(() => {
+    const agent = navigator as Navigator & { userAgentData?: { mobile?: boolean } };
+    setOnPhone(
+      looksLikePhone({
+        userAgent: agent.userAgent,
+        coarsePointer: window.matchMedia('(pointer: coarse)').matches,
+        mobile: agent.userAgentData?.mobile ?? null,
+      }),
+    );
   }, []);
 
   const loadPreview = useCallback(async () => {
@@ -310,6 +328,15 @@ export default function IssuePage() {
     return parts.join(' · ');
   };
 
+  // The code is the same thing on either device; only what surrounds it changes. Written once here so
+  // the two branches cannot drift apart.
+  const qrCode = current ? (
+    <div className="issue-qr">
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img src={current.qrDataUrl} alt="QR code for the credential offer" width={240} height={240} />
+    </div>
+  ) : null;
+
   return (
     <div className="issue">
       <header className="issue-head">
@@ -498,27 +525,54 @@ export default function IssuePage() {
             Credential {offerIndex + 1} of {offers.length}
           </span>
           <h1>Add it to your wallet</h1>
-          <p className="issue-lede">
-            Scan this with your Quals wallet, or open it directly if the wallet is on this device. The
-            code expires quickly, so use it now.
-          </p>
-          <div className="issue-qr">
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img
-              src={current.qrDataUrl}
-              alt="QR code for the credential offer"
-              width={240}
-              height={240}
-            />
-          </div>
+
+          {/*
+            Where the wallet is decides what this screen leads with (P0-47). A phone that already has
+            it should be one tap; a desktop has nothing to tap, so it is given something to scan; and a
+            phone whose wallet is on another phone keeps the code one tap away rather than buried.
+          */}
+          {onPhone && current.appLinkUrl ? (
+            <>
+              <p className="issue-lede">
+                Add it to the Quals wallet on this phone. The code expires quickly, so open it now.
+              </p>
+              <div className="issue-actions">
+                <a className="btn btn-primary" href={current.appLinkUrl}>
+                  Add to wallet
+                </a>
+                <button className="btn" onClick={() => setShowQrCode((shown) => !shown)}>
+                  {showQrCode ? 'Hide the QR code' : 'Show QR code'}
+                </button>
+              </div>
+              {showQrCode && (
+                <>
+                  {qrCode}
+                  <p className="issue-note">
+                    Wallet on a different phone? Scan this with that one instead.
+                  </p>
+                </>
+              )}
+            </>
+          ) : (
+            <>
+              <p className="issue-lede">
+                Scan this with the Quals wallet on your phone. The code expires quickly, so use it now.
+              </p>
+              {qrCode}
+            </>
+          )}
+
           <div className="issue-actions">
-            {current.appLinkUrl && (
-              <a className="btn btn-primary" href={current.appLinkUrl}>
-                Open in the Quals wallet
-              </a>
-            )}
             {offerIndex + 1 < offers.length ? (
-              <button className="btn" onClick={() => setOfferIndex(offerIndex + 1)}>
+              <button
+                className="btn"
+                onClick={() => {
+                  setOfferIndex(offerIndex + 1);
+                  // A new credential starts with its own code hidden: the open one was scanned or
+                  // opened already, and leaving it on screen invites the wrong one being used.
+                  setShowQrCode(false);
+                }}
+              >
                 Next credential ({offerIndex + 2} of {offers.length})
               </button>
             ) : (
