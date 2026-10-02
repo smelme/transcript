@@ -4,7 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { PageHeader, formatDate, shortId } from '../components/ui';
 import { isPlatformAdmin, useAdmin } from '../components/session';
 import {
-  CSV_TEMPLATE,
+  csvExampleFor,
   decideRequest,
   getRequest,
   issueRequest,
@@ -158,13 +158,16 @@ export default function RequestsPage() {
         setRefusal({ error: result.error, details: result.details });
         return;
       }
-      setNotice(
-        `Stored ${result.rowCount} credential${result.rowCount === 1 ? '' : 's'}: ${result.credentials
-          .map((credential) => credential.label)
-          .join(', ')}.`,
-      );
+      // Reload first, then say so: open() resets this panel as it re-reads the case, and a notice put
+      // up before it is a notice nobody sees. What the upload unlocked - the stored row, the preview
+      // and the issue step - is on the page by the time the operator reads the line.
       await open(selected.requestId);
       await load();
+      const what = result.credentials.map((credential) => credential.label).join(', ') || 'the record';
+      setNotice(
+        `Uploaded. ${result.rowCount} credential${result.rowCount === 1 ? '' : 's'} stored: ${what}.`
+          + ' Preview the documents below, then issue.',
+      );
     } catch (e) {
       setError((e as Error).message);
     } finally {
@@ -344,6 +347,29 @@ export default function RequestsPage() {
                     <th>Asked for</th>
                     <td>{wantedLabel(selected.wanted)}</td>
                   </tr>
+                  {/* What the school matches the record by hand with: the number, the student id when
+                      the applicant knew it, and the date of birth the document confirmed (P0-45). */}
+                  <tr>
+                    <th>Social security number</th>
+                    <td className="mono">{selected.applicantSsn || '—'}</td>
+                  </tr>
+                  <tr>
+                    <th>Student id</th>
+                    <td className="mono">{selected.applicantStudentId || '—'}</td>
+                  </tr>
+                  <tr>
+                    <th>Date of birth</th>
+                    <td>
+                      {selected.extract?.birthDate ? (
+                        <>
+                          {String(selected.extract.birthDate)}{' '}
+                          <span className="muted">from the document</span>
+                        </>
+                      ) : (
+                        <span className="muted">Not read from the document</span>
+                      )}
+                    </td>
+                  </tr>
                   <tr>
                     <th>Identity</th>
                     <td>
@@ -506,8 +532,7 @@ export default function RequestsPage() {
                         type="button"
                         className="btn btn-secondary btn-sm"
                         onClick={() => {
-                          setCsv(CSV_TEMPLATE);
-                          setFilename('example.csv');
+                          setCsv(csvExampleFor(selected.applicantEmail, selected.institution));
                         }}
                       >
                         Use the example
@@ -522,6 +547,10 @@ export default function RequestsPage() {
                       placeholder="email,full_name,student_id,credential,..."
                       style={{ width: '100%' }}
                     />
+                    <div className="muted" style={{ marginTop: 6 }}>
+                      The email column must be {selected.applicantEmail}. The record belongs to the
+                      person who asked for it.
+                    </div>
                     <div className="toolbar">
                       <button type="button" className="btn btn-primary" onClick={submitPayload} disabled={busy || csv.trim() === ''}>
                         {busy ? 'Uploading…' : 'Upload the record'}
@@ -541,7 +570,6 @@ export default function RequestsPage() {
                             <li key={item}>{item}</li>
                           ))}
                         </ul>
-                        <span className="muted">Nothing was stored, so the request is where it was.</span>
                       </div>
                     )}
                   </>

@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
 import Nav from './nav';
+import QualsMark from './components/quals-mark';
 import { PageHeader } from './components/ui';
 import {
   SessionContext,
@@ -54,9 +55,7 @@ export default function Shell({ children }: { children: React.ReactNode }) {
         </a>
         <aside className="sidebar">
           <div className="logo">
-            <span className="logo-mark" aria-hidden="true">
-              Q
-            </span>
+            <QualsMark size={30} />
             <span>
               Quals
               <small>Management portal</small>

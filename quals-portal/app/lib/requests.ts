@@ -52,6 +52,9 @@ export interface CredentialRequest {
 
 /** One case, with what a decision needs. */
 export interface RequestDetail extends CredentialRequest {
+  /** What the applicant is matched to a record by hand with (P0-45). */
+  applicantSsn?: string | null;
+  applicantStudentId?: string | null;
   extract: Record<string, unknown> | null;
   identitySummary: Record<string, unknown> | null;
   canDecide: boolean;
@@ -131,15 +134,26 @@ export async function uploadRequestPayload(
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(body),
   });
-  const data = await res.json().catch(() => ({}));
+  const data = (await res.json().catch(() => ({}))) as {
+    error?: string;
+    details?: { errors?: string[]; rows?: Array<{ line: number; errors: string[] }> };
+    rowCount?: number;
+    credentials?: Array<{ kind: string; label: string; title: string }>;
+  };
   if (!res.ok) {
-    return {
-      ok: false,
-      error: (data as { error?: string }).error || `Request failed (${res.status})`,
-      details: (data as { details?: { errors?: string[] } }).details,
-    };
+    return { ok: false, error: data.error || `Request failed (${res.status})`, details: data.details };
   }
-  return data as { ok: true; rowCount: number; credentials: Array<{ kind: string; label: string; title: string }> };
+  // Built here rather than read back off the body.
+  //
+  // The issuer answers a stored file with `success` and what it stored, not with an `ok`, so looking
+  // for one meant every successful upload was reported as a refusal - while the file was stored all
+  // along. The one thing this function has to get right is which of the two happened, so it decides
+  // that from the status code and takes only the counts from the response.
+  return {
+    ok: true,
+    rowCount: Number(data.rowCount) || 0,
+    credentials: Array.isArray(data.credentials) ? data.credentials : [],
+  };
 }
 
 export async function previewRequestPayload(requestId: string): Promise<RequestPreview> {
@@ -155,8 +169,55 @@ export async function issueRequest(
   return request(`/admin/requests/${encodeURIComponent(requestId)}/issue`, { method: 'POST' });
 }
 
-/** The columns the file may carry, so the screen can say what is expected rather than only refuse. */
-export const CSV_TEMPLATE = [
-  'email,full_name,student_id,credential,programme_title,degree_level,field_of_study,graduation_date,institution_name,total_credits,courses',
-  'holder@example.com,Ada Lovelace,SA-1001,both,BSc Computer Science,Bachelor,Computer Science,2024-06-30,Smart Academy,3,"[{""courseCode"":""CS101"",""courseName"":""Introduction to Programming"",""credits"":3,""grade"":""A"",""gradePoints"":4}]"',
-].join('\n');
+/**
+ * The columns the file may carry, with one row filled in for this request.
+ *
+ * The address is the request's own, because the issuer checks it: a file is only ever the record of
+ * the person who asked for it. This used to be a hard-coded `holder@example.com`, which meant the
+ * example could only ever be refused - an example that cannot be used is worse than none, because it
+ * looks like a working starting point. Everything else in the row is invented, and is there to be
+ * replaced with the real record.
+ */
+export function csvExampleFor(applicantEmail: string, institution: string): string {
+  const header = [
+    'email',
+    'full_name',
+    'student_id',
+    'credential',
+    'programme_title',
+    'degree_level',
+    'field_of_study',
+    'graduation_date',
+    'institution_name',
+    'total_credits',
+    'courses',
+  ];
+  const example = [
+    applicantEmail,
+    'Ada Lovelace',
+    'SA-1001',
+    'both',
+    'BSc Computer Science',
+    'Bachelor',
+    'Computer Science',
+    '2024-06-30',
+    institution,
+    '3',
+    JSON.stringify([
+      {
+        courseCode: 'CS101',
+        courseName: 'Introduction to Programming',
+        credits: 3,
+        grade: 'A',
+        gradePoints: 4,
+      },
+    ]),
+  ];
+
+  return [header.join(','), example.map(csvField).join(',')].join('\n');
+}
+
+/** One field, quoted only where it has to be — which the courses column always does. */
+function csvField(value: string): string {
+  return /[",\n]/.test(value) ? `"${value.replace(/"/g, '""')}"` : value;
+}

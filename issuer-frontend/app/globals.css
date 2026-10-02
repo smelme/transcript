@@ -1,45 +1,89 @@
+/*
+ * Smart Academy: purple and white.
+ *
+ * The institution's own colours, so a student who lands here from the academy sees the academy and
+ * never a Quals page: Quals is black and yellow, and this is deliberately neither. Purple carries
+ * the brand, the primary action and the accent, and it is dark enough to be read as text as well as
+ * filled, which is what lets a link here be purple rather than underlined ink.
+ */
 :root {
-  --brand: #ffc400;
-  --brand-light: #ffd633;
-  --brand-dark: #e0a800;
-  --ink: #0d0d0d;
-  --ink-soft: #1c1f26;
-  --link: #8a6d00;
-  --ok: #1e7e34;
-  --err: #b02a37;
-  --border: #e8e2cc;
-  --border-strong: #d8d0b4;
-  --bg: #fffdf4;
-  --bg-soft: #fff7d6;
+  --brand: #6d28d9;
+  --brand-light: #7c3aed;
+  --brand-dark: #5b21b6;
+  --brand-soft: #f4f0ff;
+  --brand-ring: rgba(109, 40, 217, 0.26);
+
+  --ink: #1b1233;
+  --ink-soft: #2a2044;
+  --on-ink: #ffffff;
+  --link: #5b21b6;
+  --link-rule: var(--brand);
+
+  /* Status colours are not brand colours: green means confirmed and red means refused on every
+     site, whichever institution is asking. */
+  --ok: #146c2e;
+  --ok-soft: #eaf7ee;
+  --ok-ink: #0f4f23;
+  --warn: #8a5a00;
+  --err: #b42318;
+  --err-soft: #fdecea;
+  --err-ink: #7a1a12;
+
+  --border: #e7e2f5;
+  --border-strong: #d6cdec;
+  --bg: #ffffff;
+  --bg-soft: #f8f6ff;
   --surface: #ffffff;
-  --text: #141414;
-  --muted: #6b6b6b;
-  --on-brand: #111111;
+  --text: #1c1533;
+  --muted: #6a6480;
+  --on-brand: #ffffff;
+
+  /* The hero is the one place with the room for atmosphere, and it is where the purple reads
+     strongest. */
+  --hero-from: #3b1d78;
+  --hero-to: #221047;
+  --hero-glow: rgba(167, 139, 250, 0.22);
+
   --radius-sm: 8px;
   --radius: 12px;
-  --radius-lg: 18px;
-  --shadow-sm: 0 1px 2px rgba(16, 24, 40, 0.06);
-  --shadow: 0 6px 22px rgba(16, 24, 40, 0.08);
+  --radius-lg: 16px;
+  --shadow-sm: 0 1px 2px rgba(27, 18, 51, 0.06);
+  --shadow: 0 1px 3px rgba(27, 18, 51, 0.08), 0 10px 30px rgba(27, 18, 51, 0.06);
   --maxw: 1080px;
 }
 
 [data-theme="dark"] {
-  --brand: #ffc400;
-  --brand-light: #ffd633;
-  --brand-dark: #e0a800;
-  --ink: #000000;
-  --ink-soft: #14161c;
-  --link: #ffc400;
-  --border: #2a2a2a;
-  --border-strong: #3a3a3a;
-  --bg: #0e0e0e;
-  --bg-soft: #1a1a1a;
-  --surface: #171717;
-  --text: #f5f5f5;
-  --muted: #a3a3a3;
-  --on-brand: #111111;
-  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.4);
-  --shadow: 0 6px 22px rgba(0, 0, 0, 0.45);
+  --brand: #a78bfa;
+  --brand-light: #c4b5fd;
+  --brand-dark: #8b5cf6;
+  --brand-soft: #241b3d;
+  --brand-ring: rgba(167, 139, 250, 0.34);
+  --ink: #14101f;
+  --ink-soft: #1e1830;
+  --on-ink: #f7f5ff;
+  --link: #c4b5fd;
+  --link-rule: var(--brand);
+  --ok: #7ee2a8;
+  --ok-soft: #10251a;
+  --ok-ink: #a7e0b8;
+  --warn: #f0c46a;
+  --err: #f3b8bc;
+  --err-soft: #2a1416;
+  --err-ink: #f3b8bc;
+  --border: #2c2440;
+  --border-strong: #3a3054;
+  --bg: #0f0c17;
+  --bg-soft: #171327;
+  --surface: #161226;
+  --text: #f4f2fb;
+  --muted: #a99fc4;
+  /* Dark ink on a light purple: the pair inverts with the theme so the button stays readable. */
+  --on-brand: #1b1233;
+  --hero-from: #241a44;
+  --hero-to: #150f28;
+  --hero-glow: rgba(167, 139, 250, 0.2);
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.45);
+  --shadow: 0 1px 3px rgba(0, 0, 0, 0.45), 0 10px 30px rgba(0, 0, 0, 0.4);
 }
 
 * {
@@ -61,11 +105,21 @@ body {
 
 a {
   color: var(--link);
-  text-decoration: none;
+  text-decoration: underline;
+  text-decoration-thickness: 1px;
+  text-decoration-color: var(--link-rule);
+  text-underline-offset: 3px;
 }
 
 a:hover {
-  text-decoration: underline;
+  text-decoration-color: var(--brand-dark);
+}
+
+.navbar a,
+.nav-item,
+.btn,
+.nav-cta {
+  text-decoration: none;
 }
 
 /* The bar wraps rather than holding one line. A brand, a menu and a button do not fit across a
@@ -77,7 +131,7 @@ a:hover {
   flex-wrap: wrap;
   gap: 10px 20px;
   background: var(--ink);
-  color: #fff;
+  color: var(--on-ink);
   padding: 12px 28px;
   min-height: 66px;
   position: sticky;
@@ -92,7 +146,7 @@ a:hover {
   font-size: 17px;
   font-weight: 700;
   letter-spacing: 0.01em;
-  color: #fff;
+  color: var(--on-ink);
 }
 
 .brand-sub {
@@ -136,7 +190,7 @@ a:hover {
   background: var(--brand) !important;
   color: var(--on-brand) !important;
   padding: 9px 16px !important;
-  border-radius: 999px !important;
+  border-radius: var(--radius) !important;
   font-weight: 700 !important;
   border-bottom: none !important;
 }
@@ -219,7 +273,7 @@ button {
   background: var(--brand);
   color: var(--on-brand);
   border: none;
-  border-radius: 6px;
+  border-radius: var(--radius-sm);
   padding: 10px 18px;
   font-size: 14px;
   font-weight: 700;
@@ -255,13 +309,13 @@ button:disabled {
 }
 
 .badge.ok {
-  background: #e6f4ea;
-  color: var(--ok);
+  background: var(--ok-soft);
+  color: var(--ok-ink);
 }
 
 .badge.err {
-  background: #fdecea;
-  color: var(--err);
+  background: var(--err-soft);
+  color: var(--err-ink);
 }
 
 /* What kind of credential this is: a text label, since both kinds share a docType. */
@@ -362,7 +416,7 @@ th {
 .stat .value {
   font-size: 24px;
   font-weight: 700;
-  color: var(--brand);
+  color: var(--ink);
 }
 
 .stat .label {
@@ -387,7 +441,9 @@ hr {
   justify-content: center;
   padding: 6px;
   cursor: pointer;
-  color: var(--brand);
+  /* White rather than the brand: the toggle sits on the ink bar, and the brand purple is far too
+     dark to be seen against it. Yellow managed this by accident; purple does not. */
+  color: var(--on-ink);
 }
 
 .theme-toggle:hover {
@@ -401,10 +457,14 @@ hr {
 
 /* ─── Marketing surface ───────────────────────────────────────────────── */
 .hero {
-  background: linear-gradient(160deg, #0d0d0d 0%, #1c1f26 55%, #262300 100%);
-  color: #fff;
+  /* One flat panel in the institution's purple rather than the three-stop gradient this used to be,
+     which ended in olive and belonged to no brand at all. */
+  background:
+    radial-gradient(120% 90% at 12% 0%, var(--hero-glow) 0%, transparent 58%),
+    linear-gradient(160deg, var(--hero-from) 0%, var(--hero-to) 100%);
+  color: var(--on-ink);
   padding: clamp(40px, 8vw, 76px) 0 clamp(44px, 9vw, 84px);
-  border-bottom: 4px solid var(--brand);
+  border-bottom: 3px solid var(--brand);
 }
 
 .hero h1 {
@@ -418,7 +478,7 @@ hr {
 .hero p.lede {
   font-size: clamp(16px, 2.4vw, 18px);
   line-height: 1.6;
-  color: rgba(255, 255, 255, 0.78);
+  color: rgba(255, 255, 255, 0.84);
   max-width: 640px;
   margin: 0 0 30px;
 }
@@ -546,7 +606,8 @@ hr {
   display: inline-flex;
   align-items: center;
   gap: 8px;
-  border-radius: 999px;
+  /* A rounded rectangle rather than a pill: a pill is a consumer shape, and this is a service. */
+  border-radius: var(--radius);
   padding: 12px 22px;
   font-size: 15px;
   font-weight: 700;
@@ -570,7 +631,7 @@ hr {
 
 .btn-dark {
   background: var(--ink);
-  color: #fff;
+  color: var(--on-ink);
 }
 
 .btn-dark:hover {
@@ -620,27 +681,15 @@ hr {
 }
 
 .notice.ok {
-  border-color: #bfe3c8;
-  background: #eefaf1;
-  color: #14532d;
+  border-color: var(--ok);
+  background: var(--ok-soft);
+  color: var(--ok-ink);
 }
 
 .notice.err {
-  border-color: #f0c2c6;
-  background: #fdecea;
-  color: #7f1d1d;
-}
-
-[data-theme="dark"] .notice.ok {
-  background: #10251a;
-  color: #a7e0b8;
-  border-color: #1e4d33;
-}
-
-[data-theme="dark"] .notice.err {
-  background: #2a1416;
-  color: #f3b8bc;
-  border-color: #5b2226;
+  border-color: var(--err);
+  background: var(--err-soft);
+  color: var(--err-ink);
 }
 
 .credential-card {
@@ -661,7 +710,7 @@ hr {
 
 .credential-card.selected {
   border-color: var(--brand);
-  box-shadow: 0 0 0 3px rgba(255, 196, 0, 0.22);
+  box-shadow: 0 0 0 3px var(--brand-ring);
 }
 
 .credential-card h3 {
@@ -705,7 +754,7 @@ hr {
 .qr-wrap .qr-caption {
   margin-top: 12px;
   font-size: 13px;
-  color: #444;
+  color: var(--muted);
 }
 
 .site-footer {

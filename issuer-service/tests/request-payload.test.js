@@ -175,6 +175,11 @@ test('the address must be the one the request was opened for', () => {
   const result = buildPayload({ csv: file(row({ email: 'somebody.else@example.com' })), expectedEmail: 'holder@example.com' });
   assert.strictEqual(result.ok, false);
   assert.match(result.errors.join(' '), /not the address this request was opened for/);
+  assert.match(
+    result.errors.join(' '),
+    /that address is holder@example\.com/,
+    'and the refusal names the address it should have been, so the operator knows what to change',
+  );
   assert.deepStrictEqual(result.credentials, [], 'nothing is stored when the file is refused');
 });
 

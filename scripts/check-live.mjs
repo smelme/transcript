@@ -88,6 +88,37 @@ check(
   `status ${scaffold.status} ${JSON.stringify(scaffold.data).slice(0, 80)}`,
 );
 
+// The identity provider sends the applicant's *browser* back here, by GET, with its own parameter
+// names. This used to answer "Cannot GET" because only the server webhook had been implemented, and
+// the redirect is the first thing a real graduate actually hits.
+const identityReturn = await get(
+  `${ISSUER}/requests/identity/callback?verificationSessionId=00000000-0000-4000-8000-000000000000&status=Approved`,
+);
+check('the identity return answers with a page, not a 404', identityReturn.status === 200, `status ${identityReturn.status}`);
+check('that page is HTML', /<!doctype html>/i.test(identityReturn.text));
+
+// The one thing this route must never do is treat what the address says as the answer. `status` in a
+// URL is a claim by whoever holds the URL, so a session we do not hold must not come back confirmed.
+check(
+  'and does not take the status in the address as the answer',
+  !/confirmed/i.test(identityReturn.text),
+  'the page claimed an outcome from the query string alone',
+);
+check(
+  'and still offers the way back to the request',
+  /Back to my request/i.test(identityReturn.text),
+);
+
+// The handle travels in the path, so the page can return the applicant to their own case.
+const identityReturnWithHandle = await get(
+  `${ISSUER}/requests/identity/callback/some-handle?verificationSessionId=00000000-0000-4000-8000-000000000000&status=Approved`,
+);
+check(
+  'the return with a handle is a page too',
+  identityReturnWithHandle.status === 200 && /<!doctype html>/i.test(identityReturnWithHandle.text),
+  `status ${identityReturnWithHandle.status}`,
+);
+
 console.log('\nThe Quals site\n');
 
 const request = await get(`${QUALS}/request`);

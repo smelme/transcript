@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import { CHECKED_PATH, COPY, REQUEST_PAGE_URL } from '../lib/doors';
 
 export const metadata = {
   title: 'Digital credentials: Smart Academy',
@@ -147,16 +148,21 @@ export default function DigitalCredentialsPage() {
 
       <section className="section">
         <div className="container">
-          <div className="panel" style={{ display: 'flex', justifyContent: 'space-between', gap: 24, flexWrap: 'wrap', alignItems: 'center' }}>
-            <div style={{ maxWidth: 620 }}>
-              <h2 style={{ margin: '0 0 8px', fontSize: 22 }}>Get your credentials</h2>
-              <p className="muted" style={{ margin: 0, fontSize: 15, lineHeight: 1.6 }}>
-                You will need the email address Smart Academy holds for you.
-              </p>
-            </div>
-            <Link href="/get-credentials" className="btn btn-dark">
-              Start
+          <div className="panel">
+            <h2 style={{ margin: '0 0 8px', fontSize: 22 }}>Get your credentials</h2>
+            <p className="muted" style={{ margin: '0 0 18px', fontSize: 15, lineHeight: 1.6 }}>
+              {COPY.intro}
+            </p>
+            <Link
+              href="/get-credentials"
+              className="btn btn-dark"
+              style={{ minHeight: 44, display: 'inline-flex', alignItems: 'center' }}
+            >
+              Sign in with your email
             </Link>
+            <p className="muted" style={{ margin: '14px 0 0' }}>
+              {CHECKED_PATH.prompt} <a href={REQUEST_PAGE_URL}>{CHECKED_PATH.action}</a>.
+            </p>
           </div>
         </div>
       </section>

@@ -142,6 +142,47 @@ function isEmail(value) {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(value || ''));
 }
 
+/**
+ * The date of birth the identity document confirmed, when the check has run.
+ *
+ * One field rather than the whole extraction: the document number, the names and the portrait the
+ * check read are evidence for the school, not something to put back in front of the applicant.
+ */
+export function extractedBirthDate(row) {
+  if (!row?.extract_json) {return null;}
+  try {
+    return JSON.parse(row.extract_json).birthDate || null;
+  } catch {
+    return null;
+  }
+}
+
+/** The name inside an extracted set of fields, when the document gave one. */
+export function nameFromExtract(extract) {
+  if (!extract || typeof extract !== 'object') {return null;}
+  if (extract.fullName) {return extract.fullName;}
+  // Some documents carry one name and not the other, and a family name on its own is still the name
+  // the school has to match.
+  const parts = [extract.givenName, extract.familyName].filter(Boolean);
+  return parts.length > 0 ? parts.join(' ') : null;
+}
+
+/**
+ * The name the identity document confirmed, when the check has run.
+ *
+ * The applicant is not asked for their name (P0-45 follow-up): a name typed into a form is one the
+ * school has to take on trust, and the document is already being read for the date of birth. So the
+ * name is taken from what the check read, which is also the only spelling of it there is.
+ */
+export function extractedName(row) {
+  if (!row?.extract_json) {return null;}
+  try {
+    return nameFromExtract(JSON.parse(row.extract_json));
+  } catch {
+    return null;
+  }
+}
+
 export class RequestService {
   /**
    * @param {object} deps
@@ -226,12 +267,25 @@ export class RequestService {
     applicantEmail,
     applicantPhone = null,
     applicantName = null,
+    applicantSsn = null,
+    applicantStudentId = null,
     wanted = ['both'],
   }) {
     const email = String(applicantEmail || '').trim().toLowerCase();
     if (!isEmail(email)) {throw new Error('A valid email address is required');}
     if (!String(institution || '').trim()) {throw new Error('An institution is required');}
     if (!String(school || '').trim()) {throw new Error('A school is required');}
+
+    // The number a person is filed under in the school's own record, and the only thing here that
+    // makes a search possible: the applicant is somebody the institution could not identify from an
+    // address, so a name alone would leave a person reading paper until they gave up. Required for
+    // that reason, and the school is told so rather than discovering it.
+    const ssn = String(applicantSsn || '').trim();
+    if (ssn.length < 3) {
+      throw new Error('A social security number is required so the school can find your record');
+    }
+    if (ssn.length > 64) {throw new Error('That is not a social security number');}
+    const studentId = String(applicantStudentId || '').trim() || null;
 
     const wantedList = (Array.isArray(wanted) ? wanted : [wanted])
       .map((value) => String(value || '').trim().toLowerCase())
@@ -252,8 +306,9 @@ export class RequestService {
       .prepare(
         `INSERT INTO credential_requests
            (request_id, institution, school, applicant_email, applicant_phone, applicant_name,
-            wanted, status, token_hash, fee_amount, fee_currency, created_at, updated_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+            applicant_ssn, applicant_student_id, wanted, status, token_hash, fee_amount,
+            fee_currency, created_at, updated_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       )
       .run(
         requestId,
@@ -262,6 +317,8 @@ export class RequestService {
         email,
         applicantPhone ? String(applicantPhone).trim() : null,
         applicantName ? String(applicantName).trim() : null,
+        ssn,
+        studentId,
         JSON.stringify(wantedList),
         STATUS.DRAFT,
         sha256Hex(token),
@@ -312,6 +369,24 @@ export class RequestService {
       reason: row.decision_reason,
       issuedAt: row.issued_at,
       expiresAt: row.expires_at,
+      // What they gave us, handed back.
+      //
+      // The document check leaves the page and comes back to it, so the page that returns is a new
+      // one with no memory of the form: whatever the applicant typed lives here or it is gone, and a
+      // review screen of dashes is how somebody ends up paying for a search against nothing. It is
+      // their own submission, behind their own handle, so giving it back costs nothing.
+      // Their own submission, behind their own handle, so giving it back costs nothing.
+      name: extractedName(row) || row.applicant_name,
+      phone: row.applicant_phone,
+      ssn: row.applicant_ssn,
+      studentId: row.applicant_student_id,
+      wanted: JSON.parse(row.wanted || '[]'),
+      fee: { amount: row.fee_amount, currency: row.fee_currency },
+      workingDays: this.workingDays,
+      // The date of birth the document confirmed. It is the one extracted field the applicant is
+      // shown, because they are about to pay for a search made with it and should be able to see
+      // what is being sent. Everything else the check extracted stays inside.
+      verifiedBirthDate: extractedBirthDate(row),
     };
   }
 
@@ -384,6 +459,9 @@ export class RequestService {
         identity_status: verified ? 'verified' : 'failed',
         identity_summary: summary ? JSON.stringify(summary) : null,
         extract_json: extract ? JSON.stringify(extract) : null,
+        // The name is the document's, and it is written onto the case here so the reviewer, the
+        // preview and the credential all spell it the way the document does.
+        ...(verified && nameFromExtract(extract) ? { applicant_name: nameFromExtract(extract) } : {}),
       },
     });
 
@@ -715,9 +793,9 @@ export class RequestService {
       requestId,
       holder: {
         email: row.applicant_email,
-        name: row.applicant_name,
+        name: extractedName(row) || row.applicant_name,
         studentId: payload.credentials[0]?.display?.studentId || null,
-        verifiedName: row.extract_json ? JSON.parse(row.extract_json).givenName || null : null,
+        verifiedName: extractedName(row),
       },
       decision: { accepted: row.decision === 'accepted', reason: row.decision_reason },
       payload: { filename: payload.filename, rowCount: payload.rowCount, uploadedAt: payload.uploadedAt },
@@ -756,7 +834,7 @@ export class RequestService {
     const invitation = await this.invitationService.create({
       institution: row.institution,
       holderEmail: row.applicant_email,
-      holderName: row.applicant_name || payload.credentials[0]?.display?.title || null,
+      holderName: extractedName(row) || row.applicant_name || payload.credentials[0]?.display?.title || null,
       studentId: payload.credentials[0]?.display?.studentId || undefined,
       credentials: payload.credentials.map((credential) => ({ claims: credential.claims })),
     });

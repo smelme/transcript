@@ -5,6 +5,9 @@
 .req {
   background: var(--surface);
   border: 1px solid var(--border);
+  /* The same gold rule the hero carries, so a page of Quals is recognisable as one before anything
+     on it is read. */
+  border-top: 3px solid var(--brand);
   border-radius: var(--radius);
   box-shadow: var(--shadow-sm);
   padding: 34px 38px 30px;
@@ -15,25 +18,29 @@
 .req-head {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 14px;
   padding-bottom: 14px;
-  border-bottom: 2px solid var(--ink);
+  /* A hairline rather than the heavy rule this used to be: the mark beside it carries the weight
+     now, and two loud things next to each other are one too many. */
+  border-bottom: 1px solid var(--border);
 }
 
 .req-mark {
-  width: 34px;
-  height: 34px;
+  width: 38px;
+  height: 38px;
   flex: 0 0 auto;
 }
 
 .req-brand {
   display: flex;
   flex-direction: column;
-  line-height: 1.25;
+  line-height: 1.2;
 }
 
 .req-brand b {
-  font-size: 15px;
+  font-size: 17px;
+  font-weight: 800;
+  letter-spacing: -0.01em;
 }
 
 .req-brand span {
@@ -160,10 +167,7 @@
 .req-choice input {
   width: 18px;
   height: 18px;
-  accent-color: var(--ink);
-  flex: 0 0 auto;
-}
-
+      accent-color: var(--brand);
 /* ── Steps ─────────────────────────────────────────────────────────────── */
 
 .req-list {
@@ -271,11 +275,7 @@
   width: 18px;
   height: 18px;
   flex: 0 0 auto;
-  accent-color: var(--ink);
-}
-
-.req-actions {
-  display: flex;
+      accent-color: var(--brand);
   flex-wrap: wrap;
   align-items: center;
   gap: 12px;
@@ -323,16 +323,12 @@
 .req-error {
   border: 1px solid var(--err);
   border-radius: var(--radius-sm);
-  background: #fff5f5;
+  background: var(--err-soft);
   color: var(--err);
   font-size: 13px;
   line-height: 1.6;
   padding: 12px 14px;
   margin: 0 0 16px;
-}
-
-[data-theme='dark'] .req-error {
-  background: #2a1414;
 }
 
 @media (max-width: 560px) {

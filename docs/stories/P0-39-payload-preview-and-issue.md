@@ -82,3 +82,27 @@ issuing a second credential, and the payload used is kept as the record of what 
 - A scripted end-to-end from accepted request to collected credential against the test sites,
   asserting the wallet's claim succeeds and the request's status becomes collected.
 - A test that the signed claims are the uploaded claims, not regenerated ones.
+
+## Fixed after the first real upload, 27 September 2026
+
+The operator uploaded the record and was told **"Nothing was stored, so the request is where it
+was."** The file had in fact been stored, and refreshing the page showed it. So the one screen that
+exists to say whether the record went in was saying the opposite, and the preview and issue steps it
+was meant to unlock only appeared after a manual refresh.
+
+The cause was a word. The portal decided stored-or-refused by reading `ok` off the response body, and
+the issuer has never sent one: a stored file comes back as `success`, `rowCount` and `credentials`. So
+`result.ok` was `undefined` on every success, the falsy branch ran, and the refusal panel rendered
+with no error to show - which is why the screen held exactly one sentence and no explanation. The
+reload lived after that branch, so it never ran either.
+
+The portal now decides from the status code and takes only the counts from the body, which is the one
+signal the issuer actually gives. On a stored file it reloads the case first and then says so, because
+the confirmation belongs beside the stored row and the steps it unlocks: *"Uploaded. 1 credential
+stored: Qualification and transcript. Preview the documents below, then issue."* The misleading
+sentence under the refusal panel is gone; a refusal already names itself and lists the rows that
+failed.
+
+Pinned by *"a stored file is answered as stored, with what it stored"*, which uploads through the same
+route the portal uses and asserts the shape it reads - including that there is no `ok` in it, so
+nothing invites the next client to wait for a word this route does not say.

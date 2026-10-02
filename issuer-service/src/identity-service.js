@@ -135,15 +135,28 @@ export class IdentityService {
     return this.mock || Boolean(this.apiKey && this.workflowId);
   }
 
-  get callbackUrl() {
-    return `${this.callbackBaseUrl}/requests/identity/callback`;
+  /**
+   * Where the provider sends somebody back to when it has finished with them.
+   *
+   * This is the applicant's **browser** being redirected, not a server being notified, which is why
+   * the handle travels in it: after the check the applicant lands on a page with no memory of the
+   * request they were making, and without their own handle that page cannot offer them the way back.
+   * It goes in the path rather than the query because the provider appends its own parameters on the
+   * way back, and a query of ours would be at the mercy of how it joins them.
+   *
+   * The handle is the applicant's own and grants nothing but their own case - the same value their
+   * browser was already showing while they completed the check. Nothing about the person is carried.
+   */
+  callbackUrlFor(handle) {
+    const base = `${this.callbackBaseUrl}/requests/identity/callback`;
+    return handle ? `${base}/${encodeURIComponent(String(handle))}` : base;
   }
 
   /**
    * Start a check. The vendor reference is the request id, which is how a callback finds its way
    * back to the right case without trusting anything the callback says about itself.
    */
-  async createSession({ requestId }) {
+  async createSession({ requestId, handle = null }) {
     if (this.mock) {
       const sessionId = `mock-${requestId}`;
       return {
@@ -158,7 +171,7 @@ export class IdentityService {
     const body = {
       workflow_id: this.workflowId,
       vendor_data: String(requestId),
-      callback: this.callbackUrl,
+      callback: this.callbackUrlFor(handle),
     };
 
     const response = await this.fetchImpl(`${DIDIT_API_BASE}/session/`, {

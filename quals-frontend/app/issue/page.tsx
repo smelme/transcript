@@ -14,6 +14,8 @@
  */
 
 import { useCallback, useEffect, useState } from 'react';
+import { chooserCopy } from '../lib/issue-copy.js';
+import { looksLikePhone } from '../lib/device.js';
 import './issue.css';
 
 type Preview = {
@@ -46,7 +48,26 @@ type Offer = {
   qrDataUrl: string;
   appLinkUrl?: string | null;
   label?: string | null;
-  reissued?: boolean;
+};
+
+/**
+ * What the issuer answers when the holder says they are finished: its own records, item by item,
+ * plus what it has stopped holding as a result.
+ */
+type Settled = {
+  success: boolean;
+  items: {
+    sessionId: string;
+    title: string;
+    degreeLevel?: string | null;
+    graduationDate?: string | null;
+    inWallet: boolean;
+    credentialId?: string | null;
+    recordedAt?: string | null;
+  }[];
+  allInWallet: boolean;
+  mdocsForgotten: number;
+  error?: string;
 };
 
 const MONTH_NAMES = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
@@ -62,6 +83,11 @@ function formatDate(value?: string | null): string {
   return `${day} ${MONTH_NAMES[month]} ${match[1]}`;
 }
 
+/**
+ * What the page says above the list, which has three states rather than one: something to add;
+ * nothing to add because it is all in the wallet already; and nothing waiting for this address at
+ * all. The wording lives in `issue-copy.js` so it can be checked without a browser.
+ */
 export default function IssuePage() {
   const [invitationId, setInvitationId] = useState('');
   const [token, setToken] = useState('');
@@ -78,8 +104,14 @@ export default function IssuePage() {
   const [offerIndex, setOfferIndex] = useState(0);
   const [termsAccepted, setTermsAccepted] = useState(false);
   const [busy, setBusy] = useState(false);
+  const [checking, setChecking] = useState(false);
+  const [settled, setSettled] = useState<Settled | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [stage, setStage] = useState<'loading' | 'signin' | 'code' | 'ready' | 'collecting'>('loading');
+  const [stage, setStage] = useState<'loading' | 'signin' | 'code' | 'ready' | 'collecting' | 'done'>('loading');
+  // Where the wallet is decides what the collecting screen leads with (P0-47): the wallet this phone
+  // is holding, or a code for the wallet that is somewhere else.
+  const [onPhone, setOnPhone] = useState(false);
+  const [showQrCode, setShowQrCode] = useState(false);
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
@@ -88,6 +120,19 @@ export default function IssuePage() {
     // An institution may redirect somebody here with the address it holds, instead of sending a
     // link. That is the same journey, so it works here rather than on a second page.
     setEmailFromLink(params.get('email') || '');
+  }, []);
+
+  // Which device this is, read after mount: the answer only exists in the browser, and arriving at it
+  // while rendering would be a guess the server and the browser could disagree about.
+  useEffect(() => {
+    const agent = navigator as Navigator & { userAgentData?: { mobile?: boolean } };
+    setOnPhone(
+      looksLikePhone({
+        userAgent: agent.userAgent,
+        coarsePointer: window.matchMedia('(pointer: coarse)').matches,
+        mobile: agent.userAgentData?.mobile ?? null,
+      }),
+    );
   }, []);
 
   const loadPreview = useCallback(async () => {
@@ -232,6 +277,48 @@ export default function IssuePage() {
   // The offer carries machine names, so what the holder is shown comes from the item they chose.
   const currentItem = items.find((item) => item.sessionId === current?.sessionId);
 
+  /**
+   * The end of the flow. The holder saying "done" is not evidence that anything arrived, so this
+   * asks the issuer to read its own records: it checks the session and the row the issue was
+   * recorded in. Only when everything chosen is in the wallet is the collection finished.
+   */
+  async function confirmCollection() {
+    if (!accessToken || selected.length === 0) {return;}
+    setChecking(true);
+    setError(null);
+    try {
+      const res = await fetch('/api/issuance/collection/confirmed', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${accessToken}` },
+        body: JSON.stringify({ sessionIds: selected }),
+      });
+      const data = (await res.json()) as Settled;
+      if (!res.ok || !data.success) {
+        throw new Error(data.error || 'We could not check that just now');
+      }
+      setSettled(data);
+      if (data.allInWallet) {setStage('done');}
+    } catch (e) {
+      setError((e as Error).message);
+    } finally {
+      setChecking(false);
+    }
+  }
+
+  /** What the issuer could not see in the wallet yet, asked before telling anybody it failed. */
+  const notArrived = settled?.items.filter((item) => !item.inWallet) ?? [];
+
+  /**
+   * Whether an item can still be added.
+   *
+   * A credential that has already been added is finished: the issuer handed the document over when
+   * the wallet collected it and keeps no copy, so a second one is the institution's decision rather
+   * than a button on this page (P0-44). Offering it here would only lead to a refusal.
+   */
+  const offerable = (item: Item) => item.status !== 'issued';
+  const offerableItems = items.filter(offerable);
+  const ready = chooserCopy(items.length, offerableItems.length);
+
   const subtitleFor = (item: Item) => {
     const parts: string[] = [];
     if (item.degreeLevel) parts.push(item.degreeLevel);
@@ -241,6 +328,15 @@ export default function IssuePage() {
     return parts.join(' · ');
   };
 
+  // The code is the same thing on either device; only what surrounds it changes. Written once here so
+  // the two branches cannot drift apart.
+  const qrCode = current ? (
+    <div className="issue-qr">
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img src={current.qrDataUrl} alt="QR code to add this to your wallet" width={240} height={240} />
+    </div>
+  ) : null;
+
   return (
     <div className="issue">
       <header className="issue-head">
@@ -248,7 +344,7 @@ export default function IssuePage() {
         <img className="issue-mark" src="/quals-mark.svg" alt="" width={34} height={34} />
         <div className="issue-brand">
           <b>Quals</b>
-          <span>Verifiable credentials</span>
+          <span>Digital credentials</span>
         </div>
         {preview?.institution && (
           <div className="issue-from">
@@ -334,75 +430,90 @@ export default function IssuePage() {
 
       {stage === 'ready' && (
         <>
-          <h1>{items.length === 1 ? 'Your credential is ready' : 'Your credentials are ready'}</h1>
-          <p className="issue-lede">
-            Choose the ones you would like in your wallet. They stay there, signed by the institution
-            that issued them, and adding one does not send it anywhere.
-          </p>
-          {items.length === 0 && (
-            <p className="issue-note">
-              Nothing is waiting for this address. If you were expecting a credential, check that
-              your institution used this address, or ask them to publish again.
-            </p>
-          )}
+          <h1>{ready.heading}</h1>
+          <p className="issue-lede">{ready.lede}</p>
           {items.length > 0 && (
             <>
               <ul className="issue-list">
                 {items.map((item) => (
                   <li key={item.sessionId} className="issue-item">
-                    <label className="issue-choice">
-                      <input
-                        type="checkbox"
-                        checked={selected.includes(item.sessionId)}
-                        onChange={() => toggle(item.sessionId)}
-                      />
-                      <span>
-                        <span className="issue-item-head">
-                          <strong>{item.title}</strong>
-                          {item.label && <span className="badge kind">{item.label}</span>}
-                          {item.inWallet && <span className="badge ok">In your wallet</span>}
+                    {offerable(item) ? (
+                      <label className="issue-choice">
+                        <input
+                          type="checkbox"
+                          checked={selected.includes(item.sessionId)}
+                          onChange={() => toggle(item.sessionId)}
+                        />
+                        <span>
+                          <span className="issue-item-head">
+                            <strong>{item.title}</strong>
+                            {item.label && <span className="badge kind">{item.label}</span>}
+                          </span>
+                          {subtitleFor(item) && (
+                            <span className="issue-item-sub">{subtitleFor(item)}</span>
+                          )}
+                          {item.holderName && (
+                            <span className="issue-item-sub">Issued to {item.holderName}</span>
+                          )}
                         </span>
-                        {subtitleFor(item) && (
-                          <span className="issue-item-sub">{subtitleFor(item)}</span>
-                        )}
-                        {item.holderName && (
-                          <span className="issue-item-sub">Issued to {item.holderName}</span>
-                        )}
+                      </label>
+                    ) : (
+                      <span className="issue-choice">
+                        <span>
+                          <span className="issue-item-head">
+                            <strong>{item.title}</strong>
+                            {item.label && <span className="badge kind">{item.label}</span>}
+                            <span className="badge ok">In your wallet</span>
+                          </span>
+                          {subtitleFor(item) && (
+                            <span className="issue-item-sub">{subtitleFor(item)}</span>
+                          )}
+                          <span className="issue-item-sub">
+                            Ask your institution if you need another copy.
+                          </span>
+                        </span>
                       </span>
-                    </label>
+                    )}
                   </li>
                 ))}
               </ul>
 
-              <label className="issue-terms">
-                <input
-                  type="checkbox"
-                  checked={termsAccepted}
-                  onChange={(e) => setTermsAccepted(e.target.checked)}
-                />
-                I agree to hold these credentials in my wallet and to the terms of issue.
-              </label>
+              {offerableItems.length > 0 && (
+                <>
+                  <label className="issue-terms">
+                    <input
+                      type="checkbox"
+                      checked={termsAccepted}
+                      onChange={(e) => setTermsAccepted(e.target.checked)}
+                    />
+                    I agree to hold these credentials in my wallet and to the terms of issue.
+                  </label>
 
-              <div className="issue-actions">
-                <button
-                  className="btn btn-primary"
-                  onClick={collectSelected}
-                  disabled={busy || !termsAccepted || selected.length === 0}
-                >
-                  {busy
-                    ? 'Preparing…'
-                    : selected.length === 1
-                      ? 'Add to wallet'
-                      : `Add ${selected.length} to wallet`}
-                </button>
-                <button
-                  className="btn"
-                  onClick={() => setSelected(items.map((item) => item.sessionId))}
-                  disabled={busy || selected.length === items.length}
-                >
-                  Select all
-                </button>
-              </div>
+                  <div className="issue-actions">
+                    <button
+                      className="btn btn-primary"
+                      onClick={collectSelected}
+                      disabled={busy || !termsAccepted || selected.length === 0}
+                    >
+                      {/* Nothing selected reads as "Add to wallet" rather than "Add 0 to wallet": the
+                          button is disabled until something is chosen, so a count of nought is never
+                          an instruction. */}
+                      {busy
+                        ? 'Preparing…'
+                        : selected.length > 1
+                          ? `Add ${selected.length} to wallet`
+                          : 'Add to wallet'}
+                    </button>
+                    <button
+                      className="btn"
+                      onClick={() => setSelected(offerableItems.map((item) => item.sessionId))}
+                      disabled={busy || selected.length === offerableItems.length}
+                    >
+                      Select all
+                    </button>
+                  </div>
+                </>
+              )}
             </>
           )}
         </>
@@ -413,36 +524,70 @@ export default function IssuePage() {
           <span className="issue-eyebrow">
             Credential {offerIndex + 1} of {offers.length}
           </span>
-          <h1>{current.reissued ? 'Add another copy' : 'Add it to your wallet'}</h1>
-          <p className="issue-lede">
-            Scan this with your Quals wallet, or open it directly if the wallet is on this device. The
-            code expires quickly, so use it now.
-          </p>
-          <div className="issue-qr">
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img
-              src={current.qrDataUrl}
-              alt="QR code for the credential offer"
-              width={240}
-              height={240}
-            />
-          </div>
+          <h1>Add it to your wallet</h1>
+
+          {/*
+            Where the wallet is decides what this screen leads with (P0-47). A phone that already has
+            it should be one tap; a desktop has nothing to tap, so it is given something to scan; and a
+            phone whose wallet is on another phone keeps the code one tap away rather than buried.
+          */}
+          {onPhone && current.appLinkUrl ? (
+            <>
+              <p className="issue-lede">
+                Add it to the Quals wallet on this phone. The code expires quickly, so open it now.
+              </p>
+              <div className="issue-actions">
+                <a className="btn btn-primary" href={current.appLinkUrl}>
+                  Add to wallet
+                </a>
+                <button className="btn" onClick={() => setShowQrCode((shown) => !shown)}>
+                  {showQrCode ? 'Hide the QR code' : 'Show QR code'}
+                </button>
+              </div>
+              {showQrCode && (
+                <>
+                  {qrCode}
+                  <p className="issue-note">
+                    Wallet on a different phone? Scan this with that one instead.
+                  </p>
+                </>
+              )}
+            </>
+          ) : (
+            <>
+              <p className="issue-lede">
+                Scan this with the Quals wallet on your phone. The code expires quickly, so use it now.
+              </p>
+              {qrCode}
+            </>
+          )}
+
           <div className="issue-actions">
-            {current.appLinkUrl && (
-              <a className="btn btn-primary" href={current.appLinkUrl}>
-                Open in the Quals wallet
-              </a>
-            )}
             {offerIndex + 1 < offers.length ? (
-              <button className="btn" onClick={() => setOfferIndex(offerIndex + 1)}>
+              <button
+                className="btn"
+                onClick={() => {
+                  setOfferIndex(offerIndex + 1);
+                  // A new credential starts with its own code hidden: the open one was scanned or
+                  // opened already, and leaving it on screen invites the wrong one being used.
+                  setShowQrCode(false);
+                }}
+              >
                 Next credential ({offerIndex + 2} of {offers.length})
               </button>
             ) : (
-              <button className="btn" onClick={() => setStage('ready')}>
-                Done
+              <button className="btn" onClick={confirmCollection} disabled={checking}>
+                {checking ? 'Checking…' : 'Done'}
               </button>
             )}
           </div>
+          {notArrived.length > 0 && (
+            <p className="issue-note">
+              Not in your wallet yet: {notArrived.map((item) => item.title).join(', ')}. If your
+              wallet is still finishing, give it a moment and choose Done again. Nothing is lost by
+              waiting.
+            </p>
+          )}
           {currentItem && (
             <p className="issue-note">
               You are adding: {currentItem.title}
@@ -453,6 +598,39 @@ export default function IssuePage() {
             Nothing was shared with anybody by adding this. Sharing is a separate step you take later,
             from the wallet.
           </p>
+        </>
+      )}
+
+      {/*
+        The end of the flow, and nothing more than that. What the issuer does with its own records,
+        and why it no longer holds a copy, is our business rather than the holder's: they asked for
+        a credential, it arrived, and the screen says so in as many words as that takes.
+      */}
+      {stage === 'done' && settled && (
+        <>
+          <span className="issue-eyebrow">Thank you</span>
+          <h1>All done</h1>
+          <p className="issue-lede">
+            {settled.items.length === 1
+              ? 'Your credential is in your wallet.'
+              : 'Your credentials are in your wallet.'}
+          </p>
+
+          <ul className="issue-list">
+            {settled.items.map((item) => (
+              <li key={item.sessionId} className="issue-item">
+                <span className="issue-item-head">
+                  <strong>{item.title}</strong>
+                  <span className="badge ok">In your wallet</span>
+                </span>
+                {item.graduationDate && (
+                  <span className="issue-item-sub">Graduated {formatDate(item.graduationDate)}</span>
+                )}
+              </li>
+            ))}
+          </ul>
+
+          <p className="issue-note">You can close this page.</p>
         </>
       )}
 

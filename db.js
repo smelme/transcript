@@ -163,6 +163,10 @@ function migrate(database) {
       applicant_email  TEXT NOT NULL,
       applicant_phone  TEXT,
       applicant_name   TEXT,
+      -- What the school matches the record by hand with. The number is the one a person is filed
+      -- under in most registries, and the student id, when they know it, saves the search.
+      applicant_ssn    TEXT,
+      applicant_student_id TEXT,
       wanted           TEXT NOT NULL,
       status           TEXT NOT NULL,
       token_hash       TEXT NOT NULL,
@@ -250,6 +254,15 @@ function migrate(database) {
   database.exec(
     'CREATE UNIQUE INDEX IF NOT EXISTS idx_credentials_status_index ON credentials (status_index)',
   );
+
+  // What the applicant is matched to a record by, added after the case table was first written: a
+  // name and an address never were enough on their own.
+  const requestColumns = database.prepare('PRAGMA table_info(credential_requests)').all();
+  for (const column of ['applicant_ssn', 'applicant_student_id']) {
+    if (!requestColumns.some((entry) => entry.name === column)) {
+      database.exec(`ALTER TABLE credential_requests ADD COLUMN ${column} TEXT`);
+    }
+  }
 }
 
 export function getDb() {

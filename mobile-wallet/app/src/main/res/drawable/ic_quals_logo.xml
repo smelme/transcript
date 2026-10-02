@@ -1,13 +1,68 @@
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
-    android:width="108dp"
-    android:height="108dp"
-    android:viewportWidth="64"
-    android:viewportHeight="64">
-    <!-- Quals shield: green field with white check mark -->
-    <path
-        android:fillColor="#1B9C5B"
-        android:pathData="M32,4 L56,12 L56,28 C56,46 46,56 32,60 C18,56 8,46 8,28 L8,12 Z" />
-    <path
-        android:fillColor="#FFFFFF"
-        android:pathData="M26,32 L31,37 L40,26 L43,29 L31,42 L23,35 Z" />
+    android:width="64dp"
+    android:height="64dp"
+    android:viewportWidth="120"
+    android:viewportHeight="120">
+    <!--
+        The Quals mark: a tall white Q with a thin top and bottom, whose gold tail comes out of the bowl
+        and ends in a hand.
+
+        Traced from the artwork the product owner supplied on 3 October 2026, in place of the
+        Q-with-a-plain-tail that stood here before it and the green shield before that. The same
+        geometry is served by the web as quals-mark.svg, so the app and the site cannot drift apart:
+        change one, change the other.
+    -->
+
+    <!--
+        The drawing is kept in the artwork's own coordinates - 115 by 121 pixels of it - and the group
+        below centres its ink in this 120 box.
+
+        That centring is not a nicety. The supplied drawing sits half a unit off the middle of its own
+        frame, and every surface centres the box rather than the ink, so an uncentred mark reads as a
+        layout fault that no layout change can fix - which is why the mark looked shoved to one side on
+        the phone while the row holding it was already centred.
+    -->
+    <group android:translateX="0.5" android:translateY="-0.5">
+        <!-- The Q: a white ring with its counter cut out by evenOdd, because the artwork's ring is thick
+             on the sides and thin at the top and bottom, which one stroke width cannot draw. -->
+        <path
+            android:fillColor="#FFFFFF"
+            android:fillType="evenOdd"
+            android:pathData="M51.5,4.5 C76,4.5 97,28 97,59 C97,90 78,113.5 51.5,113.5 C25,113.5 6,90 6,59 C6,28 27,4.5 51.5,4.5 Z M51.5,15 C63,16 76,36 76,60 C76,80 74,94 66,101 C60,105 49,105 42,99.5 C31,92 27,78 27,60 C27,38 40,16 51.5,15 Z" />
+
+        <!-- The tail: thicker where it leaves the bowl, then thinner, then the wrist turning down. -->
+        <path
+            android:fillColor="#00000000"
+            android:strokeColor="#C9A227"
+            android:strokeWidth="9.5"
+            android:strokeLineCap="round"
+            android:pathData="M52,91.5 C56.5,93.5 60,95 63.5,97" />
+        <path
+            android:fillColor="#00000000"
+            android:strokeColor="#C9A227"
+            android:strokeWidth="6.5"
+            android:strokeLineCap="round"
+            android:pathData="M60,95.5 C66,100 69,102 72,104" />
+        <path
+            android:fillColor="#00000000"
+            android:strokeColor="#C9A227"
+            android:strokeWidth="12"
+            android:strokeLineCap="round"
+            android:pathData="M75,104 C79,107 84,110 88,112" />
+
+        <!-- The fist, the heel under it, and the four fingers standing out of the top. An ellipse is two
+             arcs here, because a vector drawable has no ellipse element. -->
+        <path
+            android:fillColor="#C9A227"
+            android:pathData="M96,98 a7,8.5 0 1,0 14,0 a7,8.5 0 1,0 -14,0" />
+        <path
+            android:fillColor="#C9A227"
+            android:pathData="M95,107 a6,4 0 1,0 12,0 a6,4 0 1,0 -12,0" />
+        <path
+            android:fillColor="#00000000"
+            android:strokeColor="#C9A227"
+            android:strokeWidth="2.6"
+            android:strokeLineCap="round"
+            android:pathData="M98,93 L95.5,80.5 M101.5,93 L101,79 M106,93 L106.5,79 M110,93 L112.5,81" />
+    </group>
 </vector>

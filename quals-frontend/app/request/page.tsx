@@ -32,7 +32,7 @@ const TERMS_VERSION = '2026-01';
 type Wanted = 'qualification' | 'transcript' | 'both';
 type Held = { requestId: string; token: string; email?: string };
 type Fee = { amount: number; currency: string };
-type Stage = 'details' | 'identity' | 'waiting' | 'review' | 'done' | 'status';
+type Stage = 'details' | 'identity' | 'waiting' | 'review' | 'pay' | 'done' | 'status';
 
 type StatusView = {
   requestId: string;
@@ -87,15 +87,26 @@ export default function RequestPage() {
   const [notice, setNotice] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
-  // What they entered, and what they are asking for.
+  // What they are asking for, and how to reach them. There is no name here on purpose: it comes from
+  // the document the check reads, and is filled in on the review step.
   const [school, setSchool] = useState(SCHOOLS[0]);
   const [wanted, setWanted] = useState<Wanted>('both');
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [phone, setPhone] = useState('');
+  // The school matches the record by hand, so it is given what a person is filed under (P0-45).
+  const [ssn, setSsn] = useState('');
+  const [studentId, setStudentId] = useState('');
+  // Taken from the document the check read, never typed: a date of birth somebody is asked for is a
+  // date of birth somebody can get wrong.
+  const [verifiedBirthDate, setVerifiedBirthDate] = useState<string | null>(null);
 
   const [identityProblem, setIdentityProblem] = useState<string | null>(null);
   const [termsAccepted, setTermsAccepted] = useState(false);
+  // The embedded payment form: what the browser mounts, and the key it mounts it with. Both come
+  // back from the issuer, so the publishable key has one home rather than two.
+  const [clientSecret, setClientSecret] = useState<string | null>(null);
+  const [publishableKey, setPublishableKey] = useState<string | null>(null);
 
   const store = useCallback((next: Held | null) => {
     setHeld(next);
@@ -152,13 +163,81 @@ export default function RequestPage() {
     [school],
   );
 
-  // What the applicant arrives with decides where they start: a return from the payment provider, a
-  // link back to their own case, or nothing at all.
+  /**
+   * Ask the issuer where the check has got to, and act on the answer.
+   *
+   * Used by the poll and by the return from the provider, so the two cannot disagree about the same
+   * session: whoever asks second finds the case already decided and is told so.
+   */
+  const settleIdentity = useCallback(async (current: Held) => {
+    const result = await api<{
+      identityStatus: 'pending' | 'verified' | 'failed';
+      reason?: string | null;
+      birthDate?: string | null;
+      name?: string | null;
+    }>(`/requests/${current.requestId}/identity?token=${encodeURIComponent(current.token)}`);
+
+    if (result.identityStatus === 'verified') {
+      setVerifiedBirthDate(result.birthDate || null);
+      // The document's name, not one they typed: there is no name on the form to type one into.
+      if (result.name) setName(result.name);
+      setIdentityProblem(null);
+      setStage('review');
+    } else if (result.identityStatus === 'failed') {
+      setIdentityProblem(result.reason || 'We could not complete the check. You can try again.');
+      setStage('identity');
+    } else {
+      setStage('waiting');
+    }
+    return result.identityStatus;
+  }, []);
+
+  /**
+   * Put the applicant's own answers back.
+   *
+   * The document check takes the browser away and brings it back, so the page that comes back is a
+   * fresh one: anything kept only in this component is gone by the time they are asked to check it
+   * over. Their own case holds what they gave us, behind their own handle, so the review is filled
+   * from there rather than from luck.
+   */
+  const hydrate = useCallback(async (current: Held) => {
+    try {
+      const view = await api<{
+        name?: string | null;
+        phone?: string | null;
+        ssn?: string | null;
+        studentId?: string | null;
+        email?: string | null;
+        school?: string | null;
+        wanted?: string[] | null;
+        fee?: Fee | null;
+        workingDays?: number;
+      }>(`/requests/${current.requestId}?token=${encodeURIComponent(current.token)}`);
+
+      if (view.name) setName(view.name);
+      if (view.phone) setPhone(view.phone);
+      if (view.ssn) setSsn(view.ssn);
+      if (view.studentId) setStudentId(view.studentId);
+      if (view.email) setEmail(view.email);
+      if (view.school) setSchool(view.school);
+      if (view.fee) setFee(view.fee);
+      if (view.workingDays) setWorkingDays(view.workingDays);
+      const one = Array.isArray(view.wanted) ? view.wanted[0] : null;
+      if (one && one in WANTED_LABELS) setWanted(one as Wanted);
+    } catch {
+      // A case we cannot read back is not a reason to stop: it still resolves, and the applicant
+      // can fill anything missing in themselves.
+    }
+  }, []);
+
+  // What the applicant arrives with decides where they start: a return from the document check, a
+  // return from the payment provider, a link back to their own case, or nothing at all.
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const reference = params.get('reference');
     const token = params.get('token');
     const cancelled = params.get('cancelled');
+    const identity = params.get('identity');
 
     let remembered: Held | null = null;
     try {
@@ -172,33 +251,32 @@ export default function RequestPage() {
     if (!current) return;
 
     store(current);
+    // Before anything else: whoever comes back, comes back to their own answers.
+    void hydrate(current);
     if (cancelled) setNotice('You did not finish paying, so nothing has been sent to the school yet.');
     if (params.get('paid')) {
       confirmPayment(current, params.get('session_id'));
       return;
     }
+    if (identity) {
+      // Back from the document check, in this tab: the provider sent the browser here rather than
+      // opening a second one, so this is where the case is picked up again.
+      void settleIdentity(current).catch(() => setStage('identity'));
+      return;
+    }
     loadStatus(current);
-  }, [confirmPayment, loadStatus, store]);
+  }, [confirmPayment, hydrate, loadStatus, settleIdentity, store]);
 
   // Waiting on the document check. Polled rather than trusted to a redirect, because the provider
-  // may send the browser anywhere once it is finished.
+  // may send the browser anywhere once it is finished - including nowhere at all.
   useEffect(() => {
     if (stage !== 'waiting' || !held) return undefined;
     let stopped = false;
 
     const check = async () => {
+      if (stopped) return;
       try {
-        const result = await api<{ identityStatus: 'pending' | 'verified' | 'failed'; reason?: string | null }>(
-          `/requests/${held.requestId}/identity?token=${encodeURIComponent(held.token)}`,
-        );
-        if (stopped) return;
-        if (result.identityStatus === 'verified') {
-          setIdentityProblem(null);
-          setStage('review');
-        } else if (result.identityStatus === 'failed') {
-          setIdentityProblem(result.reason || 'We could not complete the check. You can try again.');
-          setStage('identity');
-        }
+        await settleIdentity(held);
       } catch {
         // A poll that fails is not the applicant's problem: keep waiting and try again.
       }
@@ -210,9 +288,12 @@ export default function RequestPage() {
       stopped = true;
       window.clearInterval(timer);
     };
-  }, [stage, held]);
+  }, [stage, held, settleIdentity]);
 
-  const stepNumber = useMemo(() => (stage === 'details' ? 1 : stage === 'review' || stage === 'done' ? 3 : 2), [stage]);
+  const stepNumber = useMemo(
+    () => (stage === 'details' ? 1 : stage === 'review' || stage === 'pay' || stage === 'done' ? 3 : 2),
+    [stage],
+  );
 
   async function openRequest(event: React.FormEvent) {
     event.preventDefault();
@@ -221,7 +302,7 @@ export default function RequestPage() {
     try {
       const created = await api<{ requestId: string; token: string; fee: Fee; dueWorkingDays: number }>('/requests', {
         method: 'POST',
-        body: JSON.stringify({ email, name, phone, school, wanted: [wanted] }),
+        body: JSON.stringify({ email, phone, ssn, studentId: studentId || null, school, wanted: [wanted] }),
       });
       store({ requestId: created.requestId, token: created.token, email });
       setFee(created.fee);
@@ -244,9 +325,12 @@ export default function RequestPage() {
         `/requests/${held.requestId}/identity`,
         { method: 'POST', body: JSON.stringify({ token: held.token }) },
       );
-      // Opened rather than navigated: this page has to stay alive to notice the outcome, and a
-      // second tab is easier to come back from than a lost one.
-      if (started.url) window.open(started.url, '_blank', 'noopener');
+      // The same tab, not a second one: the provider brings the browser back here when it is done,
+      // and the applicant should end up where they started rather than in a tab they have to close.
+      if (started.url) {
+        window.location.assign(started.url);
+        return;
+      }
       setStage('waiting');
     } catch (e) {
       setError((e as Error).message);
@@ -260,20 +344,69 @@ export default function RequestPage() {
     setBusy(true);
     setError(null);
     try {
-      const checkout = await api<{ checkoutUrl?: string | null; alreadyPaid?: boolean }>(
-        `/requests/${held.requestId}/checkout`,
-        { method: 'POST', body: JSON.stringify({ token: held.token }) },
-      );
-      if (checkout.checkoutUrl) {
-        window.location.href = checkout.checkoutUrl;
+      const checkout = await api<{
+        clientSecret?: string | null;
+        publishableKey?: string | null;
+        alreadyPaid?: boolean;
+      }>(`/requests/${held.requestId}/checkout`, {
+        method: 'POST',
+        body: JSON.stringify({ token: held.token }),
+      });
+      if (checkout.alreadyPaid) {
+        await confirmPayment(held, null);
         return;
       }
-      await confirmPayment(held, null);
+      if (!checkout.clientSecret || !checkout.publishableKey) {
+        throw new Error('The payment form could not be opened. Please try again.');
+      }
+      setClientSecret(checkout.clientSecret);
+      setPublishableKey(checkout.publishableKey);
+      setStage('pay');
     } catch (e) {
       setError((e as Error).message);
+    } finally {
       setBusy(false);
     }
   }
+
+  /**
+   * Put the card form on the page, once there is a session to put there.
+   *
+   * Stripe's script is fetched only when somebody is actually paying, and the form is torn down when
+   * they leave the stage: a card form left mounted behind a back button is a form somebody could pay
+   * twice in.
+   */
+  useEffect(() => {
+    if (stage !== 'pay' || !held || !clientSecret || !publishableKey) return undefined;
+    let mounted: { destroy: () => void } | null = null;
+    let abandoned = false;
+
+    (async () => {
+      const { loadStripe } = await import('@stripe/stripe-js');
+      const stripe = await loadStripe(publishableKey);
+      if (!stripe || abandoned) return;
+
+      const embedded = await stripe.createEmbeddedCheckoutPage({
+        fetchClientSecret: async () => clientSecret,
+        // The payment is confirmed from the issuer's own record of the session, so nothing here has
+        // to carry it back: the holder says it is done, and the issuer checks with the provider.
+        onComplete: () => {
+          void confirmPayment(held, null);
+        },
+      });
+      if (abandoned) {
+        embedded.destroy();
+        return;
+      }
+      embedded.mount('#payment-form');
+      mounted = embedded;
+    })().catch((e: Error) => setError(e.message));
+
+    return () => {
+      abandoned = true;
+      mounted?.destroy();
+    };
+  }, [stage, held, clientSecret, publishableKey, confirmPayment]);
 
   return (
     <div className="req">
@@ -282,7 +415,7 @@ export default function RequestPage() {
         <img className="req-mark" src="/quals-mark.svg" alt="" width={34} height={34} />
         <div className="req-brand">
           <b>Quals</b>
-          <span>Verifiable credentials</span>
+          <span>Digital credentials</span>
         </div>
         <div className="req-from">
           Requesting from {school}
@@ -308,10 +441,8 @@ export default function RequestPage() {
         <>
           <h1>Ask for your credentials</h1>
           <p className="req-lede">
-            Use this if you studied with {school} more than five years ago, or if you are not sure
-            whether we still hold a record for you. We will check with the school by hand, so it takes
-            longer than collecting them from the school&rsquo;s own site — up to {workingDays} working
-            days after you send this.
+            Use this if you studied with {school} more than five years ago, or you are not sure we
+            still hold your record. We check by hand, so it takes up to {workingDays} working days.
           </p>
 
           <form onSubmit={openRequest} className="req-form">
@@ -345,17 +476,6 @@ export default function RequestPage() {
             </fieldset>
 
             <label className="req-field">
-              <span>Your full name</span>
-              <input
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-                autoComplete="name"
-                required
-                placeholder="As it was when you studied"
-              />
-            </label>
-
-            <label className="req-field">
               <span>Email address</span>
               <input
                 type="email"
@@ -366,6 +486,31 @@ export default function RequestPage() {
                 placeholder="Where we should send your credentials"
               />
               <small>This is where the credentials are sent, and we check it before you pay.</small>
+            </label>
+
+            <label className="req-field">
+              <span>Social security number</span>
+              <input
+                value={ssn}
+                onChange={(e) => setSsn(e.target.value)}
+                required
+                autoComplete="off"
+                placeholder="How the school finds your record"
+              />
+              <small>
+                The school looks your record up by this, so it is the one thing we have to ask for.
+              </small>
+            </label>
+
+            <label className="req-field">
+              <span>Student id</span>
+              <input
+                value={studentId}
+                onChange={(e) => setStudentId(e.target.value)}
+                autoComplete="off"
+                placeholder="Optional, if you know it"
+              />
+              <small>Optional. If you have it, it saves the school looking.</small>
             </label>
 
             <label className="req-field">
@@ -380,7 +525,7 @@ export default function RequestPage() {
             </label>
 
             <div className="req-actions">
-              <button type="submit" className="req-btn" disabled={busy || !name.trim() || !email.trim()}>
+              <button type="submit" className="req-btn" disabled={busy || !email.trim() || !ssn.trim()}>
                 {busy ? 'Opening your request…' : 'Continue'}
               </button>
               <span className="req-note">Nothing is paid yet, and nothing is sent to the school yet.</span>
@@ -393,9 +538,8 @@ export default function RequestPage() {
         <>
           <h1>Confirm who you are</h1>
           <p className="req-lede">
-            You will be asked for a photo identity document and a selfie. This is how the school can
-            be sure the record it finds belongs to you, since we cannot check an address on its own
-            for a record this old.
+            You will need a photo ID and a selfie. It is how the school knows the record it finds is
+            yours.
           </p>
 
           {identityProblem && <div className="req-error">{identityProblem}</div>}
@@ -415,8 +559,8 @@ export default function RequestPage() {
             </button>
           </div>
           <p className="req-note">
-            We keep what the document says — your name, date of birth and the document number — for
-            the school to check against its record. We do not keep a copy of the document itself.
+            We keep what the document says — your name, date of birth and document number — for the
+            school to check against its record. We do not keep a copy of the document.
           </p>
         </>
       )}
@@ -425,16 +569,16 @@ export default function RequestPage() {
         <>
           <h1>Waiting for the check</h1>
           <p className="req-lede">
-            Your document check is open in another tab. Once it is finished, this page will move on
-            by itself &mdash; you can leave it open, or come back to it later.
+            The check has not finished yet. This page moves on by itself, so leave it open or come
+            back to it later.
           </p>
           <div className="req-pending" aria-live="polite">
             <span className="req-spinner" aria-hidden="true" />
-            Checking with the identity provider…
+            Checking your document…
           </div>
           <div className="req-actions">
-            <button type="button" className="req-btn" onClick={() => setStage('review')} disabled={busy}>
-              I have finished the check
+            <button type="button" className="req-btn" onClick={() => held && settleIdentity(held)} disabled={busy}>
+              Check again
             </button>
             <button type="button" className="req-btn req-btn-quiet" onClick={() => setStage('identity')}>
               Back
@@ -447,19 +591,49 @@ export default function RequestPage() {
         <>
           <h1>Check this, then pay</h1>
           <p className="req-lede">
-            {school} will check its record against what you have given us. We send it to them as soon
-            as the fee is paid, and you will have an answer within {workingDays} working days.
+            {school} will check its record against what you have given us. We send it as soon as you
+            pay, and you will have an answer within {workingDays} working days.
           </p>
 
           <dl className="req-summary">
+            {/* The name and the date of birth are both the document's rather than the applicant's:
+                the check read them, and they are what the school is asked to match against. */}
+            {name && (
+              <div>
+                <dt>Name</dt>
+                <dd>
+                  {name} <span className="req-note">from your document</span>
+                </dd>
+              </div>
+            )}
+            {verifiedBirthDate && (
+              <div>
+                <dt>Date of birth</dt>
+                <dd>
+                  {day(verifiedBirthDate)} <span className="req-note">from your document</span>
+                </dd>
+              </div>
+            )}
             <div>
-              <dt>Name</dt>
-              <dd>{name || '—'}</dd>
+              <dt>Social security number</dt>
+              <dd>{ssn || '—'}</dd>
             </div>
+            {studentId && (
+              <div>
+                <dt>Student id</dt>
+                <dd>{studentId}</dd>
+              </div>
+            )}
             <div>
               <dt>Email</dt>
               <dd>{email || '—'}</dd>
             </div>
+            {phone && (
+              <div>
+                <dt>Phone</dt>
+                <dd>{phone}</dd>
+              </div>
+            )}
             <div>
               <dt>School</dt>
               <dd>{school}</dd>
@@ -467,17 +641,6 @@ export default function RequestPage() {
             <div>
               <dt>Asked for</dt>
               <dd>{WANTED_LABELS[wanted]}</dd>
-            </div>
-            <div>
-              <dt>Fee</dt>
-              <dd>{money(fee)}</dd>
-            </div>
-            <div>
-              <dt>Answer within</dt>
-              <dd>
-                {workingDays} working days
-                {status?.dueAt ? ` · around ${day(status.dueAt)}` : ''}
-              </dd>
             </div>
           </dl>
 
@@ -491,7 +654,7 @@ export default function RequestPage() {
 
           <div className="req-actions">
             <button type="button" className="req-btn" onClick={pay} disabled={busy || !termsAccepted}>
-              {busy ? 'Taking you to the payment page…' : `Pay ${money(fee)} and send my request`}
+              {busy ? 'Taking you to the payment page…' : 'Pay'}
             </button>
             <button type="button" className="req-btn req-btn-quiet" onClick={() => setStage('identity')} disabled={busy}>
               Back
@@ -504,12 +667,38 @@ export default function RequestPage() {
         </>
       )}
 
+      {stage === 'pay' && (
+        <>
+          <h1>Pay {money(fee)}</h1>
+          <p className="req-lede">
+            Your card details go straight to our payment provider and never reach us. When the payment
+            is done, {school} has your request and the {workingDays} working days start.
+          </p>
+          {/* Stripe mounts its own form here. */}
+          <div id="payment-form" />
+          <div className="req-actions">
+            <button
+              type="button"
+              className="req-btn req-btn-quiet"
+              onClick={() => setStage('review')}
+              disabled={busy}
+            >
+              Back
+            </button>
+          </div>
+          <p className="req-note">
+            Nothing has been sent to the school yet, and nothing is taken until the payment is
+            complete.
+          </p>
+        </>
+      )}
+
       {stage === 'done' && held && (
         <>
           <h1>Your request has been sent</h1>
           <p className="req-lede">
-            {school} has your request. They check the record, and when they have confirmed it we issue
-            your credentials and email you a link to collect them.
+            {school} has your request. They check the record, then we email you a link to collect your
+            credentials.
           </p>
           <dl className="req-summary">
             <div>

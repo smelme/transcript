@@ -2,10 +2,20 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
-import { requestCredentials } from '../lib/api';
+import { CHECKED_PATH, COPY, REQUEST_PAGE_URL, outcomeFor } from '../lib/doors';
 
 /**
- * Get your credentials.
+ * Sign in with your email - the one way in.
+ *
+ * Shaped like the sign-in everybody has already done a hundred times: one field, one button, and a
+ * quiet line underneath for the case it cannot serve. That line is the whole of P0-35, and it is
+ * deliberately the shape every sign-in screen uses for "forgot your password?" - a question about
+ * circumstances rather than a verdict about the person reading it.
+ *
+ * Somebody who finished longer ago, or whom we cannot match, takes that line and lands on the
+ * checked path. Nothing here accuses them of anything, and nothing here decides on their behalf:
+ * the record says whether this way in can serve them, and the answer to that is never "you are not
+ * who you say you are".
  *
  * The academy's part in issuing is one thing: it knows who you are from the address it holds, and
  * publishing your record is what happens here. Everything after that belongs to Quals, where the
@@ -37,28 +47,67 @@ export default function GetCredentialsPage() {
   const [published, setPublished] = useState(false);
   const [expiresAt, setExpiresAt] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [refusal, setRefusal] = useState<{ title: string; body: string } | null>(null);
 
   const issueUrl = `${ISSUE_SITE_URL}/issue?email=${encodeURIComponent(email.trim())}`;
   const expiry = formatDay(expiresAt);
 
+  function startAgain() {
+    setEmail('');
+    setPublished(false);
+    setExpiresAt(null);
+    setRefusal(null);
+  }
+
   async function publish(event: React.FormEvent) {
     event.preventDefault();
     setBusy(true);
-    setError(null);
+    setRefusal(null);
+
+    const address = email.trim();
+    const answered = (reason: string, missing?: string[]) => {
+      const fallback = outcomeFor({ verdict: 'unknown', reason, missing });
+      setRefusal({ title: fallback.title, body: fallback.body });
+    };
+
     try {
-      // Publishing is what puts the credential where it can be collected, and the email carries the
-      // holder their own copy of the same link.
-      const result = (await requestCredentials({ email: email.trim() })) as
-        | { success?: boolean; error?: string; expiresAt?: string }
-        | undefined;
-      if (result && result.success === false) {
-        throw new Error(result.error || 'We could not prepare your credentials.');
+      // The question comes first: whether we hold this person, and whether they finished inside
+      // the window. The answer decides which door this page shows, and only a positive one is
+      // published for.
+      const checked = await fetch('/api/eligibility', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: address }),
+      }).then((response) => response.json());
+
+      const outcome = outcomeFor(checked);
+      if (outcome.door !== 'self') {
+        setRefusal({ title: outcome.title, body: outcome.body });
+        return;
       }
-      setExpiresAt(result?.expiresAt || null);
+
+      // Publishing is the institution's own act, from the record it holds. Nothing here asks
+      // anybody to invent a record, which is what this call replaced.
+      const result = (await fetch('/api/publish', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: address }),
+      }).then((response) => response.json())) as {
+        success?: boolean;
+        reason?: string;
+        missing?: string[];
+        expiresAt?: string;
+      };
+
+      if (!result?.success) {
+        answered(result?.reason || 'unreachable', result?.missing);
+        return;
+      }
+
+      setExpiresAt(result.expiresAt || null);
       setPublished(true);
-    } catch (err) {
-      setError((err as Error).message);
+    } catch {
+      answered('unreachable');
     } finally {
       setBusy(false);
     }
@@ -67,14 +116,59 @@ export default function GetCredentialsPage() {
   return (
     <section className="section" style={{ minHeight: '62vh' }}>
       <div className="container-narrow">
-        {published ? (
+        <span className="eyebrow" style={{ color: 'var(--link)' }}>
+          Smart Academy
+        </span>
+        <h1 style={{ fontSize: 32, letterSpacing: '-0.02em', margin: '14px 0 12px' }}>
+          Sign in with your email
+        </h1>
+        <p style={{ fontSize: 16, lineHeight: 1.65, color: 'var(--muted)', marginBottom: 30 }}>
+          {COPY.intro}
+        </p>
+        {refusal ? (
+          <>
+            <div className="card">
+              <h2 style={{ fontSize: 20, letterSpacing: '-0.01em', margin: '0 0 10px' }}>
+                {refusal.title}
+              </h2>
+              <p style={{ margin: 0, fontSize: 16, lineHeight: 1.65, color: 'var(--muted)' }}>
+                {refusal.body}
+              </p>
+              <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', marginTop: 18 }}>
+                <a
+                  className="btn btn-primary"
+                  href={REQUEST_PAGE_URL}
+                  style={{ minHeight: 44, display: 'inline-flex', alignItems: 'center' }}
+                >
+                  {CHECKED_PATH.action}
+                </a>
+                <button
+                  type="button"
+                  className="btn"
+                  onClick={startAgain}
+                  style={{ minHeight: 44, display: 'inline-flex', alignItems: 'center' }}
+                >
+                  Try another address
+                </button>
+              </div>
+              <p className="muted" style={{ marginTop: 16 }}>
+                Asking us to check costs {CHECKED_PATH.cost.toLowerCase()} and takes{' '}
+                {CHECKED_PATH.wait.toLowerCase()}. You will need{' '}
+                {CHECKED_PATH.needs.toLowerCase()}.
+              </p>
+            </div>
+            <p className="muted" style={{ marginTop: 18 }}>
+              Nothing has been changed on your record by this page.
+            </p>
+          </>
+        ) : published ? (
           <>
             <span className="eyebrow" style={{ color: 'var(--link)' }}>
               Issued by Quals
             </span>
-            <h1 style={{ fontSize: 32, letterSpacing: '-0.02em', margin: '14px 0 12px' }}>
+            <h2 style={{ fontSize: 24, letterSpacing: '-0.02em', margin: '14px 0 12px' }}>
               Your credentials are ready
-            </h1>
+            </h2>
             <p style={{ fontSize: 16, lineHeight: 1.65, color: 'var(--muted)', marginBottom: 24 }}>
               They are waiting for you on Quals, where you can add them to your wallet. We have also
               emailed you the same link.
@@ -109,17 +203,6 @@ export default function GetCredentialsPage() {
           </>
         ) : (
           <>
-            <span className="eyebrow" style={{ color: 'var(--link)' }}>
-              Smart Academy
-            </span>
-            <h1 style={{ fontSize: 32, letterSpacing: '-0.02em', margin: '14px 0 12px' }}>
-              Get your credentials
-            </h1>
-            <p style={{ fontSize: 16, lineHeight: 1.65, color: 'var(--muted)', marginBottom: 30 }}>
-              Sign in with the email address Smart Academy holds for you. We will prepare what you
-              hold and send you straight to Quals, where it is added to your wallet.
-            </p>
-
             <div className="card">
               <form onSubmit={publish}>
                 <label htmlFor="email">Email address</label>
@@ -130,20 +213,24 @@ export default function GetCredentialsPage() {
                   value={email}
                   onChange={(event) => setEmail(event.target.value)}
                   placeholder="you@example.com"
+                  // The shared input styling works out at about 37px, which is under the 44px the flow
+                  // asks for on the one control the whole page turns on.
+                  style={{ minHeight: 44 }}
                 />
-                {error && <p style={{ color: 'var(--err)' }}>{error}</p>}
                 <button
                   type="submit"
                   className="btn btn-primary"
-                  style={{ marginTop: 16 }}
+                  style={{ marginTop: 16, minHeight: 44, display: 'inline-flex', alignItems: 'center' }}
                   disabled={busy || !email.trim()}
                 >
-                  {busy ? 'Preparing…' : 'Prepare my credentials'}
+                  {busy ? 'Signing in…' : 'Sign in'}
                 </button>
               </form>
+              {/* The way out, shaped like the one every sign-in screen has: quiet, under the form,
+                  and a question about circumstances rather than a verdict about the person. */}
               <p className="muted" style={{ marginTop: 16 }}>
-                Nothing is issued here. Your credentials are published to Quals, and you collect them
-                there.
+                {CHECKED_PATH.prompt} <a href={REQUEST_PAGE_URL}>{CHECKED_PATH.action}</a>. A person
+                will look at it for you, and it is open to everyone.
               </p>
             </div>
           </>

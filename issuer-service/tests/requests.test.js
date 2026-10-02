@@ -77,11 +77,26 @@ function newService(overrides = {}) {
   return new RequestService({ invitationService: fakeInvitations(), ...overrides });
 }
 
+/**
+ * Open a case the way the wizard does.
+ *
+ * The number the school matches the record by hand with is part of opening one (P0-45), so it is
+ * supplied here once rather than repeated at every call site; the test below proves it is required.
+ */
+function openCase(service, fields = {}) {
+  return service.open({
+    institution: ACADEMY,
+    school: ACADEMY,
+    applicantEmail: 'holder@example.com',
+    applicantSsn: '123-45-6789',
+    ...fields,
+  });
+}
+
 /** A case up to the point the school has it, which is where most of these tests start. */
 function submitted(service, { institution = ACADEMY, email = 'holder@example.com' } = {}) {
-  const { requestId, token } = service.open({
+  const { requestId, token } = openCase(service, {
     institution,
-    school: ACADEMY,
     applicantEmail: email,
     applicantName: 'Ada Lovelace',
     wanted: ['both'],
@@ -102,21 +117,70 @@ test('the promised period skips weekends', () => {
   assert.strictEqual(ten.toISOString().slice(0, 10), '2026-10-05');
 });
 
-test('opening a case needs an address, a school, and a kind this issuer makes', () => {
+test('opening a case needs an address, a school, a number to match on, and a kind this issuer makes', () => {
   const service = newService();
   assert.throws(() => service.open({ institution: ACADEMY, school: ACADEMY, applicantEmail: 'not-an-address' }), /valid email/);
   assert.throws(() => service.open({ institution: ACADEMY, school: '', applicantEmail: 'a@b.com' }), /school/);
+  // Without it the school cannot look anybody up, so the case cannot be opened at all: a fee taken
+  // for a search that cannot be made is worse than being told to find the number first.
   assert.throws(
-    () => service.open({ institution: ACADEMY, school: ACADEMY, applicantEmail: 'a@b.com', wanted: ['diploma'] }),
+    () => service.open({ institution: ACADEMY, school: ACADEMY, applicantEmail: 'a@b.com' }),
+    /social security number is required/,
+  );
+  assert.throws(
+    () => service.open({ ...{ institution: ACADEMY, school: ACADEMY, applicantEmail: 'a@b.com' }, applicantSsn: '123-45-6789', wanted: ['diploma'] }),
     /Unknown credential kind/,
   );
 });
 
+test("the applicant's own view gives them back what they gave us", () => {
+  const service = newService();
+  const { requestId, token } = openCase(service, {
+    applicantName: 'Ada Lovelace',
+    applicantPhone: '+642102323447',
+    applicantSsn: '123-45-6789',
+    applicantStudentId: '58/745665',
+  });
+
+  // The document check takes the browser away and brings it back, so everything the wizard has to
+  // show on the review is read from here. A view that forgets the applicant's own answers leaves
+  // them checking a page of dashes before paying for a search made with them.
+  const view = service.applicantView({ requestId, token });
+  assert.strictEqual(view.name, 'Ada Lovelace');
+  assert.strictEqual(view.phone, '+642102323447');
+  assert.strictEqual(view.ssn, '123-45-6789');
+  assert.strictEqual(view.studentId, '58/745665');
+  assert.deepStrictEqual(view.wanted, ['both']);
+  assert.deepStrictEqual(view.fee, { amount: 3000, currency: 'USD' });
+  assert.strictEqual(view.workingDays, 10);
+
+  // Still their own case: their handle is what stands between a request id and somebody else's
+  // identity evidence.
+  assert.throws(() => service.applicantView({ requestId, token: 'not-the-handle' }), /not found/);
+
+  // A student id and a phone number are optional, so a case without them says so rather than
+  // offering up somebody else's.
+  const other = openCase(service, { applicantEmail: 'nobody@example.com' });
+  assert.strictEqual(service.applicantView(other).studentId, null);
+  assert.strictEqual(service.applicantView(other).phone, null);
+
+  // Once the document has been read, the name on the case is the document's rather than anything
+  // that arrived with the form: it is the name the school is asked to match, and the applicant is not
+  // asked for one (P0-45 follow-up).
+  service.attachIdentity({
+    requestId,
+    status: 'verified',
+    sessionRef: 'didit-name-1',
+    extract: { givenName: 'Ada', familyName: 'Lovelace', birthDate: '1815-12-10' },
+  });
+  const verified = service.applicantView({ requestId, token });
+  assert.strictEqual(verified.name, 'Ada Lovelace');
+  assert.strictEqual(verified.verifiedBirthDate, '1815-12-10');
+});
+
 test('a case cannot be submitted before the identity check and the fee', () => {
   const service = newService();
-  const { requestId, token } = service.open({
-    institution: ACADEMY, school: ACADEMY, applicantEmail: 'holder@example.com',
-  });
+  const { requestId, token } = openCase(service);
 
   assert.throws(() => service.submit({ requestId, token }), /identity check is not complete/);
 
@@ -126,9 +190,7 @@ test('a case cannot be submitted before the identity check and the fee', () => {
 
 test('a payment for the wrong amount is refused rather than recorded', () => {
   const service = newService();
-  const { requestId } = service.open({
-    institution: ACADEMY, school: ACADEMY, applicantEmail: 'holder@example.com',
-  });
+  const { requestId } = openCase(service);
   service.attachIdentity({ requestId, status: 'verified' });
 
   assert.throws(() => service.markPaid({ requestId, paymentRef: 'pi_1', amount: 1000 }), /this request is for 3000 USD/);
@@ -138,9 +200,7 @@ test('a payment for the wrong amount is refused rather than recorded', () => {
 
 test('a repeated identity callback does not move the case twice', () => {
   const service = newService();
-  const { requestId } = service.open({
-    institution: ACADEMY, school: ACADEMY, applicantEmail: 'holder@example.com',
-  });
+  const { requestId } = openCase(service);
   service.attachIdentity({ requestId, status: 'verified' });
   const again = service.attachIdentity({ requestId, status: 'verified' });
   assert.strictEqual(again.status, STATUS.AWAITING_PAYMENT);
@@ -151,9 +211,7 @@ test('a repeated identity callback does not move the case twice', () => {
 
 test('submitting starts the promised period, and only once', () => {
   const service = newService({ workingDays: 10 });
-  const { requestId, token } = service.open({
-    institution: ACADEMY, school: ACADEMY, applicantEmail: 'holder@example.com',
-  });
+  const { requestId, token } = openCase(service);
   service.attachIdentity({ requestId, status: 'verified' });
   service.markPaid({ requestId, paymentRef: 'pi_1' });
 
@@ -184,9 +242,7 @@ test('a decision names the reviewer, needs a reason, and cannot be taken twice',
 
 test('a case that was never submitted cannot be decided', () => {
   const service = newService();
-  const { requestId } = service.open({
-    institution: ACADEMY, school: ACADEMY, applicantEmail: 'holder@example.com',
-  });
+  const { requestId } = openCase(service);
   assert.throws(
     () => service.decide({ requestId, decision: 'accepted', reason: 'x', reviewedBy: 'r' }),
     /must be submitted before it can be decided/,
@@ -289,9 +345,7 @@ test('the queue is scoped, aged in working days, and flags an overdue promise', 
 
 test('an unfinished case is abandoned rather than left in the queue for ever', () => {
   const service = newService({ draftDays: 30 });
-  const { requestId } = service.open({
-    institution: ACADEMY, school: ACADEMY, applicantEmail: 'holder@example.com',
-  });
+  const { requestId } = openCase(service);
 
   assert.strictEqual(service.prune(), 0, 'a case opened today is not stale');
   const old = new Date(Date.now() - 40 * 24 * 60 * 60 * 1000).toISOString();

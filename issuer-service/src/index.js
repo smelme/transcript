@@ -8,7 +8,7 @@ import Ajv from 'ajv';
 import addFormats from 'ajv-formats';
 import QRCode from 'qrcode';
 import { InvitationService } from './invitations.js';
-import { RequestService } from './requests.js';
+import { RequestService, extractedBirthDate, extractedName } from './requests.js';
 import { IdentityService, identityReason } from './identity-service.js';
 import { PaymentService } from './payment-service.js';
 import fs from 'fs';
@@ -33,9 +33,10 @@ import {
   kindOfCredentialData,
   labelOfCredentialData,
   academicNamespacesOf,
-  todayIso,
+  validateAcademicClaims,
 } from './credential-generator.js';
 import * as emailService from './email-service.js';
+import { oneItemPerProgramme, programmeKeyOf } from './issuance-items.js';
 import { getDb } from '../../db.js';
 import {
   packStatusList,
@@ -467,6 +468,88 @@ class IssuerService {
     return session;
   }
 
+  /**
+   * The metadata row an issued credential was recorded in, as the database holds it (P0-43).
+   *
+   * This is the issuer's own record that a credential exists, and it is what "is it in the wallet"
+   * is answered from: the session says what the issuer did, and this says what it recorded, and a
+   * document is only treated as collected when the two agree.
+   */
+  getCredentialRecord(credentialId) {
+    if (!credentialId) {return null;}
+    try {
+      return this.db
+        .prepare('SELECT credential_id, status, created_at FROM credentials WHERE credential_id = ?')
+        .get(String(credentialId)) || null;
+    } catch (e) {
+      console.error('[issuer] credential record lookup failed:', e.message);
+      return null;
+    }
+  }
+
+  /**
+   * Stop holding one credential document (P0-43).
+   *
+   * The mdoc is the credential itself: signed bytes that can be presented. The issuer holds them
+   * only so a wallet can collect them - they are never written to the database - so once the holder
+   * has the document, a copy in this process has no remaining purpose. The record of the issue is a
+   * separate thing and is kept: what goes is the document.
+   *
+   * Returns whether there was anything to forget, so a caller can say what happened.
+   */
+  forgetMdoc(credentialId) {
+    if (!credentialId) {return false;}
+    return this.mdocSessions.delete(String(credentialId));
+  }
+
+  /**
+   * Read a collection back from the issuer's records, and stop keeping what has arrived (P0-43).
+   *
+   * The browser saying "done" is a hint, not evidence, so nothing here trusts it: a credential
+   * counts as collected only when the session says `issued` *and* the metadata row for the issued
+   * credential is there. Only then are the bytes forgotten, because forgetting them earlier would
+   * leave somebody who scanned the code holding nothing.
+   *
+   * Every copy of that programme which is already in a wallet is forgotten too. It is the same person
+   * holding the same programme, and no wallet is waiting for the second one.
+   */
+  settleCollected({ confirmed = [], held = [] } = {}) {
+    const groups = new Map();
+    for (const session of held) {
+      const key = programmeKeyOf(session);
+      if (!groups.has(key)) {groups.set(key, []);}
+      groups.get(key).push(session);
+    }
+
+    let forgotten = 0;
+    const items = confirmed.map((session) => {
+      const record = this.getCredentialRecord(session.credentialId);
+      const inWallet = session.status === 'issued' && !!record;
+      if (inWallet) {
+        for (const copy of groups.get(programmeKeyOf(session)) || [session]) {
+          if (copy.status === 'issued' && this.forgetMdoc(copy.credentialId)) {forgotten += 1;}
+        }
+      }
+      return {
+        sessionId: session.sessionId,
+        title: session.display?.title || 'Academic credential',
+        degreeLevel: session.display?.degreeLevel || null,
+        graduationDate: session.display?.graduationDate || null,
+        inWallet,
+        credentialId: session.credentialId || null,
+        // When the issuer recorded it, which is what makes the answer checkable rather than asserted.
+        recordedAt: record?.created_at || null,
+      };
+    });
+
+    return {
+      success: true,
+      items,
+      allInWallet: items.length > 0 && items.every((item) => item.inWallet),
+      mdocsForgotten: forgotten,
+    };
+  }
+
   // Remove timed-out mdoc sessions
   pruneExpiredMdocSessions() {
     const now = Date.now();
@@ -655,7 +738,13 @@ class IssuerService {
     }
     const session = this.getMdocSession(credentialId);
     if (!session) {
-      return { success: false, error: 'mdoc session expired. Re-issue the credential to retrieve the mdoc' };
+      // The ordinary case now (P0-44): the document is handed over in the response to the claim
+      // that issued it, and nothing is kept afterwards. Saying "expired" would suggest a window the
+      // caller missed, when there is no window at all.
+      return {
+        success: false,
+        error: 'No document is held for this credential: it was handed to the wallet that collected it',
+      };
     }
     const verification = verifyIssuerSigned(session.mdocBase64url);
     return {
@@ -903,27 +992,25 @@ class IssuerService {
 
   // Issue a device-bound mdoc for an issuance session, of whatever kind it holds.
   //
-  // A session that has already been claimed is refused unless the caller asks for a re-issue.
-  // That is what stops a double tap or a replayed offer minting a second credential, while still
-  // letting a holder who asks again be issued one - for another device, or to replace a credential
-  // they no longer have. The copy they already hold is untouched: replacing it is an operation on
-  // the status list, not a side effect of issuing another.
-  issueForSession(session, deviceJwk, { allowReissue = false } = {}) {
-    if (session.status === 'issued' && !allowReissue) {
-      return { success: false, error: 'Issuance session already claimed' };
+  // Issue a device-bound mdoc for an issuance session, of whatever kind it holds.
+  //
+  // A session that has already been claimed is refused, and there is no way to ask for it again
+  // (P0-44). The document was handed over once, when it was collected, and the issuer does not keep
+  // it: a holder who needs another copy asks the institution, which publishes again under its own
+  // name. Replacing a credential somebody still holds is an operation on the status list, and it is
+  // the institution's decision rather than the price of asking twice.
+  issueForSession(session, deviceJwk) {
+    if (session.status === 'issued') {
+      return {
+        success: false,
+        error: 'This credential has already been added to a wallet. Ask the institution that issued it if you need another copy',
+      };
     }
     if (session.status === 'superseded') {
       return {
         success: false,
         error: 'This credential was replaced by a newer one. Open your latest invitation link',
       };
-    }
-    if (session.status === 'issued') {
-      // Issuing again is issuing a document, and a document is dated the day it is issued rather
-      // than the day the invitation behind it was prepared. Everything else is the same, so the
-      // new copy says the same thing about the study as the one it replaces.
-      session.credentialData = { ...session.credentialData, issue_date: todayIso() };
-      session.reissuedAt = new Date().toISOString();
     }
     const docType = session.credentialData?.docType || PHOTOID_DOCTYPE;
     const statusIndex = this._allocateStatusIndex();
@@ -951,7 +1038,9 @@ class IssuerService {
 
     this.credentials.set(credentialId, credential);
     this._persistCredential(credential);
-    this.storeMdocSession(credentialId, mdoc.base64url);
+    // The document is returned to whoever claimed it, in the response to that claim, and is not
+    // kept here afterwards. What the issuer holds once a credential is issued is the record of it
+    // (P0-44): the mdoc exists to be collected, and collecting is the end of our part.
     this.statistics.totalIssued++;
     this.statistics.byType['PhotoID'] = (this.statistics.byType['PhotoID'] || 0) + 1;
 
@@ -979,13 +1068,18 @@ class IssuerService {
   // Claim an issuance session with a wallet access token + proof-of-possession
   // CWT. The token's `sub` must be linked (via an institute invitation) to the
   // session's studentId, and the CWT must be signed by the wallet's device key.
-  async claimIssuanceSession(sessionId, { accessToken, cwt, allowReissue = false }, walletAccounts) {
+  async claimIssuanceSession(sessionId, { accessToken, cwt }, walletAccounts) {
     const session = this.getIssuanceSession(sessionId);
     if (!session) {return { success: false, status: 404, error: 'Issuance session not found' };}
-    // A session already claimed is refused unless this claim came from an offer that asked for a
-    // re-issue - the holder's own request rather than a retry.
-    if (session.status === 'issued' && !allowReissue) {
-      return { success: false, status: 409, error: 'Issuance session already claimed' };
+    // A session that has been claimed is refused outright (P0-44). The document went with the claim
+    // that took it and is not held here any more, so there is nothing to hand over a second time -
+    // and a second copy is the institution's to decide, not the price of opening the link again.
+    if (session.status === 'issued') {
+      return {
+        success: false,
+        status: 409,
+        error: 'This credential has already been added to a wallet. Ask the institution that issued it if you need another copy',
+      };
     }
     if (session.status === 'superseded') {
       return {
@@ -1030,7 +1124,7 @@ class IssuerService {
       return { success: false, status: 401, error: `Invalid CWT: ${cwtResult.error}` };
     }
 
-    const result = this.issueForSession(session, cwtResult.devicePublicJwk, { allowReissue });
+    const result = this.issueForSession(session, cwtResult.devicePublicJwk);
     return { ...result, status: result.success ? 200 : 400 };
   }
 
@@ -1364,10 +1458,10 @@ const paymentService = new PaymentService({
 
 // Build an OpenID4VCI credential-offer URL that references an issuance session.
 //
-// A re-issue is marked inside the offer itself, because the offer is what travels to the wallet.
-// A session that has already been claimed may only be claimed again from an offer that carries
-// the marker, so a replayed or double-tapped offer cannot mint a second credential by accident.
-function buildCredentialOfferUrl(session, { reissue = false } = {}) {
+// An offer is good once, and it carries nothing that could ask for the credential a second time
+// (P0-44). A second copy is the institution's decision, so there is no marker for a wallet to send
+// and none for a replayed offer to carry: the claim refuses a session that has been claimed.
+function buildCredentialOfferUrl(session) {
   const offer = {
     credential_issuer: process.env.ISSUER_BASE_URL || 'https://issuer.smartcollege.example',
     issuer_id: session.institution,
@@ -1380,23 +1474,8 @@ function buildCredentialOfferUrl(session, { reissue = false } = {}) {
       },
     },
   };
-  if (reissue) {offer.reissue = true;}
   const encoded = Buffer.from(JSON.stringify(offer)).toString('base64url');
   return `openid-credential-offer://?credential_offer=${encoded}`;
-}
-
-// Whether an offer carries the holder's request to be issued the credential again.
-function isReissueOffer(offerUrl) {
-  let encoded = String(offerUrl || '').trim();
-  if (!encoded) {return false;}
-  const q = encoded.match(/[?&]credential_offer=([^&]+)/);
-  if (q) {encoded = q[1];}
-  try {
-    const json = Buffer.from(encoded.replace(/-/g, '+').replace(/_/g, '/'), 'base64').toString('utf8');
-    return JSON.parse(json)?.reissue === true;
-  } catch {
-    return false;
-  }
 }
 
 // When WALLET_APP_LINK_BASE is configured (e.g. https://quals.example/offer),
@@ -1928,6 +2007,27 @@ const ACADEMY_SITE_URL =
 
 const isEmail = (value) => /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(String(value || '').trim());
 
+/**
+ * The addresses a demonstration deployment will invent a record for (P0-41, demo only).
+ *
+ * `DEMO_RECORDS_ALLOWLIST` is a comma-separated list. Unset means `ALLOW_DEMO_RECORDS` alone
+ * decides, which is what a developer's own machine wants. Set means only those addresses are
+ * invented for, so one flag cannot open the generator to everybody who learns the address — the
+ * academy's sign-in offers the self-service door to the same list, and this is the fence behind it.
+ */
+export function demoRecordAllowlist(value = process.env.DEMO_RECORDS_ALLOWLIST) {
+  return String(value || '')
+    .split(',')
+    .map((entry) => entry.trim().toLowerCase())
+    .filter(Boolean);
+}
+
+/** Whether an address may be invented for, given the list the deployment was handed (if any). */
+export function demoRecordAllowed(email, allowlist = demoRecordAllowlist()) {
+  if (allowlist.length === 0) {return true;}
+  return allowlist.includes(String(email || '').trim().toLowerCase());
+}
+
 /** A number that is present, or null so the calling table omits the element. */
 const numberOrNull = (value) => (typeof value === 'number' && Number.isFinite(value) ? value : null);
 
@@ -2009,6 +2109,25 @@ function bearerToken(req) {
 app.post('/issuance/invitations', async (req, res) => {
   try {
     if (!(await requireApiKey(req, res))) {return;}
+
+    // The claims are checked before they are stored. A credential is signed with whatever
+    // arrives here, so a namespace of the caller's own invention, or an award with no date,
+    // would otherwise be discovered by whoever opens the wallet rather than at the boundary.
+    // This does not make a thin record publishable; it makes a malformed one refusable.
+    const published = Array.isArray(req.body?.credentials) ? req.body.credentials : [];
+    if (published.length === 0) {
+      return res.status(400).json({ success: false, error: 'Publish at least one credential' });
+    }
+    for (const [index, item] of published.entries()) {
+      const checked = validateAcademicClaims(item?.claims);
+      if (!checked.ok) {
+        return res.status(400).json({
+          success: false,
+          error: `credential ${index + 1}: ${checked.errors.join('; ')}`,
+        });
+      }
+    }
+
     const result = await invitationService.create({
       institution: req.clientOrg.institution,
       apiKeyId: req.clientOrg.keyId || null,
@@ -2065,7 +2184,11 @@ app.get('/issuance/invitations/:id/items', async (req, res) => {
     const token = bearerToken(req);
     if (!token) {return res.status(401).json({ success: false, error: 'Sign in required' });}
     const holder = await walletAccounts.verifyAccessToken(token);
-    const items = invitationService.items({ invitationId: req.params.id, email: holder.email });
+    // One row per programme: two sessions for one programme are normal (a collected copy, and a
+    // current one published later), and listing both asks the holder to add what they already hold.
+    const items = oneItemPerProgramme(
+      invitationService.items({ invitationId: req.params.id, email: holder.email }),
+    );
     res.json({
       success: true,
       credentials: items.map((session) => ({
@@ -2101,6 +2224,53 @@ app.post('/issuance/invitations/:id/claimed', async (req, res) => {
   }
 });
 
+// The holder has finished at the wallet and says so (P0-43).
+//
+// Saying so is not evidence, so the answer is read from the issuer's own records: the session must
+// say `issued`, and the metadata row for the issued credential must be there. Once that is true of
+// everything they chose, the documents stop being held here - the record of the issue is kept, the
+// credential itself is not - and the page can tell them the thing is done.
+app.post('/issuance/collection/confirmed', async (req, res) => {
+  try {
+    const token = bearerToken(req);
+    if (!token) {return res.status(401).json({ success: false, error: 'Sign in required' });}
+    const holder = await walletAccounts.verifyAccessToken(token);
+
+    const requested = Array.isArray(req.body?.sessionIds)
+      ? req.body.sessionIds.map((id) => String(id || '').trim()).filter(Boolean)
+      : [];
+    if (requested.length === 0) {
+      // Refused rather than read as "nothing to do": a page that sent no ids is broken, and saying
+      // "done" to a broken request would confirm a collection nobody made.
+      return res.status(400).json({
+        success: false,
+        error: 'Tell us which credentials you added, so we can check them',
+      });
+    }
+
+    const links = walletAccounts.getLinks(holder.sub);
+    const confirmed = [];
+    for (const sessionId of requested) {
+      const session = issuer.getIssuanceSession(sessionId);
+      if (!session) {return res.status(404).json({ success: false, error: 'Credential not found' });}
+      const owns =
+        session.sub === holder.sub ||
+        links.some((l) => l.institution === session.institution && l.studentId === session.studentId);
+      if (!owns) {
+        return res.status(403).json({ success: false, error: 'This credential belongs to another account' });
+      }
+      confirmed.push(session);
+    }
+
+    // The holder's whole list, so a programme held in more than one copy settles as one thing rather
+    // than only the copy that happened to be named.
+    const held = issuer.listIssuanceSessions({ sub: holder.sub, email: holder.email, links });
+    res.json(issuer.settleCollected({ confirmed, held }));
+  } catch (e) {
+    res.status(400).json({ success: false, error: e.message });
+  }
+});
+
 // The offer for one prepared credential, which is where issuing actually happens. Same rules as
 // the route it replaces: the holder must own the credential, a superseded one is refused, and
 // asking again issues another copy rather than a second identity.
@@ -2117,6 +2287,12 @@ app.post('/issuance/items/:sessionId/offer', async (req, res) => {
       session.sub === holder.sub ||
       links.some((l) => l.institution === session.institution && l.studentId === session.studentId);
     if (!owns) {return res.status(403).json({ success: false, error: 'This credential belongs to another account' });}
+    if (session.status === 'issued') {
+      return res.status(409).json({
+        success: false,
+        error: 'This has already been added to a wallet. Ask the institution that issued it if you need another copy',
+      });
+    }
     if (session.status === 'superseded') {
       return res.status(409).json({
         success: false,
@@ -2124,9 +2300,8 @@ app.post('/issuance/items/:sessionId/offer', async (req, res) => {
       });
     }
 
-    const reissue = session.status === 'issued';
     if (session.termsRequired && !session.termsAcceptedAt) {issuer.acceptTerms(session.sessionId);}
-    const offerUrl = buildCredentialOfferUrl(session, { reissue });
+    const offerUrl = buildCredentialOfferUrl(session);
     const qrDataUrl = await QRCode.toDataURL(offerUrl, {
       errorCorrectionLevel: 'M',
       type: 'image/png',
@@ -2141,7 +2316,6 @@ app.post('/issuance/items/:sessionId/offer', async (req, res) => {
       kind: kindOf(session),
       label: kindLabel(session),
       offerUrl,
-      reissued: reissue,
       appLinkUrl: buildAppLinkOfferUrl(offerUrl),
       qrDataUrl,
     });
@@ -2184,7 +2358,9 @@ function requestSummary(request) {  return {
     school: request.school,
     applicantEmail: request.applicant_email,
     applicantPhone: request.applicant_phone,
-    applicantName: request.applicant_name,
+    // The document's name where the check has run, since that is the name the school is matching and
+    // the applicant is no longer asked to type one (P0-45 follow-up).
+    applicantName: extractedName(request) || request.applicant_name,
     wanted: typeof request.wanted === 'string' ? JSON.parse(request.wanted) : request.wanted,
     status: request.status,
     applicantStatus: request.applicantStatus,
@@ -2226,6 +2402,11 @@ app.get('/admin/requests/:id', async (req, res) => {
       success: true,
       request: {
         ...requestSummary(request),
+        // What the school matches the record by hand with, and the student id when the applicant
+        // knew it (P0-45). On the one case rather than on the queue: a reviewer reads these while
+        // looking somebody up, and a list of them is a list nobody needs to be holding.
+        applicantSsn: request.applicant_ssn ?? null,
+        applicantStudentId: request.applicant_student_id ?? null,
         extract: request.extract,
         identitySummary: request.identitySummary,
         canDecide: request.canDecide,
@@ -2354,7 +2535,12 @@ app.post('/requests', async (req, res) => {
       school: req.body?.school || ACADEMY_NAME,
       applicantEmail: req.body?.email,
       applicantPhone: req.body?.phone ?? null,
-      applicantName: req.body?.name ?? null,
+      // No name is taken from here: the applicant door does not ask for one, and the document check
+      // reads it instead. A name supplied by a browser is a name nobody verified.
+      // What the school matches the record by hand with (P0-45): the number is required, and a
+      // student id is taken when the applicant knows it.
+      applicantSsn: req.body?.ssn ?? null,
+      applicantStudentId: req.body?.studentId ?? null,
       wanted: req.body?.wanted,
     });
     res.status(201).json({
@@ -2411,7 +2597,7 @@ app.post('/requests/:id/identity', async (req, res) => {
     }
     if (!identityService.configured) {throw new Error('Identity checks are not configured');}
 
-    const session = await identityService.createSession({ requestId: row.request_id });
+    const session = await identityService.createSession({ requestId: row.request_id, handle: req.body?.token });
     requestService.startIdentity({
       requestId: row.request_id,
       token: req.body?.token,
@@ -2441,6 +2627,10 @@ app.get('/requests/:id/identity', async (req, res) => {
         success: true,
         identityStatus: row.identity_status,
         reason: row.identity_status === 'failed' ? identityReason(null) : null,
+        // What the document said, so the applicant can see the date of birth the search will use and
+        // the name it will be made in.
+        birthDate: extractedBirthDate(row),
+        name: extractedName(row),
       });
     }
     if (!row.identity_ref) {return res.json({ success: true, identityStatus: 'pending', url: null });}
@@ -2459,11 +2649,169 @@ app.get('/requests/:id/identity', async (req, res) => {
       success: true,
       identityStatus: updated.identity_status,
       reason: updated.identity_status === 'failed' ? identityReason(decision.status) : null,
+      birthDate: extractedBirthDate(updated),
+      name: extractedName(updated),
     });
   } catch (e) {
     sendRequestError(res, e);
   }
 });
+
+/**
+ * The provider's session id, wherever it arrives.
+ *
+ * Its server notification puts it in the body as `session_id`; its redirect puts it in the query as
+ * `verificationSessionId`. One function reads both, because two entry points reading two different
+ * names is exactly how the redirect came to answer "Cannot GET".
+ */
+function providerSessionIdFrom(req) {
+  const candidates = [
+    req.body?.session_id,
+    req.body?.sessionId,
+    req.query?.verificationSessionId,
+    req.query?.session_id,
+    req.query?.sessionId,
+  ];
+  for (const candidate of candidates) {
+    const value = String(candidate ?? '').trim();
+    if (value) {return value;}
+  }
+  return null;
+}
+
+/** The page interpolates a reason and a handle that both arrive from outside this process. */
+function escapeHtmlText(value) {
+  return String(value ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
+/**
+ * The page a person lands on when the provider sends their browser back after the check.
+ *
+ * A page rather than JSON, because the visitor is a graduate holding a phone rather than a client,
+ * and it has to do one thing above all: put them back in front of their own request. The styling is
+ * inline and dependency-free on purpose - this is the one screen in the flow that must render even
+ * when everything else is having a bad day.
+ */
+function identityReturnPage({ outcome, reference, handle, reason }) {
+  const back = reference && handle
+    ? `${ISSUE_SITE_URL}/request?reference=${encodeURIComponent(reference)}&token=${encodeURIComponent(handle)}`
+    : `${ISSUE_SITE_URL}/request`;
+
+  let heading = 'Your check is on its way';
+  let body = 'This can take a moment. Go back to your request - it keeps checking for you, and there is nothing else you need to do.';
+
+  if (outcome === 'verified') {
+    heading = 'That is you confirmed';
+    body = 'Your identity check is done. Go back to your request to carry on.';
+  } else if (outcome === 'failed') {
+    heading = 'We could not complete that check';
+    body = reason || identityReason(null);
+  }
+
+  return `<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>${escapeHtmlText(heading)} - Quals</title>
+<style>
+  :root { color-scheme: light dark; }
+  body { margin: 0; background: #f7f7f8; color: #16181d;
+         font: 16px/1.6 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+  main { max-width: 34rem; margin: 0 auto; padding: 3rem 1.25rem; }
+  h1 { font-size: 1.5rem; line-height: 1.3; margin: 0 0 .75rem; letter-spacing: -.01em; }
+  p { margin: 0 0 1.25rem; color: #4a4f5a; }
+  a.button { display: inline-flex; align-items: center; min-height: 44px; padding: 0 1.25rem;
+             border-radius: 999px; background: #16181d; color: #fff; text-decoration: none;
+             font-weight: 600; }
+  @media (prefers-color-scheme: dark) {
+    body { background: #101216; color: #f2f3f5; }
+    p { color: #b9bdc7; }
+    a.button { background: #f2f3f5; color: #101216; }
+  }
+</style>
+</head>
+<body>
+  <main>
+    <h1>${escapeHtmlText(heading)}</h1>
+    <p>${escapeHtmlText(body)}</p>
+    <p><a class="button" href="${escapeHtmlText(back)}">Back to my request</a></p>
+  </main>
+</body>
+</html>`;
+}
+
+/**
+ * Where the applicant's browser comes back to after the identity provider has finished with them.
+ *
+ * Nothing in the address decides anything. `status=Approved` is a claim by whoever holds the URL, so
+ * it is ignored outright; the only thing taken from it is which session to ask about, and the answer
+ * comes from the provider's API, exactly as it does for the webhook. A session that maps to no case
+ * renders the same page and changes nothing.
+ *
+ * No rate limit, deliberately, and not out of optimism: the provider call only happens once a
+ * session id has been matched to a case we already hold, and that id is a value the caller cannot
+ * guess. A limiter here would be a new dependency guarding the one route that has to keep working.
+ */
+async function identityReturn(req, res) {
+  const sessionId = providerSessionIdFrom(req);
+  const handle = req.params?.handle || null;
+
+  let outcome = null;
+  let reason = null;
+  let reference = null;
+
+  const row = sessionId ? requestService.findByIdentityRef(sessionId) : null;
+
+  if (row) {
+    reference = row.request_id;
+
+    if (row.identity_status === 'verified' || row.identity_status === 'failed') {
+      // Already decided. Somebody may be reloading the page, and reloading must not change the
+      // answer they have already been given.
+      outcome = row.identity_status;
+      reason = outcome === 'failed' ? identityReason(null) : null;
+    } else {
+      try {
+        const decision = await identityService.getDecision(sessionId);
+        if (decision.outcome === 'pending') {
+          reason = identityReason(decision.status);
+        } else {
+          const updated = applyIdentityOutcome(row, decision, 'identity-provider');
+          outcome = updated.identity_status;
+          reason = outcome === 'failed' ? identityReason(decision.status) : null;
+        }
+      } catch (e) {
+        // Somebody is standing in front of this page. A provider we cannot reach is something to
+        // tell them about plainly, and the request page keeps checking regardless.
+        console.error('The identity decision could not be collected on the return:', e.message);
+      }
+    }
+  }
+
+  // Put the applicant back in front of their own request rather than leaving them on a page of ours.
+  // The wizard reads the marker: it carries on if the check passed, and offers another try if it did
+  // not. The rendered page below is the fallback for a session with no handle to return with.
+  if (reference && handle) {
+    const back = new URL(`${ISSUE_SITE_URL}/request`);
+    back.searchParams.set('reference', reference);
+    back.searchParams.set('token', handle);
+    back.searchParams.set('identity', outcome || 'pending');
+    return res.redirect(302, back.toString());
+  }
+
+  res.type('html').status(200).send(identityReturnPage({ outcome, reference, handle, reason }));
+}
+
+// The provider redirects the applicant's browser here. Two spellings of the path because the handle
+// is optional: a session started without one still has somewhere to come back to.
+app.get('/requests/identity/callback', identityReturn);
+app.get('/requests/identity/callback/:handle', identityReturn);
 
 /**
  * The provider's notification that there is a decision to collect.
@@ -2476,7 +2824,7 @@ app.post(
   '/requests/identity/callback',
   express.json({ limit: '256kb', verify: (req, _res, buffer) => {req.rawBody = buffer.toString('utf8');} }),
   async (req, res) => {
-    const sessionId = String(req.body?.session_id || req.body?.sessionId || '').trim();
+    const sessionId = providerSessionIdFrom(req);
     if (!sessionId) {return res.status(400).json({ success: false, error: 'A session is required' });}
     if (!identitySignatureValid(req)) {
       return res.status(401).json({ success: false, error: 'Signature check failed' });
@@ -2521,26 +2869,30 @@ app.post('/requests/:id/checkout', async (req, res) => {
     }
     if (!paymentService.configured) {throw new Error('Payment is not configured');}
 
-    // Where the applicant comes back to. The handle travels in it because the return is a fresh page
-    // load with no memory of the wizard, and the same handle is what lets them see their own case.
-    // The provider replaces the session placeholder, so the return carries which payment it was.
+    // Where the applicant comes back to if the provider insists on sending them somewhere. The handle
+    // travels in it because the return is a fresh page load with no memory of the wizard, and the same
+    // handle is what lets them see their own case. The provider replaces the session placeholder, so
+    // the return carries which payment it was.
     const back = `${ISSUE_SITE_URL}/request?reference=${encodeURIComponent(row.request_id)}&token=${encodeURIComponent(cash)}`;
-    const session = await paymentService.createCheckout({
+    const session = await paymentService.createEmbeddedCheckout({
       requestId: row.request_id,
       amount: row.fee_amount,
       currency: row.fee_currency,
       productName: `Credential request: ${row.school}`,
       description: 'Checking your record and issuing your credential',
-      successUrl: `${back}&paid=1&session_id={CHECKOUT_SESSION_ID}`,
-      cancelUrl: `${back}&cancelled=1`,
+      returnUrl: `${back}&paid=1&session_id={CHECKOUT_SESSION_ID}`,
     });
 
-    // Recorded as well as returned, so confirming does not depend on the return keeping its query.
+    // Recorded as well as returned, so confirming does not depend on the browser coming back with
+    // anything at all: the embedded form finishes where it is and asks us to confirm.
     requestService.recordCheckout({ requestId: row.request_id, sessionId: session.sessionId });
 
     res.json({
       success: true,
-      checkoutUrl: session.url,
+      // What the browser mounts, and the key it mounts it with. The amount is repeated so the page can
+      // say what it is about to take without trusting what it was told earlier.
+      clientSecret: session.clientSecret,
+      publishableKey: paymentService.publishableKey,
       sessionId: session.sessionId,
       fee: { amount: row.fee_amount, currency: row.fee_currency },
     });
@@ -2734,9 +3086,44 @@ async function tellApplicant(request) {
 
 app.post('/academy/requests', async (req, res) => {
   try {
+    // The generator is fenced, not deleted (P0-41).
+    //
+    // This route does not publish a record, it *invents* one: the graduation year is picked from
+    // a range, the modules come from a demo fixture, and the credits are computed. It is what the
+    // self-service path used to run on, and every credential it produced was synthetic. A silent
+    // fallback to generated claims is the most dangerous thing this codebase could do, because
+    // the result looks exactly like a real credential and is not.
+    //
+    // The demo sites still need a recognisable record to show, so the route stays behind a flag
+    // that has to be set deliberately. It is off unless somebody says otherwise, which means the
+    // live deployments must publish through /issuance/invitations instead.
+    if (process.env.ALLOW_DEMO_RECORDS !== 'true') {
+      return res.status(409).json({
+        success: false,
+        error:
+          'This route invents a record and is disabled. Publish the institution\u2019s real claims '
+          + 'through POST /issuance/invitations with an API key. Set ALLOW_DEMO_RECORDS=true only on '
+          + 'a demonstration deployment.',
+        code: 'DEMO_RECORDS_DISABLED',
+      });
+    }
+
     const email = String(req.body?.email || '').trim().toLowerCase();
     if (!isEmail(email)) {
       return res.status(400).json({ success: false, error: 'Please provide a valid email address' });
+    }
+
+    // The flag opens the generator; the list closes it again to the addresses this deployment was
+    // told to serve. Checked before anything is generated, so an address off the list leaves no
+    // trace: no student id, no account link, no prepared credential, no email.
+    if (!demoRecordAllowed(email)) {
+      return res.status(403).json({
+        success: false,
+        error:
+          'This demonstration deployment invents a record for a short list of addresses only. '
+          + 'Set DEMO_RECORDS_ALLOWLIST to change which addresses those are.',
+        code: 'DEMO_RECORDS_NOT_ALLOWED',
+      });
     }
 
     // Deterministic student id so repeat requests always map to one person.
@@ -2930,7 +3317,7 @@ app.get('/academy/credentials', async (req, res) => {
     res.json({
       success: true,
       email: payload.email,
-      credentials: sessions.map((session) => ({
+      credentials: oneItemPerProgramme(sessions).map((session) => ({
         sessionId: session.sessionId,
         status: session.status,
         inWallet: session.status === 'issued',
@@ -2975,15 +3362,17 @@ app.post('/academy/credentials/:sessionId/offer', async (req, res) => {
       );
     if (!owns) {return res.status(403).json({ success: false, error: 'This credential belongs to another account' });}
 
-    // A credential already sitting in a wallet is not a reason to refuse it. The holder is asking
-    // for the document, and asking again is asking for another copy: it is issued again, dated the
-    // day it is issued, and the copy they already hold stays valid until the organisation revokes
-    // it - which is the operational way one credential is replaced by another.
-    const reissue = session.status === 'issued';
     if (session.status === 'superseded') {
       return res.status(409).json({
         success: false,
         error: 'This credential was replaced by a newer one. Open your latest invitation link',
+      });
+    }
+    // Already collected, so there is no second copy to offer (P0-44).
+    if (session.status === 'issued') {
+      return res.status(409).json({
+        success: false,
+        error: 'This has already been added to a wallet. Ask the institution that issued it if you need another copy',
       });
     }
 
@@ -2991,7 +3380,7 @@ app.post('/academy/credentials/:sessionId/offer', async (req, res) => {
       issuer.acceptTerms(session.sessionId);
     }
 
-    const offerUrl = buildCredentialOfferUrl(session, { reissue });
+    const offerUrl = buildCredentialOfferUrl(session);
     const qrDataUrl = await QRCode.toDataURL(offerUrl, {
       errorCorrectionLevel: 'M',
       type: 'image/png',
@@ -3006,9 +3395,6 @@ app.post('/academy/credentials/:sessionId/offer', async (req, res) => {
       kind: kindOf(session),
       label: kindLabel(session),
       offerUrl,
-      // True when this offer issues the credential again rather than for the first time, so the
-      // page can say so rather than presenting it as a first issuance.
-      reissued: reissue,
       // Present only when a wallet App Link domain is configured.
       appLinkUrl: buildAppLinkOfferUrl(offerUrl),
       qrDataUrl,
@@ -3085,17 +3471,16 @@ app.post('/issuance-sessions/:id/claim', async (req, res) => {
 // The wallet scans the offer URL, then sends the offer + its access token + a
 // proof-of-possession CWT in ONE request; the mdoc is returned directly.
 app.post('/wallet/issuance', async (req, res) => {
-  const { offerUrl, sessionId, accessToken, cwt, reissue } = req.body || {};
+  const { offerUrl, sessionId, accessToken, cwt } = req.body || {};
   const resolved = sessionId || parseSessionIdFromOffer(offerUrl);
   if (!resolved) {
     return res.status(400).json({ success: false, error: 'offerUrl or sessionId is required' });
   }
-  // Only an offer that says the holder asked for a re-issue may claim a session a second time.
-  // The marker travels inside the offer, so a wallet replaying an older one is still refused.
-  const allowReissue = reissue === true || isReissueOffer(offerUrl);
+  // An offer is good once: a session that has been claimed is refused here, and there is no marker
+  // a wallet could send to ask for it again (P0-44).
   const result = await issuer.claimIssuanceSession(
     resolved,
-    { accessToken, cwt, allowReissue },
+    { accessToken, cwt },
     walletAccounts,
   );
   if (!result.success) {
@@ -3212,7 +3597,7 @@ app.use((err, req, res, _next) => {
 });
 
 // Export for testing
-export { IssuerService, app, issuer, buildCredentialOfferUrl, isReissueOffer };
+export { IssuerService, app, issuer, buildCredentialOfferUrl };
 
 // Start server if run directly (robust entry-point detection)
 const PORT = process.env.PORT || 3000;

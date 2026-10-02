@@ -82,9 +82,55 @@ export class PaymentService {
     };
   }
 
-  /** Look a session up. This is where a payment is confirmed from. */
-  async getSession(sessionId) {
+  /**
+   * The same checkout, embedded in the applicant's own page.
+   *
+   * One page fewer to be lost on: the applicant is about to hand over a card, and a form that appears
+   * where they already are reads as part of the request rather than as somewhere else that has to be
+   * trusted. The client secret is what the browser mounts; the secret key stays here.
+   *
+   * `redirect_on_completion: 'if_required'` keeps the browser in place once it is done, so the page
+   * can confirm the payment itself instead of relying on a return URL keeping its query string.
+   */
+  async createEmbeddedCheckout({ requestId, amount, currency, productName, description = null, returnUrl }) {
     if (!this.configured) {throw new Error('Payment is not configured');}
+    if (!Number.isInteger(Number(amount)) || Number(amount) <= 0) {
+      throw new Error('A positive amount in minor units is required');
+    }
+
+    const form = new URLSearchParams();
+    form.set('ui_mode', 'embedded');
+    form.set('mode', 'payment');
+    form.set('redirect_on_completion', 'if_required');
+    form.set('return_url', returnUrl);
+    form.set('client_reference_id', String(requestId));
+    form.set('metadata[request_id]', String(requestId));
+    form.set('line_items[0][quantity]', '1');
+    form.set('line_items[0][price_data][currency]', String(currency).toLowerCase());
+    form.set('line_items[0][price_data][unit_amount]', String(Number(amount)));
+    form.set(
+      'line_items[0][price_data][product_data][name]',
+      productName || 'Credential request',
+    );
+    if (description) {
+      form.set('line_items[0][price_data][product_data][description]', String(description).slice(0, 500));
+    }
+
+    const data = await this._call('/checkout/sessions', form);
+    if (!data.id || !data.client_secret) {
+      throw new Error('The payment provider returned no embedded checkout');
+    }
+
+    return {
+      sessionId: data.id,
+      clientSecret: data.client_secret,
+      amount: Number(data.amount_total ?? amount),
+      currency: String(data.currency || currency).toLowerCase(),
+    };
+  }
+
+  /** Look a session up. This is where a payment is confirmed from. */
+  async getSession(sessionId) {    if (!this.configured) {throw new Error('Payment is not configured');}
     const data = await this._call(`/checkout/sessions/${encodeURIComponent(sessionId)}`, null, 'GET');
     return {
       sessionId: data.id,
