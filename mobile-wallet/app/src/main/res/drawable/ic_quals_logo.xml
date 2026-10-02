@@ -11,29 +11,43 @@
         drift apart: change one, change the other.
     -->
 
-    <!-- The Q: a white ring. Two arcs, because a vector drawable has no ellipse element. -->
-    <path
-        android:fillColor="#00000000"
-        android:strokeColor="#FFFFFF"
-        android:strokeWidth="8.5"
-        android:pathData="M16.5,26 a13.5,18 0 1,0 27,0 a13.5,18 0 1,0 -27,0" />
+    <!--
+        The artwork is centred in its own box before anything else places it.
 
-    <!-- The tail, swinging out of the bowl. -->
-    <path
-        android:fillColor="#00000000"
-        android:strokeColor="#C9A227"
-        android:strokeWidth="5.4"
-        android:strokeLineCap="round"
-        android:pathData="M23.5,37 C31,43 37,37.5 44,43 C48,46.5 50,49 51.5,51.5" />
+        The Q sits up and to the left of the 64 grid while the hand reaches down and to the right, so
+        the drawing leaned about five units right and two down of centre. Centring the box, which is
+        what every layout does, therefore did not centre the mark - it looked shoved off to one side.
+        The group below moves the drawing's own bounding box to the middle, leaving equal margins.
+    -->
+    <group
+        android:scaleX="0.9642"
+        android:scaleY="0.9642"
+        android:translateX="-3.51"
+        android:translateY="-0.61">
+        <!-- The Q: a white ring. Two arcs, because a vector drawable has no ellipse element. -->
+        <path
+            android:fillColor="#00000000"
+            android:strokeColor="#FFFFFF"
+            android:strokeWidth="8.5"
+            android:pathData="M16.5,26 a13.5,18 0 1,0 27,0 a13.5,18 0 1,0 -27,0" />
 
-    <!-- The palm, and four fingers below it. -->
-    <path
-        android:fillColor="#C9A227"
-        android:pathData="M48.6,51.5 a2.9,2.9 0 1,0 5.8,0 a2.9,2.9 0 1,0 -5.8,0" />
-    <path
-        android:fillColor="#00000000"
-        android:strokeColor="#C9A227"
-        android:strokeWidth="2.8"
-        android:strokeLineCap="round"
-        android:pathData="M51.5,51.5 L44.5,60.5 M51.5,51.5 L50.5,62.5 M51.5,51.5 L56,61.5 M51.5,51.5 L60,57" />
+        <!-- The tail, swinging out of the bowl. -->
+        <path
+            android:fillColor="#00000000"
+            android:strokeColor="#C9A227"
+            android:strokeWidth="5.4"
+            android:strokeLineCap="round"
+            android:pathData="M23.5,37 C31,43 37,37.5 44,43 C48,46.5 50,49 51.5,51.5" />
+
+        <!-- The palm, and four fingers below it. -->
+        <path
+            android:fillColor="#C9A227"
+            android:pathData="M48.6,51.5 a2.9,2.9 0 1,0 5.8,0 a2.9,2.9 0 1,0 -5.8,0" />
+        <path
+            android:fillColor="#00000000"
+            android:strokeColor="#C9A227"
+            android:strokeWidth="2.8"
+            android:strokeLineCap="round"
+            android:pathData="M51.5,51.5 L44.5,60.5 M51.5,51.5 L50.5,62.5 M51.5,51.5 L56,61.5 M51.5,51.5 L60,57" />
+    </group>
 </vector>

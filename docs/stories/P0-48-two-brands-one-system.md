@@ -69,9 +69,19 @@ whose tail is a hand, in gold. The site serves it as `quals-mark.svg`, the porta
 the app carries the same geometry as a vector drawable in place of the raster logo it used to load — so
 the mark is readable and redrawable from the repository rather than a binary nobody can edit.
 
+The supplied artwork leans in the grid it was drawn on: its ink sits about 4.8 units right and 1.8
+down of the 64×64 box centre. Every surface centres the box rather than the ink, which is why the mark
+looked off-centre on the phone while the layout was already correct. The correction is now in the
+drawing — one wrapping group per copy, five in total, with the launcher nesting it inside the group
+that scales the mark into the adaptive icon's safe zone — so the app, the header, the tab icon and the
+home screen agree without each layout growing a nudge of its own. The launcher's outer scale was
+retuned from 1.19 to 1.207 so the wrap's 0.9642 leaves the mark the same size on the home screen.
+
 ## Verification
 
 - `npx next build` clean in all three apps.
 - The deployed stylesheet is grepped for each site's brand token and the served HTML for the new copy,
   so a palette that failed to deploy is caught rather than assumed.
+- The centring was confirmed by eye, in bordered boxes at three sizes, and the app's copy was read back
+  out of the built APK rather than trusted from the source, because the device installs the APK.
 - Handoff note: `docs/ui-development/two-brand-design-system-ui-implementation.md`.

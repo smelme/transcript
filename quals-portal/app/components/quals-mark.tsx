@@ -20,22 +20,26 @@ export default function QualsMark({ size = 30 }: { size?: number }) {
       role="img"
       aria-label="Quals"
     >
-      <ellipse cx="30" cy="26" rx="13.5" ry="18" fill="none" stroke="currentColor" strokeWidth={8.5} />
-      <path
-        d="M23.5 37 C31 43 37 37.5 44 43 C48 46.5 50 49 51.5 51.5"
-        fill="none"
-        stroke="#c9a227"
-        strokeWidth={5.4}
-        strokeLinecap="round"
-      />
-      <circle cx="51.5" cy="51.5" r={2.9} fill="#c9a227" />
-      <path
-        d="M51.5 51.5 L44.5 60.5 M51.5 51.5 L50.5 62.5 M51.5 51.5 L56 61.5 M51.5 51.5 L60 57"
-        fill="none"
-        stroke="#c9a227"
-        strokeWidth={2.8}
-        strokeLinecap="round"
-      />
+      {/* The artwork centred in its own box: the Q sits up and to the left of the 64 grid while the
+          hand reaches down and to the right, so centring the box alone does not centre the mark. */}
+      <g transform="translate(-3.51 -0.61) scale(0.9642)">
+        <ellipse cx="30" cy="26" rx="13.5" ry="18" fill="none" stroke="currentColor" strokeWidth={8.5} />
+        <path
+          d="M23.5 37 C31 43 37 37.5 44 43 C48 46.5 50 49 51.5 51.5"
+          fill="none"
+          stroke="#c9a227"
+          strokeWidth={5.4}
+          strokeLinecap="round"
+        />
+        <circle cx="51.5" cy="51.5" r={2.9} fill="#c9a227" />
+        <path
+          d="M51.5 51.5 L44.5 60.5 M51.5 51.5 L50.5 62.5 M51.5 51.5 L56 61.5 M51.5 51.5 L60 57"
+          fill="none"
+          stroke="#c9a227"
+          strokeWidth={2.8}
+          strokeLinecap="round"
+        />
+      </g>
     </svg>
   );
 }

@@ -85,6 +85,16 @@ surface is black. The launcher icon supplies its own black, as an adaptive icon 
 logo and its five per-density launcher rasters are gone: minSdk is 26, so the vector foreground is what
 every device in support uses, and a raster cannot be redrawn by reading the repository.
 
+**The artwork leans in the grid it was drawn on** — its ink sits about 4.8 units right and 1.8 down of
+the 64×64 box centre — and every surface centres the box, not the ink, so the mark read as shifted on
+the phone while the layout was already correct. The correction belongs in the drawing rather than in a
+layout, because a per-surface nudge has to be repeated on every new surface and is wrong the moment
+the layout changes. All five copies therefore wrap the paths in a group that centres the ink:
+`translate(-3.51 -0.61) scale(0.9642)` as an SVG group, the equivalent `<group>` in the two drawables,
+and the launcher's foreground nests that wrap inside the group which scales the mark into the adaptive
+icon's safe zone. Its outer scale was retuned (1.19 → 1.207) so the home screen shows the same sized
+mark as before; the ink lands on the icon's centre line at 54 of 108.
+
 **Two golds, deliberately.** The logo's gold is `#c9a227` — the brass in the supplied artwork. The
 interaction gold (`--brand`) is `#ffc400`, which comes from the app's own theme and is what buttons,
 focus rings and links use. If they should be one colour, the logo's is the one to move, not the app's.
@@ -129,4 +139,7 @@ Every state was checked in the built output: loading, empty, error, success, and
 - `npx next build` clean in `quals-frontend`, `issuer-frontend` and `quals-portal`.
 - The deployed stylesheet is grepped for the brand token of each site, and the served HTML for the new
   copy, so a palette that silently failed to deploy is caught rather than assumed.
+- The centring was judged by rendering the served mark in bordered 200, 120 and 64 pixel boxes and
+  looking at the margins, because "centred" is not something a build can assert; the app's copy was
+  then read back out of the built APK with `aapt2 dump xmltree`, which is what the device installs.
 - Story P0-48 records what changed and why.
