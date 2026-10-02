@@ -441,7 +441,9 @@ hr {
   justify-content: center;
   padding: 6px;
   cursor: pointer;
-  color: var(--brand);
+  /* White rather than the brand: the toggle sits on the ink bar, and the brand purple is far too
+     dark to be seen against it. Yellow managed this by accident; purple does not. */
+  color: var(--on-ink);
 }
 
 .theme-toggle:hover {
