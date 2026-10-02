@@ -16,20 +16,6 @@
   --brand-soft: #fff8e1;
   --brand-ring: rgba(255, 196, 0, 0.28);
 
-  /*
-   * The wallet's second colour.
-   *
-   * The app is gold first and green second: gold is what it acts with, green is what it wears on its
-   * shield and what it marks a confirmed record with. The site carries the same pair in the same
-   * order, so a green tick means the same thing in both places. Without it the site was gold on grey,
-   * which was a brand the app did not have.
-   */
-  --brand-alt: #1b9c5b;
-  --brand-alt-dark: #0e6b3d;
-  --brand-alt-soft: #e2f7ec;
-
-  /* The app's black, which is very slightly green. Using a neutral black here would have left the
-     two products with blacks that almost match, which is worse than either. */
   --ink: #0b0f0c;
   --ink-soft: #171d19;
   --on-ink: #ffffff;
@@ -38,12 +24,11 @@
   --link: #0a0a0a;
   --link-rule: var(--brand);
 
-  /* Status colours are not brand colours: green means confirmed and red means refused on every site,
-     whichever institution is asking. Confirmed is the app's own green, so a record that has been
-     checked looks the same in the wallet as it does here. */
-  --ok: #0e6b3d;
-  --ok-soft: #e2f7ec;
-  --ok-ink: #0b3d24;
+  /* Status, not brand: green means confirmed and red means refused, whichever institution is asking.
+     Quals itself is black, gold and white, so this green appears on a badge and nowhere else. */
+  --ok: #146c2e;
+  --ok-soft: #eaf7ee;
+  --ok-ink: #0f4f23;
   --warn: #8a5a00;
   --err: #b42318;
   --err-soft: #fdecea;
@@ -71,40 +56,53 @@
   --maxw: 1080px;
 }
 
+/*
+ * The Quals brand is the dark set, and the layout puts `data-theme="dark"` on the page.
+ *
+ * The app is black with gold and white: its window background is pure black, its mark is a white Q
+ * with a gold tail, and gold is the colour it acts with - cursors, focus, buttons, links. A white site
+ * with gold accents is the inverse of that, which is why the two never looked like one product.
+ *
+ * Green is not here at all. The app has it only as an untouched Material slot, which is a slot rather
+ * than a brand; what is left of green is the status colour below.
+ */
 [data-theme="dark"] {
   --brand: #ffc400;
   --brand-light: #ffd83d;
   --brand-dark: #d9a300;
   --brand-soft: #2a2411;
   --brand-ring: rgba(255, 196, 0, 0.32);
-  --brand-alt: #5bd496;
-  --brand-alt-dark: #1b9c5b;
-  --brand-alt-soft: #123f2a;
+
   --ink: #000000;
-  --ink-soft: #101612;
-  --on-ink: #fafafa;
-  --link: #fafafa;
+  --ink-soft: #101014;
+  --on-ink: #ffffff;
+  --link: #ffffff;
   --link-rule: var(--brand);
-  --ok: #5bd496;
-  --ok-soft: #123f2a;
+
+  --ok: #7ee2a8;
+  --ok-soft: #10251a;
   --ok-ink: #a7e0b8;
   --warn: #f0c46a;
   --err: #f3b8bc;
   --err-soft: #2a1416;
   --err-ink: #f3b8bc;
-  --border: #2a2a2d;
-  --border-strong: #3a3a3f;
-  --bg: #0b0b0c;
-  --bg-soft: #151517;
-  --surface: #131315;
-  --text: #f7f7f8;
-  --muted: #a1a1aa;
-  --on-brand: #0a0a0a;
+
+  --border: #26262b;
+  --border-strong: #3a3a41;
+  /* Pure black, because that is the colour the app opens on. */
+  --bg: #000000;
+  --bg-soft: #0f0f11;
+  --surface: #0b0f0c;
+  --text: #ffffff;
+  --muted: #a1a1a6;
+  --on-brand: #000000;
+
   --hero-from: #000000;
-  --hero-to: #141416;
-  --hero-glow: rgba(255, 196, 0, 0.16);
-  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.5);
-  --shadow: 0 1px 3px rgba(0, 0, 0, 0.5), 0 10px 30px rgba(0, 0, 0, 0.45);
+  --hero-to: #0b0f0c;
+  --hero-glow: rgba(255, 196, 0, 0.14);
+
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.6);
+  --shadow: 0 1px 3px rgba(0, 0, 0, 0.6), 0 10px 30px rgba(0, 0, 0, 0.5);
 }
 
 * {
@@ -290,6 +288,12 @@ textarea {
   resize: vertical;
   font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
   font-size: 12px;
+}
+
+/* A browser draws a placeholder in its own grey, which is unreadable on a black field. */
+::placeholder {
+  color: var(--muted);
+  opacity: 1;
 }
 
 button {
@@ -756,7 +760,9 @@ hr {
 .checkbox {
   width: 20px;
   height: 20px;
-  accent-color: var(--ink);
+  /* Gold rather than ink: the brand is the dark set, and a black tick on a black page is a tick
+     nobody can see. It reads on the light set too. */
+  accent-color: var(--brand);
   margin-top: 2px;
   flex: 0 0 auto;
 }

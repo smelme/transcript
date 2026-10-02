@@ -8,7 +8,8 @@ export const metadata = {
 
 export default function RootLayout({ children }: { children: ReactNode }) {
   return (
-    <html lang="en">
+    // The brand is the dark set: the app opens on black with gold and white, so the site does too.
+    <html lang="en" data-theme="dark">
       <body>
         <main className="container-narrow">{children}</main>
       </body>

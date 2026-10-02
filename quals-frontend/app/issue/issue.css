@@ -120,7 +120,7 @@
   flex: 0 0 auto;
   width: 18px;
   height: 18px;
-  accent-color: var(--ink);
+  accent-color: var(--brand);
 }
 
 .issue-eyebrow {

@@ -1,10 +1,20 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="Quals">
   <!--
-    The browser tab and home-screen icon: the wallet's launcher icon, which is the same shield on a
-    black field. A tab is small and sits among other tabs, so the mark gets the tile there exactly as
-    the app gives it one.
+    The browser tab icon: the app's launcher icon, which is this Q on a black field - the app's own
+    window background colour. A tab is small and sits among other tabs, so the mark gets the field
+    there exactly as the app gives it one.
   -->
-  <rect width="64" height="64" rx="14" fill="#0b0f0c" />
-  <path fill="#1b9c5b" d="M32 8 L53 15 L53 29 C53 45 44 53 32 57 C20 53 11 45 11 29 L11 15 Z" />
-  <path fill="#ffffff" d="M26 31 L30 35 L38 25 L41 28 L30 40 L23 33 Z" />
+  <rect width="64" height="64" rx="14" fill="#000000" />
+  <g transform="translate(32 32) scale(0.62) translate(-32 -32)">
+    <circle cx="31" cy="28" r="17" fill="none" stroke="#ffffff" stroke-width="8.5" />
+    <rect
+      x="33"
+      y="38"
+      width="26"
+      height="9"
+      rx="4.5"
+      transform="rotate(45 46 42.5)"
+      fill="#ffc400"
+    />
+  </g>
 </svg>

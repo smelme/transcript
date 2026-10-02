@@ -167,10 +167,7 @@
 .req-choice input {
   width: 18px;
   height: 18px;
-  accent-color: var(--ink);
-  flex: 0 0 auto;
-}
-
+      accent-color: var(--brand);
 /* ── Steps ─────────────────────────────────────────────────────────────── */
 
 .req-list {
@@ -278,11 +275,7 @@
   width: 18px;
   height: 18px;
   flex: 0 0 auto;
-  accent-color: var(--ink);
-}
-
-.req-actions {
-  display: flex;
+      accent-color: var(--brand);
   flex-wrap: wrap;
   align-items: center;
   gap: 12px;

@@ -23,9 +23,8 @@
   --border: #e5e5e7;
   --border-strong: #d2d2d6;
 
-/* The wallet's green, so a confirmed record is the same colour in the app, the site and here. */
-  --ok: #0e6b3d;
-  --ok-bg: #e2f7ec;
+  --ok: #146c2e;
+  --ok-bg: #eaf7ee;
   --warn: #8a5a00;
   --warn-bg: #fff6e5;
   --err: #b42318;
